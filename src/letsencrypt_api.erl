@@ -1,11 +1,11 @@
 %% Copyright 2015-2020 Guillaume Bour
-%% 
+%%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
 %% You may obtain a copy of the License at
-%% 
+%%
 %% http://www.apache.org/licenses/LICENSE-2.0
-%% 
+%%
 %% Unless required by applicable law or agreed to in writing, software
 %% distributed under the License is distributed on an "AS IS" BASIS,
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,17 +22,17 @@
 
 
 -ifdef(TEST).
-    -define(STAGING_API_URL, <<"https://127.0.0.1:14000/dir">>).
-    -define(DEFAULT_API_URL, <<"">>).
+	-define(STAGING_API_URL, <<"https://127.0.0.1:14000/dir">>).
+	-define(DEFAULT_API_URL, <<"">>).
 -else.
 	-define(STAGING_API_URL, <<"https://acme-staging-v02.api.letsencrypt.org/directory">>).
 	-define(DEFAULT_API_URL, <<"https://acme-v02.api.letsencrypt.org/directory">>).
 -endif.
 
 -ifdef(DEBUG).
-    -define(debug(Fmt, Args), io:format(Fmt, Args)).
+	-define(debug(Fmt, Args), io:format(Fmt, Args)).
 -else.
-    -define(debug(Fmt, Args), ok).
+	-define(debug(Fmt, Args), ok).
 -endif.
 
 -spec status(binary()) -> atom().
@@ -42,8 +42,8 @@ status(<<"valid">>)      -> valid;
 status(<<"invalid">>)    -> invalid;
 status(<<"revoked">>)    -> revoked;
 status(_Status)       ->
-    io:format("unknown status: ~p~n", [_Status]),
-    unknown.
+	io:format("unknown status: ~p~n", [_Status]),
+	unknown.
 
 %% PRIVATE
 
@@ -97,7 +97,7 @@ decode(_, Response) ->
 %	{error, invalid_method}               :: Method MUST be either 'get' or 'post'
 %   {error, term()}                       :: query failed
 %
-% TODO: is 'application/jose+json' content type always required ?
+% TODO: is 'application/jose+json' content type always required?
 %       (check acme documentation)
 -spec request(get|post, string()|binary(), map(), nil|binary(), map()) ->
 	shotgun:result()|{error, invalid_method}.
@@ -178,13 +178,13 @@ nonce(#{<<"newNonce">> := Uri}, Opts) ->
 %
 -spec account(map(), binary(), map(), map()) -> {ok, map(), binary(), binary()}.
 account(#{<<"newAccount">> := Uri}, Key, Jws, Opts) ->
-    Payload = #{
+	Payload = #{
 		termsOfServiceAgreed => true,
 		contact              => []
-    },
-    Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, Payload),
+	},
+	Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, Payload),
 
-    {ok, #{
+	{ok, #{
 	   json     := Resp,
 	   location := Location,
 	   nonce    := Nonce
@@ -213,9 +213,9 @@ order(#{<<"newOrder">> := Uri}, Domain, Key, Jws, Opts) ->
 			value => Domain
 		 }]
 	},
-    Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, Payload),
+	Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, Payload),
 
-    {ok, #{
+	{ok, #{
 		json     := Resp,
 		location := Location,
 		nonce    := Nonce
@@ -227,16 +227,16 @@ order(#{<<"newOrder">> := Uri}, Domain, Key, Jws, Opts) ->
 % Get order state.
 %
 order(Uri, Key, Jws, Opts) ->
-    % POST-as-GET = no payload
-    Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, empty),
+	% POST-as-GET = no payload
+	Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, empty),
 
-    {ok, #{
-        json     := Resp,
-        location := Location,
-        nonce    := Nonce
-    }} = request(post, Uri, #{}, Req, Opts#{json=> true}),
+	{ok, #{
+		json     := Resp,
+		location := Location,
+		nonce    := Nonce
+	}} = request(post, Uri, #{}, Req, Opts#{json=> true}),
 
-    {ok, Resp, Location, Nonce}.
+	{ok, Resp, Location, Nonce}.
 
 % authorization(Uri, Key, Jws, Opts)
 %
@@ -253,9 +253,9 @@ order(Uri, Key, Jws, Opts) ->
 -spec authorization(binary(), binary(), map(), map()) -> {ok, map(), binary(), binary()}.
 authorization(Uri, Key, Jws, Opts) ->
 	% POST-as-GET = no payload
-    Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, empty),
+	Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, empty),
 
-    {ok, #{
+	{ok, #{
 		json     := Resp,
 		location := Location,
 		nonce    := Nonce
@@ -276,9 +276,9 @@ authorization(Uri, Key, Jws, Opts) ->
 -spec challenge(map(), binary(), map(), map()) -> {ok, map(), binary(), binary()}.
 challenge(#{<<"url">> := Uri}, Key, Jws, Opts) ->
 	% POST-as-GET = no payload
-    Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, #{}),
+	Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, #{}),
 
-    {ok, #{
+	{ok, #{
 	   json     := Resp,
 	   location := Location,
 	   nonce    := Nonce
@@ -296,12 +296,12 @@ challenge(#{<<"url">> := Uri}, Key, Jws, Opts) ->
 -spec finalize(map(), binary(), letsencrypt:ssl_privatekey(), map(), map()) -> {ok, map(), binary(), binary()}.
 finalize(#{<<"finalize">> := Uri}, Csr, Key, Jws, Opts) ->
 	Payload = #{
-	    csr => Csr
+		csr => Csr
 	},
 
-    Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, Payload),
+	Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, Payload),
 
-    {ok, #{
+	{ok, #{
 	   json     := Resp,
 	   location := Location,
 	   nonce    := Nonce
@@ -319,10 +319,9 @@ finalize(#{<<"finalize">> := Uri}, Csr, Key, Jws, Opts) ->
 -spec certificate(map(), letsencrypt:ssl_privatekey(), map(), map()) -> {ok, binary()}.
 certificate(#{<<"certificate">> := Uri}, Key, Jws, Opts) ->
 	% POST-as-GET = no payload
-    Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, empty),
+	Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, empty),
 
-    {ok, #{
+	{ok, #{
 	   body := Cert
 	}} = request(post, Uri, #{}, Req, Opts),
 	{ok, Cert}.
-
