@@ -1,11 +1,11 @@
 %% Copyright 2015-2020 Guillaume Bour
-%% 
+%%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
 %% You may obtain a copy of the License at
-%% 
+%%
 %% http://www.apache.org/licenses/LICENSE-2.0
-%% 
+%%
 %% Unless required by applicable law or agreed to in writing, software
 %% distributed under the License is distributed on an "AS IS" BASIS,
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,7 +17,8 @@
 -behaviour(gen_fsm).
 
 -export([make_cert/2, make_cert_bg/2, get_challenge/0]).
--export([start/1, stop/0, init/1, handle_event/3, handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
+-export([start/1, stop/0, init/1, handle_event/3, handle_sync_event/4,
+		 handle_info/3, terminate/3, code_change/4]).
 -export([idle/3, pending/3, valid/3, finalize/3]).
 
 -import(letsencrypt_utils, [bin/1, str/1]).
@@ -28,8 +29,13 @@
 % NOTE: currently only support 'http-01' challenge.
 -type challenge_type() :: 'http-01'.
 -type nonce()          :: binary().
--type jws()            :: #{'alg' => 'RS256', 'jwk' => map(), nonce => undefined|letsencrypt:nonce() }.
--type ssl_privatekey() :: #{'raw' => crypto:rsa_private(), 'b64' => {binary(), binary()}, 'file' => string()}.
+
+-type jws()            :: #{'alg' => 'RS256',
+							'jwk' => map(),
+							nonce => undefined|letsencrypt:nonce() }.
+
+-type ssl_privatekey() :: #{'raw' => crypto:rsa_private(),
+							'b64' => {binary(), binary()}, 'file' => string()}.
 
 
 -define(WEBROOT_CHALLENGE_PATH, <<"/.well-known/acme-challenge">>).
@@ -40,23 +46,23 @@
 	% acme directory (map operation -> uri)
 	directory = undefined           :: undefined | map(),
 %    acme_srv = ?DEFAULT_API_URL     :: uri() | string(),
-    key_file  = undefined           :: undefined | string(),
-    cert_path = "/tmp"              :: string(),
+	key_file  = undefined           :: undefined | string(),
+	cert_path = "/tmp"              :: string(),
 
-    mode = undefined                :: undefined | mode(),
-    % mode = webroot
-    webroot_path = undefined        :: undefined | string(),
-    % mode = standalone
-    port = 80                       :: integer(),
+	mode = undefined                :: undefined | mode(),
+	% mode = webroot
+	webroot_path = undefined        :: undefined | string(),
+	% mode = standalone
+	port = 80                       :: integer(),
 
-    intermediate_cert = undefined   :: undefined | binary(),
+	intermediate_cert = undefined   :: undefined | binary(),
 
-    % state datas
-    nonce = undefined               :: undefined | nonce(),
-    domain = undefined              :: undefined | binary(),
-    sans  = []                      :: list(string()),
-    key   = undefined               :: undefined | ssl_privatekey(),
-    jws   = undefined               :: undefined | jws(),
+	% state datas
+	nonce = undefined               :: undefined | nonce(),
+	domain = undefined              :: undefined | binary(),
+	sans  = []                      :: list(string()),
+	key   = undefined               :: undefined | ssl_privatekey(),
+	jws   = undefined               :: undefined | jws(),
 
 	account_key = undefined,
 	order = undefined,
@@ -65,7 +71,7 @@
 	% certificate/csr key file
 	cert_key_file = undefined,
 
-    % api options
+	% api options
 	opts = #{netopts => #{timeout => 30000}} :: map()
 
 }).
@@ -78,10 +84,10 @@
 %
 % returns:
 %	{ok, Pid}
-%	
+%
 -spec start(list()) -> {'ok', pid}|{'error', {'already_started',pid()}}.
 start(Args) ->
-    gen_fsm:start_link({global, ?MODULE}, ?MODULE, Args, []).
+	gen_fsm:start_link({global, ?MODULE}, ?MODULE, Args, []).
 
 % stop().
 %
@@ -91,9 +97,9 @@ start(Args) ->
 %	'ok'
 -spec stop() -> 'ok'.
 stop() ->
-    %NOTE: maintain compatibility with 17.X versions
-    %gen_fsm:stop({global, ?MODULE})
-    gen_fsm:sync_send_all_state_event({global, ?MODULE}, stop).
+	%NOTE: maintain compatibility with 17.X versions
+	%gen_fsm:stop({global, ?MODULE})
+	gen_fsm:sync_send_all_state_event({global, ?MODULE}, stop).
 
 %% init(Args).
 %%
@@ -107,15 +113,15 @@ stop() ->
 -spec init(list( atom() | {atom(),any()} )) -> {ok, idle, state()}.
 init(Args) ->
 	State = setup_mode(
-	    getopts(Args, #state{})
+		getopts(Args, #state{})
 	),
-    %{Args2, State} = mode_opts(proplists:get_value(mode, Args), Args),
-    %State2 = getopts(Args2, State),
-    %io:format("state= ~p~n", [State2]),
+	%{Args2, State} = mode_opts(proplists:get_value(mode, Args), Args),
+	%State2 = getopts(Args2, State),
+	%io:format("state= ~p~n", [State2]),
 
-    % initialize key & jws
-    Key = letsencrypt_ssl:private_key(State#state.key_file, State#state.cert_path),
-    Jws = letsencrypt_jws:init(Key),
+	% initialize key & jws
+	Key = letsencrypt_ssl:private_key(State#state.key_file, State#state.cert_path),
+	Jws = letsencrypt_jws:init(Key),
 
 	% request directory
 	{ok, Directory} = letsencrypt_api:directory(State#state.env, State#state.opts),
@@ -123,7 +129,7 @@ init(Args) ->
 	% get first nonce
 	{ok, Nonce} = letsencrypt_api:nonce(Directory, State#state.opts),
 
-    {ok, idle, State#state{directory=Directory, key=Key, jws=Jws, nonce=Nonce}}.
+	{ok, idle, State#state{directory=Directory, key=Key, jws=Jws, nonce=Nonce}}.
 
 
 %%
@@ -142,53 +148,53 @@ init(Args) ->
 %				generated certificate filename
 %						  if false, immediately returns
 %			* callback: function executed when async = true once domain certificate
-%			            has been successfully generated
+%						has been successfully generated
 % returns:
 %	- 'async' if async is set (default)
-%	- {error, Err} if something goes bad 😈
+%	- {error, Err} if something goes bad
 %
 -spec make_cert(string()|binary(), map()) -> {'ok', #{cert => binary(), key => binary()}}|
-                                             {'error','invalid'}|
-                                             async.
+											 {'error','invalid'}|
+											 async.
 make_cert(Domain, Opts=#{async := false}) ->
-    make_cert_bg(Domain, Opts);
+	make_cert_bg(Domain, Opts);
 % default to async = true
 make_cert(Domain, Opts) ->
-    _Pid = erlang:spawn(?MODULE, make_cert_bg, [Domain, Opts#{async => true}]),
-    async.
+	_Pid = erlang:spawn(?MODULE, make_cert_bg, [Domain, Opts#{async => true}]),
+	async.
 
 -spec make_cert_bg(string()|binary(), map()) -> {'ok', map()}|{'error', 'invalid'}.
 make_cert_bg(Domain, Opts=#{async := Async}) ->
-    Ret = case gen_fsm:sync_send_event({global, ?MODULE}, {create, bin(Domain), Opts}, 15000) of
-        {error, Err} ->
-            io:format("error: ~p~n", [Err]),
-            {error, Err};
+	Ret = case gen_fsm:sync_send_event({global, ?MODULE}, {create, bin(Domain), Opts}, 15000) of
+		{error, Err} ->
+			io:format("error: ~p~n", [Err]),
+			{error, Err};
 
-        ok ->
-            case wait_valid(20) of
-                ok ->
-                    Status = gen_fsm:sync_send_event({global, ?MODULE}, finalize, 15000),
+		ok ->
+			case wait_valid(20) of
+				ok ->
+					Status = gen_fsm:sync_send_event({global, ?MODULE}, finalize, 15000),
 					case wait_finalized(Status, 20) of
-						{ok, Res} -> {ok, Res};
+						P={ok, _SomeRes} -> P;
 						Err -> Err
 					end;
 
-                Error ->
-                    gen_fsm:send_all_state_event({global, ?MODULE}, reset),
-                    Error
-            end
-    end,
+				Error ->
+					gen_fsm:send_all_state_event({global, ?MODULE}, reset),
+					Error
+			end
+	end,
 
-    case Async of
-        true ->
-            Callback = maps:get(callback, Opts, fun(_) -> ok end),
-            Callback(Ret);
+	case Async of
+		true ->
+			Callback = maps:get(callback, Opts, fun(_) -> ok end),
+			Callback(Ret);
 
-        _    ->
-            ok
-    end,
+		_    ->
+			ok
+	end,
 
-    Ret.
+	Ret.
 
 % get_challenge().
 %
@@ -200,15 +206,15 @@ make_cert_bg(Domain, Opts=#{async := Async}) ->
 %
 -spec get_challenge() -> error|map().
 get_challenge() ->
-    case catch gen_fsm:sync_send_event({global, ?MODULE}, get_challenge) of
-        % process not started, wrong state, ...
-        {'EXIT', _Exc} ->
-            %io:format("exc: ~p~n", [Exc]),
-            error;
+	case catch gen_fsm:sync_send_event({global, ?MODULE}, get_challenge) of
+		% process not started, wrong state, ...
+		{'EXIT', _Exc} ->
+			%io:format("exc: ~p~n", [Exc]),
+			error;
 
-        % challenge #{token => ..., thumbprint => ...}
-        C -> C
-    end.
+		% challenge #{token => ..., thumbprint => ...}
+		C -> C
+	end.
 
 
 %%
@@ -223,7 +229,7 @@ get_challenge() ->
 % idle(get_challenge) :: nothing done
 %
 idle(get_challenge, _, State) ->
-    {reply, no_challenge, idle, State};
+	{reply, no_challenge, idle, State};
 
 % idle({create, Domain, Opts}).
 %
@@ -239,14 +245,14 @@ idle(get_challenge, _, State) ->
 %
 idle({create, Domain, _Opts}, _, State=#state{directory=Dir, key=Key, jws=Jws,
 											  nonce=Nonce, opts=Opts}) ->
-    % 'http-01' or 'tls-sni-01'
+	% 'http-01' or 'tls-sni-01'
 	% TODO: validate type
-    ChallengeType = maps:get(challenge, Opts, 'http-01'),
+	ChallengeType = maps:get(challenge, Opts, 'http-01'),
 
-    %Conn  = get_conn(State),
-    %Nonce = get_nonce(Conn, State),
+	%Conn  = get_conn(State),
+	%Nonce = get_nonce(Conn, State),
 	%TODO: SANs
-    %SANs  = maps:get(san, Opts, []),
+	%SANs  = maps:get(san, Opts, []),
 
 	{ok, Accnt, Location, Nonce2} = letsencrypt_api:account(Dir, Key, Jws#{nonce => Nonce}, Opts),
 	AccntKey = maps:get(<<"key">>, Accnt),
@@ -261,20 +267,20 @@ idle({create, Domain, _Opts}, _, State=#state{directory=Dir, key=Key, jws=Jws,
 	% we need to keep trace of order location
 	Order2 = Order#{<<"location">> => OrderLocation},
 
-    %Nonce2    = letsencrypt_api:new_reg(Conn, BasePath, Key, JWS#{nonce => Nonce}),
-    %AuthzResp = authz([Domain|SANs], ChallengeType, State#state{conn=Conn, nonce=Nonce2}),
-    AuthUris = maps:get(<<"authorizations">>, Order),
-    AuthzResp = authz(ChallengeType, AuthUris, State#state{domain=Domain, jws=Jws2, account_key=AccntKey, nonce=Nonce3}),
-    {StateName, Reply, Challenges, Nonce5} = case AuthzResp of
-            {error, Err, Nonce3} ->
-                {idle, {error, Err}, nil, Nonce3};
+	%Nonce2    = letsencrypt_api:new_reg(Conn, BasePath, Key, JWS#{nonce => Nonce}),
+	%AuthzResp = authz([Domain|SANs], ChallengeType, State#state{conn=Conn, nonce=Nonce2}),
+	AuthUris = maps:get(<<"authorizations">>, Order),
+	AuthzResp = authz(ChallengeType, AuthUris, State#state{domain=Domain, jws=Jws2, account_key=AccntKey, nonce=Nonce3}),
+	{StateName, Reply, Challenges, Nonce5} = case AuthzResp of
+			{error, Err, Nonce3} ->
+				{idle, {error, Err}, nil, Nonce3};
 
-            {ok, Xchallenges, Nonce4} ->
-                {pending, ok, Xchallenges, Nonce4}
-    end,
+			{ok, Xchallenges, Nonce4} ->
+				{pending, ok, Xchallenges, Nonce4}
+	end,
 
-    {reply, Reply, StateName, 
-     State#state{domain=Domain, jws=Jws2, nonce=Nonce5, order=Order2, challenges=Challenges, sans=[], account_key=AccntKey}}.
+	{reply, Reply, StateName,
+	 State#state{domain=Domain, jws=Jws2, nonce=Nonce5, order=Order2, challenges=Challenges, sans=[], account_key=AccntKey}}.
 
 
 % state 'pending'
@@ -311,28 +317,28 @@ pending(get_challenge, _, State=#state{account_key=AccntKey, challenges=Challeng
 %      'expired' and 'revoked'
 %
 pending(_Action, _, State=#state{order=#{<<"authorizations">> := Authzs}, nonce=Nonce, key=Key, jws=Jws, opts=Opts}) ->
-    % checking status for each authorization
-    {StateName, Nonce2} = lists:foldl(fun(AuthzUri, {Status, InNonce}) ->
+	% checking status for each authorization
+	{StateName, Nonce2} = lists:foldl(fun(AuthzUri, {Status, InNonce}) ->
 		{ok, Authz, _, OutNonce} = letsencrypt_api:authorization(AuthzUri, Key, Jws#{nonce => InNonce}, Opts),
 
 		Status2 = maps:get(<<"status">>, Authz),
-        %{Status2, Msg2} = letsencrypt_api:challenge(Challengestatus, Conn, UriPath),
-        %io:format("~p: ~p (~p)~n", [_K, Status2, Msg2]),
+		%{Status2, Msg2} = letsencrypt_api:challenge(Challengestatus, Conn, UriPath),
+		%io:format("~p: ~p (~p)~n", [_K, Status2, Msg2]),
 
-        Ret = case {Status, Status2} of
-            {valid  ,   <<"valid">>} -> valid;
-            {pending,             _} -> pending;
-            {_      , <<"pending">>} -> pending;
+		Ret = case {Status, Status2} of
+			{valid  ,   <<"valid">>} -> valid;
+			{pending,             _} -> pending;
+			{_      , <<"pending">>} -> pending;
 			%TODO: we must not let that openbar :)
-            {valid  ,       Status2} -> Status2;
-            {Status ,             _} -> Status
-        end,
+			{valid  ,       Status2} -> Status2;
+			{Status ,             _} -> Status
+		end,
 		{Ret, OutNonce}
-    end, {valid, Nonce}, Authzs),
+	end, {valid, Nonce}, Authzs),
 
-    %io:format(":: challenge state -> ~p~n", [Reply]),
+	%io:format(":: challenge state -> ~p~n", [Reply]),
 	% reply w/ StateName
-    {reply, StateName, StateName, State#state{nonce=Nonce2}}.
+	{reply, StateName, StateName, State#state{nonce=Nonce2}}.
 
 % state 'valid'
 %
@@ -347,7 +353,7 @@ pending(_Action, _, State=#state{order=#{<<"authorizations">> := Authzs}, nonce=
 valid(_, _, State=#state{mode=Mode, domain=Domain, sans=SANs, cert_path=CertPath,
 						 order=Order, key=Key, jws=Jws, nonce=Nonce, opts=Opts}) ->
 
-    challenge_destroy(Mode, State),
+	challenge_destroy(Mode, State),
 
 	%NOTE: keyfile is required for csr generation
 	#{file := KeyFile} = letsencrypt_ssl:private_key({new, str(Domain) ++ ".key"}, CertPath),
@@ -357,7 +363,7 @@ valid(_, _, State=#state{mode=Mode, domain=Domain, sans=SANs, cert_path=CertPath
 
 	{reply, status(maps:get(<<"status">>, FinOrder, nil)), finalize,
 	 State#state{order=FinOrder#{<<"location">> => maps:get(<<"location">>, Order)},
-	             cert_key_file=KeyFile, nonce=Nonce2}}.
+				 cert_key_file=KeyFile, nonce=Nonce2}}.
 
 % state 'finalize'
 %
@@ -393,8 +399,8 @@ finalize(processing, _, State=#state{order=Order, key=Key, jws=Jws, nonce=Nonce,
 % transition:
 %   state 'idle' : fsm complete, going back to initial state
 finalize(valid, _, State=#state{order=Order, domain=Domain, cert_key_file=KeyFile,
-                                cert_path=CertPath, key=Key, jws=Jws, nonce=Nonce,
-                                opts=Opts}) ->
+								cert_path=CertPath, key=Key, jws=Jws, nonce=Nonce,
+								opts=Opts}) ->
 	% download certificate
 	{ok, Cert} = letsencrypt_api:certificate(Order, Key, Jws#{nonce => Nonce}, Opts),
 	CertFile   = letsencrypt_ssl:certificate(str(Domain), Cert, CertPath),
@@ -417,28 +423,28 @@ finalize(Status, _, State) ->
 
 
 handle_event(reset, _StateName, State=#state{mode=Mode}) ->
-    %io:format("reset from ~p state~n", [StateName]),
-    challenge_destroy(Mode, State),
-    {next_state, idle, State};
+	%io:format("reset from ~p state~n", [StateName]),
+	challenge_destroy(Mode, State),
+	{next_state, idle, State};
 
 handle_event(_, StateName, State) ->
-    io:format("async evt: ~p~n", [StateName]),
-    {next_state, StateName, State}.
+	io:format("async evt: ~p~n", [StateName]),
+	{next_state, StateName, State}.
 
 handle_sync_event(stop,_,_,_) ->
-    {stop, normal, ok, #state{}};
+	{stop, normal, ok, #state{}};
 handle_sync_event(_,_, StateName, State) ->
-    io:format("sync evt: ~p~n", [StateName]),
-    {reply, ok, StateName, State}.
+	io:format("sync evt: ~p~n", [StateName]),
+	{reply, ok, StateName, State}.
 
 handle_info(_, StateName, State) ->
-    {next_state, StateName, State}.
+	{next_state, StateName, State}.
 
 terminate(_,_,_) ->
-    ok.
+	ok.
 
 code_change(_, StateName, State, _) ->
-    {ok, StateName, State}.
+	{ok, StateName, State}.
 
 
 %%
@@ -466,53 +472,53 @@ code_change(_, StateName, State, _) ->
 %
 -spec getopts(list(atom()|{atom(),any()}), state()) -> state().
 getopts([], State) ->
-    State;
+	State;
 getopts([staging|Args], State) ->
-    getopts(
-        Args,
-        State#state{env = staging}
-    );
+	getopts(
+		Args,
+		State#state{env = staging}
+	);
 getopts([{mode, Mode}|Args], State) ->
 	getopts(
-	    Args,
+		Args,
 		State#state{mode=Mode}
 	);
 getopts([{key_file, KeyFile}|Args], State) ->
-    getopts(
-        Args,
-        State#state{key_file = KeyFile}
-    );
+	getopts(
+		Args,
+		State#state{key_file = KeyFile}
+	);
 getopts([{cert_path, Path}|Args], State) ->
-    getopts(
-        Args,
-        State#state{cert_path = Path}
-    );
+	getopts(
+		Args,
+		State#state{cert_path = Path}
+	);
 getopts([{webroot_path, Path}|Args], State) ->
-    getopts(
-        Args,
-        State#state{webroot_path = Path}
-    );
+	getopts(
+		Args,
+		State#state{webroot_path = Path}
+	);
 getopts([{port, Port}|Args], State) ->
-    getopts(
-        Args,
-        State#state{port = Port}
-    );
+	getopts(
+		Args,
+		State#state{port = Port}
+	);
 % for compatibility. Will be removed in future release
 getopts([{connect_timeout, Timeout}|Args], State) ->
 	io:format("'connect_timeout' option is deprecated. Please use 'http_timeout' instead~n", []),
-    getopts(
-        Args,
-        State#state{opts = #{netopts => #{timeout => Timeout}}}
-     );
+	getopts(
+		Args,
+		State#state{opts = #{netopts => #{timeout => Timeout}}}
+	 );
 getopts([{http_timeout, Timeout}|Args], State) ->
-    getopts(
-        Args,
-        State#state{opts = #{netopts => #{timeout => Timeout}}}
-     );
+	getopts(
+		Args,
+		State#state{opts = #{netopts => #{timeout => Timeout}}}
+	 );
 getopts([Unk|_], _) ->
-    io:format("unknow parameter: ~p~n", [Unk]),
-    %throw({badarg, io_lib:format("unknown ~p parameter", [Unk])}).
-    throw(badarg).
+	io:format("unknow parameter: ~p~n", [Unk]),
+	%throw({badarg, io_lib:format("unknown ~p parameter", [Unk])}).
+	throw(badarg).
 
 % setup_mode(State).
 %
@@ -530,10 +536,10 @@ setup_mode(#state{mode=webroot, webroot_path=undefined}) ->
 	io:format("missing 'webroot_path' parameter", []),
 	throw(misarg);
 setup_mode(State=#state{mode=webroot, webroot_path=Path}) ->
-    %TODO: check directory is writeable
+	%TODO: check directory is writeable
 	%TODO: handle errors
 	%TODO: protect against injections ?
-    os:cmd(string:join(["mkdir -p '", Path, str(?WEBROOT_CHALLENGE_PATH), "'"], "")),
+	os:cmd(string:join(["mkdir -p '", Path, str(?WEBROOT_CHALLENGE_PATH), "'"], "")),
 	State;
 setup_mode(State=#state{mode=standalone, port=_Port}) ->
 	%TODO: checking port is unused ?
@@ -557,19 +563,19 @@ setup_mode(#state{mode=Mode}) ->
 %
 -spec wait_valid(0..10) -> ok|{error, any()}.
 wait_valid(X) ->
-    wait_valid(X,X).
+	wait_valid(X,X).
 
 -spec wait_valid(0..10, 0..10) -> ok|{error, any()}.
 wait_valid(0,_) ->
-    {error, timeout};
+	{error, timeout};
 wait_valid(Cnt,Max) ->
-    case gen_fsm:sync_send_event({global, ?MODULE}, check, 15000) of
-        valid   -> ok;
-        pending ->
-            timer:sleep(500*(Max-Cnt+1)),
-            wait_valid(Cnt-1,Max);
-        {_      , Err} -> {error, Err}
-    end.
+	case gen_fsm:sync_send_event({global, ?MODULE}, check, 15000) of
+		valid   -> ok;
+		pending ->
+			timer:sleep(500*(Max-Cnt+1)),
+			wait_valid(Cnt-1,Max);
+		{_      , Err} -> {error, Err}
+	end.
 
 % wait_finalized(X).
 %
@@ -583,23 +589,23 @@ wait_valid(Cnt,Max) ->
 %
 -spec wait_finalized(atom(), 0..10) -> {ok, map()}|{error, timeout|any()}.
 wait_finalized(Status, X) ->
-    wait_finalized(Status,X,X).
+	wait_finalized(Status,X,X).
 
 -spec wait_finalized(atom(), 0..10, 0..10) -> {ok, map()}|{error, timeout|any()}.
 wait_finalized(_, 0,_) ->
-    {error, timeout};
+	{error, timeout};
 wait_finalized(Status, Cnt,Max) ->
-    case gen_fsm:sync_send_event({global, ?MODULE}, Status, 15000) of
-        {ok, Res}   -> {ok, Res};
-        valid ->
-            timer:sleep(500*(Max-Cnt+1)),
-            wait_finalized(valid, Cnt-1,Max);
-        processing  ->
-            timer:sleep(500*(Max-Cnt+1)),
-            wait_finalized(processing, Cnt-1,Max);
-        {_      , Err} -> {error, Err};
-        Any -> Any
-    end.
+	case gen_fsm:sync_send_event({global, ?MODULE}, Status, 15000) of
+		{ok, Res}   -> {ok, Res};
+		valid ->
+			timer:sleep(500*(Max-Cnt+1)),
+			wait_finalized(valid, Cnt-1,Max);
+		processing  ->
+			timer:sleep(500*(Max-Cnt+1)),
+			wait_finalized(processing, Cnt-1,Max);
+		{_      , Err} -> {error, Err};
+		Any -> Any
+	end.
 
 % authz(ChallenteType, AuthzUris, State).
 %
@@ -609,24 +615,24 @@ wait_finalized(Status, Cnt,Max) ->
 %	{ok, Challenges, Nonce}
 %	{error, Error, Nonce}
 %
--spec authz(challenge_type(), list(binary()), state()) -> {error, uncatched|binary(), nonce()}|
-                                                          {ok, map(), nonce()}.
+-spec authz(challenge_type(), list(binary()), state()) -> {error, uncaught|binary(), nonce()}|
+														  {ok, map(), nonce()}.
 authz(ChallengeType, AuthzUris, State=#state{mode=Mode}) ->
-    case authz_step1(AuthzUris, ChallengeType, State, #{}) of
-        {error, Err, Nonce} ->
-            {error, Err, Nonce};
+	case authz_step1(AuthzUris, ChallengeType, State, #{}) of
+		T={error, _Err, _Nonce} ->
+			T;
 
-        {ok, Challenges, Nonce2} ->
-            %io:format("challenges: ~p ~p~n", [Challenges, Domain]),
-            challenge_init(Mode, State, ChallengeType, Challenges),
+		{ok, Challenges, Nonce2} ->
+			%io:format("challenges: ~p ~p~n", [Challenges, Domain]),
+			challenge_init(Mode, State, ChallengeType, Challenges),
 
-            case authz_step2(maps:to_list(Challenges), State#state{nonce=Nonce2}) of
-                {ok, Nonce3} ->
-                    {ok, Challenges, Nonce3};
-                Err ->
-                    Err
-            end
-    end.
+			case authz_step2(maps:to_list(Challenges), State#state{nonce=Nonce2}) of
+				{ok, Nonce3} ->
+					{ok, Challenges, Nonce3};
+				Err ->
+					Err
+			end
+	end.
 
 % authz_step1(AuthzUris, ChallengeType, State).
 %
@@ -637,36 +643,36 @@ authz(ChallengeType, AuthzUris, State=#state{mode=Mode}) ->
 %		- Challenges is map of Uri -> Challenge, where Challenge is of ChallengeType type
 %		- Nonce is a new valid replay-nonce
 %
--spec authz_step1(list(binary()), challenge_type(), state(), map()) -> {ok, map(), nonce()} |
-                                                             {error, uncatched|binary(), nonce()}.
+-spec authz_step1(list(binary()), challenge_type(), state(),
+		map()) -> {ok, map(), nonce()} | {error, uncaught|binary(), nonce()}.
 authz_step1([], _, #state{nonce=Nonce}, Challenges) ->
-    {ok, Challenges, Nonce};
+	{ok, Challenges, Nonce};
 authz_step1([Uri|T], ChallengeType,
 			State=#state{nonce=Nonce, key=Key, jws=Jws, opts=Opts}, Challenges) ->
 
 	AuthzRet = letsencrypt_api:authorization(Uri, Key, Jws#{nonce => Nonce}, Opts),
-    %io:format("authzret= ~p~n", [AuthzRet]),
+	%io:format("authzret= ~p~n", [AuthzRet]),
 
-    case AuthzRet of
-        %{error, Err, Nonce2} ->
-        %    {error, Err, Nonce2};
+	case AuthzRet of
+		%{error, Err, Nonce2} ->
+		%    {error, Err, Nonce2};
 
-        {ok, Authz, _, Nonce2} ->
+		{ok, Authz, _, Nonce2} ->
 			% get challenge
 			% map(
 			%	type,
 			%	url,
 			%	token
 			% )
-            [Challenge] = lists:filter(fun(C) ->
-                    maps:get(<<"type">>, C, error) =:= bin(ChallengeType)
-                end,
-                maps:get(<<"challenges">>, Authz)
-            ),
+			[Challenge] = lists:filter(fun(C) ->
+					maps:get(<<"type">>, C, error) =:= bin(ChallengeType)
+				end,
+				maps:get(<<"challenges">>, Authz)
+			),
 
 			authz_step1(T, ChallengeType, State#state{nonce=Nonce2},
 						Challenges#{Uri => Challenge})
-    end.
+	end.
 
 % authz_step2(Challenges, State).
 %
@@ -675,7 +681,7 @@ authz_step1([Uri|T], ChallengeType,
 %
 -spec authz_step2(list(binary()), state()) -> {ok, nonce()} | {error, binary(), nonce()}.
 authz_step2([], #state{nonce=Nonce}) ->
-    {ok, Nonce};
+	{ok, Nonce};
 authz_step2([{_Uri, Challenge}|T], State=#state{nonce=Nonce, key=Key, jws=Jws, opts=Opts}) ->
 	{ok, _, _, Nonce2 } = letsencrypt_api:challenge(Challenge, Key, Jws#{nonce => Nonce}, Opts),
 	authz_step2(T, State#state{nonce=Nonce2}).
@@ -689,20 +695,20 @@ authz_step2([{_Uri, Challenge}|T], State=#state{nonce=Nonce, key=Key, jws=Jws, o
 %
 -spec challenge_init(mode(), state(), challenge_type(), map()) -> ok.
 challenge_init(webroot, #state{webroot_path=WPath, account_key=AccntKey}, 'http-01', Challenges) ->
-    maps:fold(
-        fun(_K, #{<<"token">> := Token}, _Acc) ->
+	maps:fold(
+		fun(_K, #{<<"token">> := Token}, _Acc) ->
 			Thumbprint = letsencrypt_jws:keyauth(AccntKey, Token),
-            file:write_file(<<(bin(WPath))/binary, $/, ?WEBROOT_CHALLENGE_PATH/binary, $/, Token/binary>>,
-                            Thumbprint)
-        end,
-        0, Challenges
-    );
+			file:write_file(<<(bin(WPath))/binary, $/, ?WEBROOT_CHALLENGE_PATH/binary, $/, Token/binary>>,
+							Thumbprint)
+		end,
+		0, Challenges
+	);
 challenge_init(slave, _, _, _) ->
-    ok;
+	ok;
 challenge_init(standalone, #state{port=Port, domain=Domain, account_key=AccntKey}, ChallengeType, Challenges) ->
-    %io:format("init standalone challenge for ~p~n", [ChallengeType]),
-    {ok, _} = case ChallengeType of
-        'http-01' ->
+	%io:format("init standalone challenge for ~p~n", [ChallengeType]),
+	{ok, _} = case ChallengeType of
+		'http-01' ->
 			% elli webserver callback args is:
 			% #{Domain => #{
 			%     Token => Thumbprint,
@@ -714,20 +720,20 @@ challenge_init(standalone, #state{port=Port, domain=Domain, account_key=AccntKey
 					{Token, letsencrypt_jws:keyauth(AccntKey, Token)}
 				end, maps:values(Challenges)
 			)),
-            elli:start_link([
-                {name    , {local, letsencrypt_elli_listener}},
-                {callback, letsencrypt_elli_handler},
+			elli:start_link([
+				{name    , {local, letsencrypt_elli_listener}},
+				{callback, letsencrypt_elli_handler},
 				{callback_args, [#{Domain => Thumbprints}]},
-                {port    , Port}
-            ]);
+				{port    , Port}
+			]);
 
 		_ ->
 			io:format("standalone mode: unknown ~p challenge type~n", [ChallengeType])
 		% TODO
-        %'tls-sni-01' ->
-    end,
+		%'tls-sni-01' ->
+	end,
 
-    ok.
+	ok.
 
 % challenge_destroy(Mode, State)
 %
@@ -743,15 +749,13 @@ challenge_init(standalone, #state{port=Port, domain=Domain, account_key=AccntKey
 %
 -spec challenge_destroy(mode(), state()) -> ok.
 challenge_destroy(webroot, #state{webroot_path=WPath, challenges=Challenges}) ->
-    maps:fold(fun(_K, #{<<"token">> := Token}, _) ->
-        file:delete(<<(bin(WPath))/binary, $/, ?WEBROOT_CHALLENGE_PATH/binary, $/, Token/binary>>)
-    end, 0, Challenges),
-    ok;
+	maps:fold(fun(_K, #{<<"token">> := Token}, _) ->
+		file:delete(<<(bin(WPath))/binary, $/, ?WEBROOT_CHALLENGE_PATH/binary, $/, Token/binary>>)
+	end, 0, Challenges),
+	ok;
 challenge_destroy(standalone, _) ->
 	% stop http server
-    elli:stop(letsencrypt_elli_listener),
-    ok;
+	elli:stop(letsencrypt_elli_listener),
+	ok;
 challenge_destroy(slave, _) ->
 	ok.
-
-
