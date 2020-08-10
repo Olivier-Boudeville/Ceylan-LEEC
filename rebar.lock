@@ -1,22 +1,20 @@
 {"1.1.0",
-[{<<"color">>,{pkg,<<"erlang_color">>,<<"1.0.0">>},0},
- {<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.6.0">>},2},
- {<<"elli">>,{pkg,<<"elli">>,<<"3.2.0">>},0},
+[{<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.6.0">>},2},
+ {<<"elli">>,{pkg,<<"elli">>,<<"3.3.0">>},0},
  {<<"erlang_color">>,{pkg,<<"erlang_color">>,<<"1.0.0">>},0},
  {<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},0},
  {<<"gun">>,{pkg,<<"gun">>,<<"1.3.1">>},1},
- {<<"jiffy">>,{pkg,<<"jiffy">>,<<"1.0.1">>},0},
+ {<<"jiffy">>,{pkg,<<"jiffy">>,<<"1.0.5">>},0},
  {<<"shotgun">>,{pkg,<<"shotgun">>,<<"0.4.0">>},0},
  {<<"yamerl">>,{pkg,<<"yamerl">>,<<"0.7.0">>},0}]}.
 [
 {pkg_hash,[
- {<<"color">>, <<"145FE1D2E65C4516E4F03FEFCA6C2F47EBAD5899D978D70382A5CFE643E4AC9E">>},
  {<<"cowlib">>, <<"8AA629F81A0FC189F261DC98A42243FA842625FEEA3C7EC56C48F4CCDB55490F">>},
- {<<"elli">>, <<"7842861819869EBBFF7230BC77ECF2DF551AE3EAEF5FDE6B01A7561CACCB811E">>},
+ {<<"elli">>, <<"089218762A7FF3D20AE81C8E911BD0F73EE4EE0ED85454226D1FC6B4FFF3B4F6">>},
  {<<"erlang_color">>, <<"145FE1D2E65C4516E4F03FEFCA6C2F47EBAD5899D978D70382A5CFE643E4AC9E">>},
  {<<"getopt">>, <<"C73A9FA687B217F2FF79F68A3B637711BB1936E712B521D8CE466B29CBF7808A">>},
  {<<"gun">>, <<"1489FD96018431B89F401041A9CE0B02B45265247F0FDCF71273BF087C64EA4F">>},
- {<<"jiffy">>, <<"4F25639772CA41202F41BA9C8F6CA0933554283DD4742C90651E03471C55E341">>},
+ {<<"jiffy">>, <<"A69B58FAF7123534C20E1B0B7AE97AC52079CA02ED4B6989B4B380179CD63A54">>},
  {<<"shotgun">>, <<"D9931B5F78C79169984C22F573032CCAFE03898C611DF360C0CC9D3756517746">>},
  {<<"yamerl">>, <<"E51DBA652DCE74C20A88294130B48051EBBBB0BE7D76F22DE064F0F3CCF0AAF5">>}]}
 ].
