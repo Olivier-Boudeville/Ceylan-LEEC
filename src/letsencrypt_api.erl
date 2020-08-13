@@ -103,8 +103,11 @@ decode(_, Response) ->
 	shotgun:result()|{error, invalid_method}.
 request(Method, Uri, Headers, Content, Opts=#{netopts := Netopts}) ->
 
-	#{ scheme := Scheme, host := Host, port := Port, path := Path } =
+	% Port may not be specified:
+	UriMap = #{ scheme := Scheme, host := Host, path := Path } =
 		uri_string:parse(str(Uri)),
+
+	Port = maps:get( port, UriMap, _DefaultPort=80 ),
 
 	Proto = list_to_atom( Scheme ),
 
