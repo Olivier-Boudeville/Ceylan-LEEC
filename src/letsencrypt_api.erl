@@ -102,7 +102,11 @@ decode(_, Response) ->
 -spec request(get|post, string()|binary(), map(), nil|binary(), map()) ->
 	shotgun:result()|{error, invalid_method}.
 request(Method, Uri, Headers, Content, Opts=#{netopts := Netopts}) ->
-	{ok, {Proto, _, Host, Port, Path, _}} = http_uri:parse(str(Uri)),
+
+	#{ scheme := Scheme, host := Host, port := Port, path := Path } =
+		uri_utils:parse(str(Uri)),
+
+	Proto = list_to_atom( Scheme ),
 
 	Headers2 = Headers#{<<"content-type">> => <<"application/jose+json">>},
 
