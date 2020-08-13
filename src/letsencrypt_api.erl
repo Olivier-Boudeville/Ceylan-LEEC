@@ -104,7 +104,7 @@ decode(_, Response) ->
 request(Method, Uri, Headers, Content, Opts=#{netopts := Netopts}) ->
 
 	#{ scheme := Scheme, host := Host, port := Port, path := Path } =
-		uri_utils:parse(str(Uri)),
+		uri_string:parse(str(Uri)),
 
 	Proto = list_to_atom( Scheme ),
 
