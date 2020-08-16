@@ -58,35 +58,49 @@ status(_Status)       ->
 -spec tcpconn({http|https, string(), integer()}) -> {ok, pid()}.
 tcpconn(Key={Proto, Host, Port}) ->
 	case ets:info(conns) of
-		% does not exists
-		undefined -> ets:new(conns, [set, named_table]);
-		_         -> ok
+		% Does not exist:
+		undefined ->
+			ets:new(conns, [set, named_table]);
+
+		_ ->
+			ok
 	end,
 
 	case ets:lookup(conns, Key) of
 		% not found
 		[] ->
-			%TODO: handle connection failures
-			{ok, Conn} = shotgun:open(Host, Port, Proto),
+			trace_utils:debug_fmt( "Opening connection to ~s:~B, with the "
+				"'~s' scheme.", [ Host, Port, Proto ] ),
+
+			Conn = case shotgun:open(Host, Port, Proto) of
+
+				{ok, Connection} ->
+				   Connection;
+
+				{error,gun_open_failed} ->
+				   throw( { gun_open_failed, Host, Port, Proto } )
+
+		   end,
 			ets:insert(conns, {Key, Conn}),
 			{ok, Conn};
 		[{_, Conn}] ->
 			{ok, Conn}
 	end.
 
-% decode(Option, Result)
+
+
+% Decodes http body as json if asked, or return it as is.
 %
-% Decodes http body as json if asked, or return as if.
+% Returns {ok, Result} with added json structure if required.
 %
-% returns:
-%	{ok, Result} with added json structure if required
-%
--spec decode(map(), map()) -> {ok, map()}.
+-spec decode( Option :: map(), Result :: map() ) -> {ok, map()}.
 decode(#{json := true}, Response=#{body := Body}) ->
 	Payload = jiffy:decode(Body, [return_maps, use_nil]),
 	{ok, Response#{json => Payload}};
+
 decode(_, Response) ->
 	{ok, Response}.
+
 
 % request(get|post, Uri, Headers, Content, Options)
 %
@@ -107,19 +121,36 @@ request(Method, Uri, Headers, Content, Opts=#{netopts := Netopts}) ->
 	UriMap = #{ scheme := Scheme, host := Host, path := Path } =
 		uri_string:parse(str(Uri)),
 
-	Port = maps:get( port, UriMap, _DefaultPort=80 ),
-
 	Proto = list_to_atom( Scheme ),
+
+	DefaultPort = case Proto of
+
+		http ->
+			80;
+
+		https ->
+			443
+
+	end,
+
+	Port = maps:get( port, UriMap, DefaultPort ),
 
 	Headers2 = Headers#{<<"content-type">> => <<"application/jose+json">>},
 
-	% we want to reuse connection if exists
+	% We want to reuse connection if it already exists:
 	{ok, Conn} = tcpconn({Proto, Host, Port}),
 
-	Result = case  Method of
-		get  -> shotgun:get(Conn, Path, Headers2, Netopts);
-		post -> shotgun:post(Conn, Path, Headers2, Content, Netopts);
-		_     -> {error, invalid_method}
+	Result = case Method of
+
+		get ->
+			shotgun:get(Conn, Path, Headers2, Netopts);
+
+		post ->
+			shotgun:post(Conn, Path, Headers2, Content, Netopts);
+
+		_ ->
+			{error, invalid_method}
+
 	end,
 
 	?debug("~p(~p) => ~p~n", [Method, Uri, Result]),
@@ -300,7 +331,8 @@ challenge(#{<<"url">> := Uri}, Key, Jws, Opts) ->
 % returns:
 %
 % finalize order
--spec finalize(map(), binary(), letsencrypt:ssl_privatekey(), map(), map()) -> {ok, map(), binary(), binary()}.
+-spec finalize(map(), binary(), letsencrypt:ssl_privatekey(), map(), map()) ->
+		  {ok, map(), binary(), binary()}.
 finalize(#{<<"finalize">> := Uri}, Csr, Key, Jws, Opts) ->
 	Payload = #{
 		csr => Csr
@@ -314,6 +346,7 @@ finalize(#{<<"finalize">> := Uri}, Csr, Key, Jws, Opts) ->
 	   nonce    := Nonce
 	}} = request(post, Uri, #{}, Req, Opts#{json => true}),
 	{ok, Resp, Location, Nonce}.
+
 
 % certificate(Order, Key, Jws, Opts)
 %

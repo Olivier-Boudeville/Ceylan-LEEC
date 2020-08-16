@@ -12,137 +12,228 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
+
+% Main module for Erlang Let's Encrypt.
 -module(letsencrypt).
+
 -author("Guillaume Bour <guillaume@bour.cc>").
+
 -behaviour(gen_fsm).
 
--export([make_cert/2, make_cert_bg/2, get_challenge/0]).
--export([start/1, stop/0, init/1, handle_event/3, handle_sync_event/4,
-		 handle_info/3, terminate/3, code_change/4]).
--export([idle/3, pending/3, valid/3, finalize/3]).
 
--import(letsencrypt_utils, [bin/1, str/1]).
--import(letsencrypt_api, [status/1]).
+% Public API:
+-export([ make_cert/2, make_cert_bg/2, get_challenge/0 ]).
 
-% uri format compatible with shotgun library
--type mode()           :: 'webroot'|'slave'|'standalone'.
-% NOTE: currently only support 'http-01' challenge.
+
+% FSM API:
+-export([ start/1, stop/0, init/1, handle_event/3, handle_sync_event/4,
+		  handle_info/3, terminate/3, code_change/4 ]).
+
+
+% FSM state-related callbacks:
+-export([ idle/3, pending/3, valid/3, finalize/3 ]).
+
+-type maybe( T ) :: T | 'undefined'.
+-type void() :: any().
+
+-type domain() :: net_utils:string_fqdn() | net_utils:bin_fqdn().
+
+
+% URI format compatible with the shotgun library:
+-type le_mode() :: 'webroot' | 'slave' | 'standalone'.
+
+
+% Note: only the 'http-01' challenge is supported currently.
 -type challenge_type() :: 'http-01'.
--type nonce()          :: binary().
-
--type jws()            :: #{'alg' => 'RS256',
-							'jwk' => map(),
-							nonce => undefined|letsencrypt:nonce() }.
-
--type ssl_privatekey() :: #{'raw' => crypto:rsa_private(),
-							'b64' => {binary(), binary()}, 'file' => string()}.
+					  % | 'tls-sni-01'.
 
 
--define(WEBROOT_CHALLENGE_PATH, <<"/.well-known/acme-challenge">>).
+-type challenge() :: term().
 
--record(state, {
-	% acme environment
-	env       = prod                :: staging | prod,
-	% acme directory (map operation -> uri)
-	directory = undefined           :: undefined | map(),
-%    acme_srv = ?DEFAULT_API_URL     :: uri() | string(),
-	key_file  = undefined           :: undefined | string(),
-	cert_path = "/tmp"              :: string(),
+-type thumbprint() :: term().
 
-	mode = undefined                :: undefined | mode(),
-	% mode = webroot
-	webroot_path = undefined        :: undefined | string(),
-	% mode = standalone
-	port = 80                       :: integer(),
+-type thumbprint_map() :: map( token(), thumbprint() ).
 
-	intermediate_cert = undefined   :: undefined | binary(),
 
-	% state datas
-	nonce = undefined               :: undefined | nonce(),
-	domain = undefined              :: undefined | binary(),
-	sans  = []                      :: list(string()),
-	key   = undefined               :: undefined | ssl_privatekey(),
-	jws   = undefined               :: undefined | jws(),
+% All known information regarding a challenge.
+%
+% Keys: <<"token">>, 'thumbprint'.
+%
+-type challenge_map() :: map().
+
+
+-type bin_uri() :: binary().
+
+-type uri_challenge_type_map() :: map( bin_uri(), challenge_type() ).
+
+
+-type type_challenge_map() :: map( challenge_type(), challenge_map() ).
+
+-type option_map() :: map().
+
+-type nonce() :: binary().
+
+-type san() :: text_utils:ustring().
+
+
+% JSON Web Signature:
+-type jws() :: #{ 'alg' => 'RS256',
+				  'jwk' => map(),
+				  nonce => maybe( nonce() ) }.
+
+
+-type ssl_private_key() :: #{
+		'raw' => crypto:rsa_private(),
+		'b64' => { binary(), binary() },
+		'file' => string() }.
+
+-type key_file_info() :: { 'new', file_name() } | file_path() }.
+
+-define( webroot_challenge_path, <<"/.well-known/acme-challenge">> ).
+
+
+% State of a Let's Encrypt instance:
+-record( le_state, {
+
+	% ACME environment:
+	env = prod :: staging | prod,
+
+	% ACME directory (map operation -> uri):
+	directory = undefined :: maybe( map() ),
+
+	%acme_srv = ?DEFAULT_API_URL :: uri() | string(),
+
+	key_file = undefined :: maybe( key_file_info() ),
+
+	% Directory where certificates are to be stored:
+	cert_dir_path = <<"/tmp">> :: bin_directory_path(),
+
+	% Ex: mode = webroot.
+	mode = undefined :: maybe( le_mode() ),
+
+	% If mode is 'webroot':
+	webroot_path = undefined :: maybe( bin_directory_path() ).
+
+	% If mode is 'standalone':
+	port = 80 :: net_utils:tcp_port(),
+
+	intermediate_cert = undefined :: maybe( bin_certificate() ),
+
+
+	% State-related data:
+
+	nonce = undefined :: maybe( nonce() ),
+
+	domain = undefined :: maybe( binary() ),
+
+	sans = [] :: [ san() ],
+
+	% SSL private key information:
+	key = undefined :: maybe( ssl_private_key() ),
+
+	% JSON Web Signature:
+	jws = undefined :: maybe( jws() ),
 
 	account_key = undefined,
+
 	order = undefined,
-	challenges = []                 :: map(),
 
-	% certificate/csr key file
-	cert_key_file = undefined,
+	% Known challenges, per type:
+	challenges = #{} :: type_challenge_map(),
 
-	% api options
-	opts = #{netopts => #{timeout => 30000}} :: map()
+	% certificate/csr key file:
+	cert_key_file = undefined :: maybe( file_utils:file_path() ),
+
+	% API options:
+	opts = #{ netopts => #{ timeout => 30000 } } :: option_map()
 
 }).
 
--type state() :: #state{}.
+-type le_state() :: #le_state{}.
 
-% start(Args).
-%
+-type fsm_pid() :: pid().
+
+
+% A certificate, as a binary:
+-type bin_certificate() :: binary().
+
+% A key, as a binary:
+-type bin_key() :: binary().
+
+-type status() :: atom().
+
+
+
+% Shorthands:
+
+-type directory_path() :: file_utils:directory_path().
+
+
+
 % Starts letsencrypt service.
-%
-% returns:
-%	{ok, Pid}
-%
--spec start(list()) -> {'ok', pid}|{'error', {'already_started',pid()}}.
-start(Args) ->
-	gen_fsm:start_link({global, ?MODULE}, ?MODULE, Args, []).
+-spec start( list() ) -> { 'ok', fsm_pid() }
+			  | {'error', { 'already_started', fsm_pid() } }.
+start( Args ) ->
+	gen_fsm:start_link( ?MODULE, Args, _Opts=[] ).
 
-% stop().
-%
+
 % Stops letsencrypt service.
-%
-% returns:
-%	'ok'
--spec stop() -> 'ok'.
-stop() ->
+-spec stop( fsm_pid() ) -> 'ok'.
+stop( FsmPid ) ->
 	%NOTE: maintain compatibility with 17.X versions
-	%gen_fsm:stop({global, ?MODULE})
-	gen_fsm:sync_send_all_state_event({global, ?MODULE}, stop).
+	%gen_fsm:stop()
+	gen_fsm:sync_send_all_state_event( FsmPid, stop ).
 
-%% init(Args).
-%%
-%% Initialize state machine
-%%   - init ssl & jws
-%%   - fetch acme directory
-%%   - get valid nonce
-%%
-%% transition:
-%%   - 'idle' state
--spec init(list( atom() | {atom(),any()} )) -> {ok, idle, state()}.
-init(Args) ->
-	State = setup_mode(
-		getopts(Args, #state{})
-	),
-	%{Args2, State} = mode_opts(proplists:get_value(mode, Args), Args),
-	%State2 = getopts(Args2, State),
-	%io:format("state= ~p~n", [State2]),
 
-	% initialize key & jws
-	Key = letsencrypt_ssl:private_key(State#state.key_file, State#state.cert_path),
-	Jws = letsencrypt_jws:init(Key),
+% Initializes the state machine:
+%   - init ssl & jws
+%   - fetch ACME directory
+%   - get valid nonce
+%
+% Transitions to the 'idle' state.
+%
+-spec init( [ atom() | { atom(), any() } ] ) -> { 'ok', 'idle', le_state() }.
+init( Args ) ->
 
-	% request directory
-	{ok, Directory} = letsencrypt_api:directory(State#state.env, State#state.opts),
+	SetupLEState = setup_mode( getopts( Args, #le_state{} ) ),
 
-	% get first nonce
-	{ok, Nonce} = letsencrypt_api:nonce(Directory, State#state.opts),
+	KeyLEState = update_key_info( SetupLEState ),
 
-	{ok, idle, State#state{directory=Directory, key=Key, jws=Jws, nonce=Nonce}}.
+	trace_utils:debug_fmt( "[~w] Initial state: ~p", [ self(), KeyLEState ] ),
 
+	% Creates key & initialises JWS:
+	Key = letsencrypt_ssl:create_private_key( LEState#le_state.key_file_info,
+											  LEState#le_state.cert_dir_path ),
+
+	Jws = letsencrypt_jws:init( Key ),
+
+	% Request directory:
+	{ ok, Directory } = letsencrypt_api:directory( LEState#le_state.env,
+												   LEState#le_state.opts ),
+
+	% Gets first nonce:
+	{ ok, Nonce } = letsencrypt_api:nonce( Directory, LEState#le_state.opts ),
+
+	{ ok, _LEStateName=idle,
+	  LEState#le_state{ directory=Directory, key=Key, jws=Jws, nonce=Nonce } }.
+
+
+
+% Updates if need the key info, typically so there is a unique key filename per
+% Let's Encrypt instance.
+%
+update_key_info( le_state() ) -> le_state().
+update_key_info( LEState=#letstate{ key_file_info=
 
 %%
 %% PUBLIC funs
 %%
 
 
-% make_cert(Domain, Opts).
-%
-% Generates a new certificate for given Domain
+% Generates a new certificate for specified domain (FQDN).
 %
 % params:
-%	- Domain: domain name to generate acme certificate for
+%	- Domain: domain name to generate an ACME certificate for
 %	- Opts  : dictionary of options
 %			* async (bool): if true, make_cert() blocks until complete and returns
 %				generated certificate filename
@@ -153,68 +244,114 @@ init(Args) ->
 %	- 'async' if async is set (default)
 %	- {error, Err} if something goes bad
 %
--spec make_cert(string()|binary(), map()) -> {'ok', #{cert => binary(), key => binary()}}|
-											 {'error','invalid'}|
-											 async.
-make_cert(Domain, Opts=#{async := false}) ->
-	make_cert_bg(Domain, Opts);
-% default to async = true
-make_cert(Domain, Opts) ->
-	_Pid = erlang:spawn(?MODULE, make_cert_bg, [Domain, Opts#{async => true}]),
+-spec make_cert( fsm_pid(), Domain :: domain(), option_map() ) ->
+		  {'ok', #{ cert => bin_certificate(), key => bin_key() } }
+			  | {'error','invalid'}
+			  | 'async'.
+make_cert( FsmPid, Domain, Opts=#{ async := false } ) ->
+
+	trace_utils:debug_fmt( "Generating async certificate for domain '~s'.",
+						   [ Domain ] ),
+
+	make_cert_bg( FsmPid, Domain, Opts );
+
+% Default to async = true:
+make_cert( FsmPid, Domain, Opts ) ->
+
+	trace_utils:debug_fmt( "Generating sync certificate for domain '~s'.",
+						   [ Domain ] ),
+
+	_Pid = erlang:spawn( ?MODULE, make_cert_bg,
+						[ FsmPid, Domain, Opts#{ async => true } ] ),
 	async.
 
--spec make_cert_bg(string()|binary(), map()) -> {'ok', map()}|{'error', 'invalid'}.
-make_cert_bg(Domain, Opts=#{async := Async}) ->
-	Ret = case gen_fsm:sync_send_event({global, ?MODULE}, {create, bin(Domain), Opts}, 15000) of
-		{error, Err} ->
-			io:format("error: ~p~n", [Err]),
-			{error, Err};
+
+% (spawn helper)
+-spec make_cert_bg( fsm_pid(), Domain :: domain(), option_map() ) ->
+		  { 'ok', map() } | { 'error', 'invalid' }.
+make_cert_bg( FsmPid, Domain, Opts=#{async := Async} ) ->
+
+	BinDomain = text_utils:ensure_binary( Domain ),
+
+	Timeout = 15000,
+
+	Ret = case gen_fsm:sync_send_event( FsmPid,
+							{ create, BinDomain, Opts }, Timeout ) of
+
+		{ error, Error } ->
+			trace_utils:error_fmt( "Creation error: ~p.", [ Error ] ),
+			{ creation_error, Error };
 
 		ok ->
-			case wait_valid(20) of
+			case wait_valid( 20 ) of
+
 				ok ->
-					Status = gen_fsm:sync_send_event({global, ?MODULE}, finalize, 15000),
-					case wait_finalized(Status, 20) of
-						P={ok, _SomeRes} -> P;
-						Err -> Err
+					Status = gen_fsm:sync_send_event( FsmPid, finalize,
+													  Timeout ),
+
+					case wait_finalized( Status, 20 ) of
+
+						P={ ok, _SomeRes } ->
+							%trace_utils:debug_fmt( "OK for '~s': ~p",
+							%                     [ Domain, SomeRes ] ),
+							P;
+
+						Error ->
+							%trace_utils:debug_fmt( "Error for '~s': ~p",
+							%                     [ Domain, Error ] ),
+							Error
+
 					end;
 
-				Error ->
-					gen_fsm:send_all_state_event({global, ?MODULE}, reset),
-					Error
-			end
+				OtherError ->
+					gen_fsm:send_all_state_event( FsmPid, reset ),
+					trace_utils:debug_fmt( "Reset for '~s': ~p",
+										   [ Domain, OtherError ] ),
+					OtherError
+
+			end;
+
+		Other ->
+			trace_utils:error_fmt("Unexpected after create: ~p", [ Other ] ),
+			throw( { unexpected_create, Other } )
+
 	end,
 
 	case Async of
-		true ->
-			Callback = maps:get(callback, Opts, fun(_) -> ok end),
-			Callback(Ret);
 
-		_    ->
+		true ->
+			Callback = maps:get( callback, Opts, _Default=fun(_) -> ok end),
+			Callback( Ret );
+
+		_ ->
 			ok
+
 	end,
 
+	%trace_utils:debug_fmt( "Return for '~s': ~p", [ Domain, Ret ] ),
 	Ret.
 
-% get_challenge().
-%
-% Returns ongoing challenges with pre-computed thumbprints.
-%
-% returns:
+
+
+% Returns the ongoing challenges with pre-computed thumbprints:
 %   #{Challenge => Thumbrint} if ok,
 %	'error' if fails
 %
--spec get_challenge() -> error|map().
+-spec get_challenge() -> 'error' | challenge_map().
 get_challenge() ->
-	case catch gen_fsm:sync_send_event({global, ?MODULE}, get_challenge) of
-		% process not started, wrong state, ...
-		{'EXIT', _Exc} ->
-			%io:format("exc: ~p~n", [Exc]),
+
+	case catch gen_fsm:sync_send_event( FsmPid, get_challenge ) of
+
+		% Process not started, wrong state, etc.:
+		{'EXIT', Exc } ->
+			trace_utils:error_fmt( "Challenge not obtained: ~p.", [ Exc ] ),
 			error;
 
-		% challenge #{token => ..., thumbprint => ...}
-		C -> C
+		ChallengeMap ->
+			ChallengeMap
+
 	end.
+
 
 
 %%
@@ -222,147 +359,190 @@ get_challenge() ->
 %%
 
 
-% state 'idle'
-%
-% When awaiting for certificate request.
+% State 'idle', used when awaiting for certificate request.
 %
 % idle(get_challenge) :: nothing done
 %
-idle(get_challenge, _, State) ->
-	{reply, no_challenge, idle, State};
+idle( get_challenge, _, LEState ) ->
+	{ reply, no_challenge, idle, LEState };
 
-% idle({create, Domain, Opts}).
+% idle( {create, Domain, Opts} ).
 %
-% Starts a new certificate delivery process.
+% Starts a new certificate delivery process:
 %  - create new account
-%  - create new order (incl
-%  - requires authorization (returns challenges list)
+%  - create new order
+%  - require authorization (returns challenges list)
 %  - initiate choosen challenge
 %
-% transition:
+% Transition to:
 %  - 'idle' if process failed
-%  - 'pending' waiting for challenges to be completes
+%  - 'pending' waiting for challenges to be complete
 %
-idle({create, Domain, _Opts}, _, State=#state{directory=Dir, key=Key, jws=Jws,
-											  nonce=Nonce, opts=Opts}) ->
+idle( { create, Domain, _CertOpts }, _,
+	  LEState=#le_state{ directory=Dir, key=Key, jws=Jws, nonce=Nonce,
+						 opts=Opts } ) ->
+
 	% 'http-01' or 'tls-sni-01'
 	% TODO: validate type
-	ChallengeType = maps:get(challenge, Opts, 'http-01'),
+	ChallengeType = maps:get( challenge, Opts, _Default='http-01'),
 
-	%Conn  = get_conn(State),
-	%Nonce = get_nonce(Conn, State),
+	%Conn  = get_conn(LEState),
+	%Nonce = get_nonce(Conn, LEState),
 	%TODO: SANs
 	%SANs  = maps:get(san, Opts, []),
 
-	{ok, Accnt, Location, Nonce2} = letsencrypt_api:account(Dir, Key, Jws#{nonce => Nonce}, Opts),
-	AccntKey = maps:get(<<"key">>, Accnt),
+	{ ok, Accnt, Location, Nonce2 } = letsencrypt_api:account( Dir, Key,
+											 Jws#{ nonce => Nonce }, Opts ),
 
-	Jws2 = #{
-		alg   => maps:get(alg, Jws),
-		nonce => Nonce2,
-		kid   => Location
-	},
+	AccntKey = maps:get( <<"key">>, Accnt ),
+
+	Jws2 = #{ alg => maps:get( alg, Jws),
+			  nonce => Nonce2,
+			  kid   => Location },
+
+	BinDomain = text_utils:ensure_binary( Domain ),
+
 	%TODO: checks order is ok
-	{ok, Order, OrderLocation, Nonce3} = letsencrypt_api:order(Dir, bin(Domain), Key, Jws2, Opts),
-	% we need to keep trace of order location
-	Order2 = Order#{<<"location">> => OrderLocation},
+	{ ok, Order, OrderLocation, Nonce3 } =
+		letsencrypt_api:order( Dir, BinDomain, Key, Jws2, Opts ),
 
-	%Nonce2    = letsencrypt_api:new_reg(Conn, BasePath, Key, JWS#{nonce => Nonce}),
-	%AuthzResp = authz([Domain|SANs], ChallengeType, State#state{conn=Conn, nonce=Nonce2}),
-	AuthUris = maps:get(<<"authorizations">>, Order),
-	AuthzResp = authz(ChallengeType, AuthUris, State#state{domain=Domain, jws=Jws2, account_key=AccntKey, nonce=Nonce3}),
-	{StateName, Reply, Challenges, Nonce5} = case AuthzResp of
-			{error, Err, Nonce3} ->
-				{idle, {error, Err}, nil, Nonce3};
+	% We need to keep trace of order location:
+	Order2 = Order#{ <<"location">> => OrderLocation },
 
-			{ok, Xchallenges, Nonce4} ->
-				{pending, ok, Xchallenges, Nonce4}
+	% Nonce2 = letsencrypt_api:new_reg( Conn, BasePath, Key,
+	%                                   JWS#{nonce => Nonce} ),
+
+	% AuthzResp = authz([Domain|SANs], ChallengeType,
+	%     LEState#le_state{conn=Conn, nonce=Nonce2}),
+
+	AuthUris = maps:get( <<"authorizations">>, Order ),
+
+	AuthzResp = authz( ChallengeType, AuthUris,
+		LEState#le_state{ domain=Domain, jws=Jws2, account_key=AccntKey,
+						  nonce=Nonce3 } ),
+
+	{ StateName, Reply, Challenges, Nonce5 } = case AuthzResp of
+
+		{ error, Err, Nonce3 } ->
+			{ idle, {error, Err}, nil, Nonce3 };
+
+
+		{ ok, Xchallenges, Nonce4 } ->
+			{ pending, ok, Xchallenges, Nonce4 }
+
 	end,
 
-	{reply, Reply, StateName,
-	 State#state{domain=Domain, jws=Jws2, nonce=Nonce5, order=Order2, challenges=Challenges, sans=[], account_key=AccntKey}}.
+	{reply, Reply, StateName, LEState#le_state{ domain=Domain, jws=Jws2,
+		nonce=Nonce5, order=Order2, challenges=Challenges, sans=[],
+		account_key=AccntKey } }.
 
 
-% state 'pending'
-%
-% When challenges are on-the-go.
-%
-% pending(get_challenge).
-%
-% Returns list of challenges currently on-the-go with pre-computed thumbprints.
-%
-pending(get_challenge, _, State=#state{account_key=AccntKey, challenges=Challenges}) ->
-	% #{Domain => #{
-	%     Token => Thumbprint,
-	%     ...
-	% }}
-	%
-	Thumbprints = maps:from_list(lists:map(
-		fun(#{<<"token">> := Token}) ->
-			{Token, letsencrypt_jws:keyauth(AccntKey, Token)}
-		end, maps:values(Challenges)
-	)),
-	{reply, Thumbprints, pending, State};
 
-% pending(check).
+
+% Management of the 'pending' state, when challenges are on-the-go.
 %
+% Returns a list of the challenges currently on-the-go with pre-computed
+% thumbprints, i.e. a thumbprint_map().
+%
+pending( get_challenge, _Domain, LEState=#le_state{ account_key=AccntKey,
+													challenges=Challenges } ) ->
+	ThumbprintMap = maps:from_list(
+		[ { Token, _Thumbprint=letsencrypt_jws:keyauth( AccntKey, Token ) }
+		  || #{ <<"token">> := Token } <- maps:values( Challenges ) ] ),
+
+	{ reply, ThumbprintMap, pending, LEState };
+
+
 % Checks if all challenges are completed.
-% Switch to 'valid' state iff all challenges are validated only
+% Switch to 'valid' state iff all challenges are validated only.
 %
-% transition:
+% Transitions to:
 %	- 'pending' if at least one challenge is not complete yet
 %	- 'valid' if all challenges are complete
 %
-%TODO: handle other states explicitely (allowed values are 'invalid', 'deactivated',
-%      'expired' and 'revoked'
+% TODO: handle other states explicitely (allowed values are 'invalid',
+% 'deactivated', 'expired' and 'revoked')
 %
-pending(_Action, _, State=#state{order=#{<<"authorizations">> := Authzs}, nonce=Nonce, key=Key, jws=Jws, opts=Opts}) ->
-	% checking status for each authorization
-	{StateName, Nonce2} = lists:foldl(fun(AuthzUri, {Status, InNonce}) ->
-		{ok, Authz, _, OutNonce} = letsencrypt_api:authorization(AuthzUri, Key, Jws#{nonce => InNonce}, Opts),
+pending( _CheckAction, _Domain,
+		 LEState=#le_state{ order=#{<<"authorizations">> := Authzs},
+							nonce=Nonce, key=Key, jws=Jws, opts=Opts } ) ->
 
-		Status2 = maps:get(<<"status">>, Authz),
-		%{Status2, Msg2} = letsencrypt_api:challenge(Challengestatus, Conn, UriPath),
-		%io:format("~p: ~p (~p)~n", [_K, Status2, Msg2]),
+	% Checking status for each authorization:
+	{ LEStateName, Nonce2 } = lists:foldl(
+		fun( AuthzUri, _Acc={ Status, InNonce } ) ->
+			{ok, Authz, _, OutNonce } = letsencrypt_api:authorization( AuthzUri,
+								Key, Jws#{ nonce => InNonce }, Opts ),
 
-		Ret = case {Status, Status2} of
-			{valid  ,   <<"valid">>} -> valid;
-			{pending,             _} -> pending;
-			{_      , <<"pending">>} -> pending;
-			%TODO: we must not let that openbar :)
-			{valid  ,       Status2} -> Status2;
-			{Status ,             _} -> Status
+			Status2 = maps:get( <<"status">>, Authz ),
+
+			%{ Status2, Msg2 } = letsencrypt_api:challenge( Challengestatus,
+			%Conn, UriPath ), io:format( "~p: ~p (~p)~n", [ _K, Status2, Msg2 ]
+			%),
+
+			Ret = case { Status, Status2 } of
+
+				{ valid, <<"valid">> } ->
+					valid;
+
+				{ pending, _ } ->
+					pending;
+
+				{ _, <<"pending">> } ->
+					pending;
+
+				%TODO: we must not let that openbar :)
+				{ valid, Status2 } ->
+					Status2 ;
+
+				{ Status , _ } ->
+					Status
+
+			end,
+
+			{ Ret, OutNonce }
+
 		end,
-		{Ret, OutNonce}
-	end, {valid, Nonce}, Authzs),
+		_Acc0={ valid, Nonce },
+		_List=Authzs ),
 
 	%io:format(":: challenge state -> ~p~n", [Reply]),
-	% reply w/ StateName
-	{reply, StateName, StateName, State#state{nonce=Nonce2}}.
+	% reply w/ LEStateName
 
-% state 'valid'
+	{ reply, LEStateName, LEStateName, LEState#le_state{ nonce=Nonce2 } }.
+
+
+
+% Management of the 'valid' state.
 %
-% When challenges has been successfully completed.
-% Finalize acme order and generate ssl certificate.
+% When challenges have been successfully completed, finalizes ACME order and
+% generates TLS certificate.
 %
 % returns:
 %	Status: order status
 %
-% transition:
-%	state 'finalize'
-valid(_, _, State=#state{mode=Mode, domain=Domain, sans=SANs, cert_path=CertPath,
-						 order=Order, key=Key, jws=Jws, nonce=Nonce, opts=Opts}) ->
+% Transitions to 'finalize' state.
+%
+valid( _Action, _Domain,
+	   LEState=#le_state{ mode=Mode, domain=BinDomain, sans=SANs,
+						  cert_dir_path=CertDirPath, order=Order, key=Key, jws=Jws,
+						  nonce=Nonce, opts=Opts } ) ->
 
-	challenge_destroy(Mode, State),
+	challenge_destroy( Mode, LEState ),
 
-	%NOTE: keyfile is required for csr generation
-	#{file := KeyFile} = letsencrypt_ssl:private_key({new, str(Domain) ++ ".key"}, CertPath),
-	Csr = letsencrypt_ssl:cert_request(str(Domain), CertPath, SANs),
+	%NOTE: keyfile is required for csr generation.
+
+	KeyFilename = text_utils:binary_to_string( BinDomain ) ++ ".key",
+
+	#{ file := KeyFilePath } = letsencrypt_ssl:create_private_key(
+								 { new, KeyFilename }, CertDirPath ),
+
+	Csr = letsencrypt_ssl:get_cert_request( BinDomain, CertPath, SANs),
+
 	{ok, FinOrder, _, Nonce2} = letsencrypt_api:finalize(Order, Csr, Key,
 														 Jws#{nonce => Nonce}, Opts),
 
-	{reply, status(maps:get(<<"status">>, FinOrder, nil)), finalize,
-	 State#state{order=FinOrder#{<<"location">> => maps:get(<<"location">>, Order)},
+	{reply, letsencrypt_api:status(maps:get(<<"status">>, FinOrder, nil)), finalize,
+	 LEState#le_state{order=FinOrder#{<<"location">> => maps:get(<<"location">>, Order)},
 				 cert_key_file=KeyFile, nonce=Nonce2}}.
 
 % state 'finalize'
@@ -379,12 +559,12 @@ valid(_, _, State=#state{mode=Mode, domain=Domain, sans=SANs, cert_path=CertPath
 % transition:
 %   state 'processing' : still ongoing
 %   state 'valid'      : certificate is ready
-finalize(processing, _, State=#state{order=Order, key=Key, jws=Jws, nonce=Nonce, opts=Opts}) ->
+finalize(processing, _, LEState=#le_state{order=Order, key=Key, jws=Jws, nonce=Nonce, opts=Opts}) ->
 	{ok, Order2, _, Nonce2} = letsencrypt_api:order(
 		maps:get(<<"location">>, Order, nil),
 		Key, Jws#{nonce => Nonce}, Opts),
-	{reply, status(maps:get(<<"status">>, Order2, nil)), finalize,
-	 State#state{order=Order2, nonce=Nonce2}
+	{reply, letsencrypt_api:status(maps:get(<<"status">>, Order2, nil)), finalize,
+	 LEState#le_state{order=Order2, nonce=Nonce2}
 	};
 
 % finalize(valid)
@@ -398,23 +578,23 @@ finalize(processing, _, State=#state{order=Order, key=Key, jws=Jws, nonce=Nonce,
 %
 % transition:
 %   state 'idle' : fsm complete, going back to initial state
-finalize(valid, _, State=#state{order=Order, domain=Domain, cert_key_file=KeyFile,
-								cert_path=CertPath, key=Key, jws=Jws, nonce=Nonce,
+finalize(valid, _, LEState=#le_state{order=Order, domain=Domain, cert_key_file=KeyFile,
+								cert_dir_path=CertPath, key=Key, jws=Jws, nonce=Nonce,
 								opts=Opts}) ->
 	% download certificate
 	{ok, Cert} = letsencrypt_api:certificate(Order, Key, Jws#{nonce => Nonce}, Opts),
 	CertFile   = letsencrypt_ssl:certificate(str(Domain), Cert, CertPath),
 
 	{reply, {ok, #{key => bin(KeyFile), cert => bin(CertFile)}}, idle,
-	 State#state{nonce=undefined}};
+	 LEState#le_state{nonce=undefined}};
 
 % finalize(Status)
 %
 % Any other order status leads to exception.
 %
-finalize(Status, _, State) ->
+finalize(Status, _, LEState) ->
 	io:format("unknown finalize status ~p~n", [Status]),
-	{reply, {error, Status}, finalize, State}.
+	{reply, {error, Status}, finalize, LEState}.
 
 
 %%%
@@ -422,292 +602,324 @@ finalize(Status, _, State) ->
 %%%
 
 
-handle_event(reset, _StateName, State=#state{mode=Mode}) ->
+handle_event(reset, _StateName, LEState=#le_state{mode=Mode}) ->
 	%io:format("reset from ~p state~n", [StateName]),
-	challenge_destroy(Mode, State),
-	{next_state, idle, State};
+	challenge_destroy(Mode, LEState),
+	{next_state, idle, LEState};
 
-handle_event(_, StateName, State) ->
+handle_event(_, StateName, LEState) ->
 	io:format("async evt: ~p~n", [StateName]),
-	{next_state, StateName, State}.
+	{next_state, StateName, LEState}.
 
 handle_sync_event(stop,_,_,_) ->
-	{stop, normal, ok, #state{}};
-handle_sync_event(_,_, StateName, State) ->
+	{stop, normal, ok, #le_state{}};
+handle_sync_event(_,_, StateName, LEState) ->
 	io:format("sync evt: ~p~n", [StateName]),
-	{reply, ok, StateName, State}.
+	{reply, ok, StateName, LEState}.
 
-handle_info(_, StateName, State) ->
-	{next_state, StateName, State}.
+handle_info(_, StateName, LEState) ->
+	{next_state, StateName, LEState}.
 
 terminate(_,_,_) ->
 	ok.
 
-code_change(_, StateName, State, _) ->
-	{ok, StateName, State}.
+code_change(_, StateName, LEState, _) ->
+	{ok, StateName, LEState}.
+
 
 
 %%
-%% PRIVATE funs
+%% PRIVATE functions
 %%
 
 
-% getopts(Args)
-%
-% Parse letsencrypt:start() options.
+% Parses letsencrypt:start() options.
 %
 % Available options are:
-%   - staging        : runs in staging environment (running on production either)
-%   - key_file       : reuse an existing ssl key
-%   - cert_path      : path to read/save ssl certificate, key and csr request
-%   - connect_timeout: timeout for acme api requests (seconds)
-%                      THIS OPTION IS DEPRECATED, REPLACED BY http_timeout
-%   - http_timeout   : timeout for acme api requests (seconds)
+%   - staging: runs in staging environment (running on production either)
+%   - key_file_path: reuse an existing TLS key
+%   - cert_dir_path: path to read/save ssl certificate, key and csr request
+%   - http_timeout: timeout for acme api requests (seconds)
 %
-% returns:
-%   - State (type record 'state') filled with options values
+% Returns LEState (type record 'le_state') filled with options values
 %
-% exception:
-%   - 'badarg' if unrecognized option
-%
--spec getopts(list(atom()|{atom(),any()}), state()) -> state().
-getopts([], State) ->
-	State;
-getopts([staging|Args], State) ->
-	getopts(
-		Args,
-		State#state{env = staging}
-	);
-getopts([{mode, Mode}|Args], State) ->
-	getopts(
-		Args,
-		State#state{mode=Mode}
-	);
-getopts([{key_file, KeyFile}|Args], State) ->
-	getopts(
-		Args,
-		State#state{key_file = KeyFile}
-	);
-getopts([{cert_path, Path}|Args], State) ->
-	getopts(
-		Args,
-		State#state{cert_path = Path}
-	);
-getopts([{webroot_path, Path}|Args], State) ->
-	getopts(
-		Args,
-		State#state{webroot_path = Path}
-	);
-getopts([{port, Port}|Args], State) ->
-	getopts(
-		Args,
-		State#state{port = Port}
-	);
-% for compatibility. Will be removed in future release
-getopts([{connect_timeout, Timeout}|Args], State) ->
-	io:format("'connect_timeout' option is deprecated. Please use 'http_timeout' instead~n", []),
-	getopts(
-		Args,
-		State#state{opts = #{netopts => #{timeout => Timeout}}}
-	 );
-getopts([{http_timeout, Timeout}|Args], State) ->
-	getopts(
-		Args,
-		State#state{opts = #{netopts => #{timeout => Timeout}}}
-	 );
-getopts([Unk|_], _) ->
-	io:format("unknow parameter: ~p~n", [Unk]),
-	%throw({badarg, io_lib:format("unknown ~p parameter", [Unk])}).
-	throw(badarg).
+-spec getopts( [ atom() | { atom(), any() } ], le_state() ) -> le_state().
+getopts( _Opts=[], LEState ) ->
+	LEState;
 
-% setup_mode(State).
-%
-% Setup context of choosen mode.
-%
-% returns:
-%   - State, as received
-%
-% exception:
-%   - 'misarg' if a parameter is missing for choosen mode,
-%   - 'invalid_mode' if mode is not valid
-%
--spec setup_mode(state()) -> state().
-setup_mode(#state{mode=webroot, webroot_path=undefined}) ->
-	io:format("missing 'webroot_path' parameter", []),
-	throw(misarg);
-setup_mode(State=#state{mode=webroot, webroot_path=Path}) ->
-	%TODO: check directory is writeable
-	%TODO: handle errors
-	%TODO: protect against injections ?
-	os:cmd(string:join(["mkdir -p '", Path, str(?WEBROOT_CHALLENGE_PATH), "'"], "")),
-	State;
-setup_mode(State=#state{mode=standalone, port=_Port}) ->
-	%TODO: checking port is unused ?
-	State;
-setup_mode(State=#state{mode=slave}) ->
-	State;
-% every other mode value is invalid
-setup_mode(#state{mode=Mode}) ->
-	io:format("invalid '~p' mode", [Mode]),
-	throw(invalid_mode).
+getopts( _Opts=[ staging | T ], LEState ) ->
+	getopts( T, LEState#le_state{ env=staging } );
 
-% wait_valid(X).
+getopts( _Opts=[ { mode, Mode } | T ], LEState ) ->
+	getopts( T, LEState#le_state{ mode=Mode } );
+
+getopts( _Opts=[ { key_file_path, KeyFilePath } | T ], LEState ) ->
+	getopts( T, LEState#le_state{ key_file_info=KeyFilePath } );
+
+getopts( _Opts=[ { cert_dir_path, CertDirPath } | T ], LEState ) ->
+	getopts( T, LEState#le_state{
+				  cert_dir_path=text_utils:string_to_binary( CertDirPath ) } );
+
+getopts( _Opts=[ { webroot_dir_path, WebDirPath } | T ], LEState ) ->
+	getopts( T, LEState#le_state{
+				  webroot_path=text_utils:string_to_binary( WebDirPath ) } );
+
+getopts( _Opts=[ { port, Port } | T ], LEState ) ->
+	getopts( T, LEState#le_state{ port=Port } );
+
+getopts( _Opts=[ { http_timeout, Timeout } | T ], LEState ) ->
+	getopts( T, LEState#le_state{ opts=#{
+							netopts => #{ timeout => Timeout } } } );
+
+getopts( _Opts=[ Unexpected | _T ], _LEState ) ->
+	trace_utils:error_fmt( "Invalid option: ~p.", [ Unexpected ] ),
+	throw( { invalid_option, Unexpected } ).
+
+
+
+% Setups the context of chosen mode.
+-spec setup_mode( le_state() ) -> le_state().
+setup_mode( #le_state{ mode=webroot, webroot_path=undefined } ) ->
+	trace_utils:error( "Missing 'webroot_path' parameter." ),
+	throw( webroot_path_missing );
+
+setup_mode( LEState=#le_state{ mode=webroot, webroot_path=BinWebrootPath } ) ->
+	% TODO: check directory is writable
+	ChallengeDirPath = file_utils:join( WebrootPath, ?webroot_challenge_path ),
+	file_utils:create_directory_if_not_existing( ChallengeDirPath,
+												 create_parents ),
+	LEState;
+
+setup_mode( LEState=#le_state{ mode=standalone, port=_Port } ) ->
+	% TODO: checking port is unused?
+	LEState;
+
+setup_mode( LEState=#le_state{ mode=slave } ) ->
+	LEState;
+
+% Every other mode value is invalid:
+setup_mode( #le_state{ mode=Mode } ) ->
+	trace_utils:error_fmt( "Invalid '~p' mode.", [ Mode ] ),
+	throw( { invalid_mode, Mode } ).
+
+
+
+% Loops X times on authorization check until challenges are all validated (waits
+% incrementing time between each trial).
 %
-% Loops X time on authorization check until challenges are all validated
-% (waits incrementing time between each trial).
-%
-% returns:
+% Returns:
 %   - {error, timeout} if failed after X loops
 %   - {error, Err} if another error
 %   - 'ok' if succeed
 %
--spec wait_valid(0..10) -> ok|{error, any()}.
-wait_valid(X) ->
-	wait_valid(X,X).
+-spec wait_valid( fsm_pid(), count() ) -> 'ok' | { 'error', any() }.
+wait_valid( FsmPid, C ) ->
+	wait_valid( FsmPid, C, C ).
 
--spec wait_valid(0..10, 0..10) -> ok|{error, any()}.
-wait_valid(0,_) ->
-	{error, timeout};
-wait_valid(Cnt,Max) ->
-	case gen_fsm:sync_send_event({global, ?MODULE}, check, 15000) of
-		valid   -> ok;
+
+% (helper)
+-spec wait_valid( fsm_pid(), count(), count() ) -> 'ok' | { 'error', any() }.
+wait_valid( FsmPid, 0, _C ) ->
+	{ error, timeout };
+
+wait_valid( FsmPid, Count, Max ) ->
+	case gen_fsm:sync_send_event( FsmPid, check, _Timeout=15000 ) of
+
+		valid ->
+			ok;
+
 		pending ->
-			timer:sleep(500*(Max-Cnt+1)),
-			wait_valid(Cnt-1,Max);
-		{_      , Err} -> {error, Err}
+			timer:sleep( 500 * ( Max - Count + 1 ) ),
+			wait_valid( FsmPid, Count - 1, Max );
+
+		{ _Other, Error } ->
+			{ error, Error }
+
 	end.
+
 
 % wait_finalized(X).
 %
-% Loops X time on order being finalized
-% (waits incrementing time between each trial).
+% Loops X times on order being finalized (waits incrementing time between each
+% trial).
 %
-% returns:
+% Returns:
 %   - {error, timeout} if failed after X loops
 %   - {error, Err} if another error
 %   - {'ok', Response} if succeed
 %
--spec wait_finalized(atom(), 0..10) -> {ok, map()}|{error, timeout|any()}.
-wait_finalized(Status, X) ->
-	wait_finalized(Status,X,X).
+-spec wait_finalized( status(), count() ) ->
+		  { 'ok', map() } | { 'error', 'timeout' | any() }.
+wait_finalized( Status, C ) ->
+	wait_finalized( Status, C, C ).
 
--spec wait_finalized(atom(), 0..10, 0..10) -> {ok, map()}|{error, timeout|any()}.
-wait_finalized(_, 0,_) ->
-	{error, timeout};
-wait_finalized(Status, Cnt,Max) ->
-	case gen_fsm:sync_send_event({global, ?MODULE}, Status, 15000) of
-		{ok, Res}   -> {ok, Res};
+
+-spec wait_finalized( status(), count(), count() ) ->
+		  { 'ok', map() } | { 'error', 'timeout' | any() }.
+
+wait_finalized( _Status, _Count=0, _Max ) ->
+	{ error, timeout };
+
+wait_finalized( Status, Count, Max ) ->
+
+	case gen_fsm:sync_send_event( FsmPid, Status, _Timeout=15000 ) of
+
+		P={ ok, _Res } ->
+			P;
+
 		valid ->
-			timer:sleep(500*(Max-Cnt+1)),
-			wait_finalized(valid, Cnt-1,Max);
+			timer:sleep( 500 * ( Max - Count + 1 ) ),
+			wait_finalized( valid, Count-1, Max );
+
 		processing  ->
-			timer:sleep(500*(Max-Cnt+1)),
-			wait_finalized(processing, Cnt-1,Max);
-		{_      , Err} -> {error, Err};
-		Any -> Any
+			timer:sleep( 500 * ( Max - Count + 1 ) ),
+			wait_finalized( processing, Count-1, Max );
+
+		{ _, Error } ->
+			{ error, Error };
+
+		Any ->
+			Any
+
 	end.
 
-% authz(ChallenteType, AuthzUris, State).
-%
-% Perform acme authorization and selected challenge initialization.
-%
-% returns:
-%	{ok, Challenges, Nonce}
-%	{error, Error, Nonce}
-%
--spec authz(challenge_type(), list(binary()), state()) -> {error, uncaught|binary(), nonce()}|
-														  {ok, map(), nonce()}.
-authz(ChallengeType, AuthzUris, State=#state{mode=Mode}) ->
-	case authz_step1(AuthzUris, ChallengeType, State, #{}) of
-		T={error, _Err, _Nonce} ->
+
+
+% Performs ACME authorization and selected challenge initialization.
+-spec authz( challenge_type(), [ bin_uri() ], le_state() ) ->
+		  { 'ok', uri_challenge_type_map(), nonce() }
+		| { 'error', 'uncaught' | binary(), nonce() }.
+authz( ChallengeType, AuthzUris, LEState=#le_state{ mode=Mode } ) ->
+
+	case authz_step1( AuthzUris, ChallengeType, LEState, _Challenges=#{} ) of
+
+		T={ error, _Error, _Nonce } ->
 			T;
 
-		{ok, Challenges, Nonce2} ->
-			%io:format("challenges: ~p ~p~n", [Challenges, Domain]),
-			challenge_init(Mode, State, ChallengeType, Challenges),
+		{ ok, Challenges, Nonce } ->
+			%trace_utils:debug_fmt( "Challenges: ~p.", [ Challenges ] ),
+			challenge_init( Mode, LEState, ChallengeType, Challenges ),
 
-			case authz_step2(maps:to_list(Challenges), State#state{nonce=Nonce2}) of
-				{ok, Nonce3} ->
-					{ok, Challenges, Nonce3};
-				Err ->
-					Err
+			case authz_step2( maps:to_list( Challenges ),
+							  LEState#le_state{ nonce=Nonce } ) of
+
+				{ ok, NewNonce } ->
+					{ ok, Challenges, NewNonce };
+
+				Error ->
+					Error
+
 			end
 	end.
 
-% authz_step1(AuthzUris, ChallengeType, State).
-%
-% Request authorizations.
+
+
+% Requests authorizations.
 %
 % returns:
 %   {ok, Challenges, Nonce}
 %		- Challenges is map of Uri -> Challenge, where Challenge is of ChallengeType type
 %		- Nonce is a new valid replay-nonce
 %
--spec authz_step1(list(binary()), challenge_type(), state(),
-		map()) -> {ok, map(), nonce()} | {error, uncaught|binary(), nonce()}.
-authz_step1([], _, #state{nonce=Nonce}, Challenges) ->
-	{ok, Challenges, Nonce};
-authz_step1([Uri|T], ChallengeType,
-			State=#state{nonce=Nonce, key=Key, jws=Jws, opts=Opts}, Challenges) ->
+-spec authz_step1( [ bin_uri() ], challenge_type(), le_state(),
+				   uri_challenge_type_map() ) ->
+		  { 'ok', uri_challenge_type_map(), nonce() }
+		| { 'error', 'uncaught' | binary(), nonce() }.
+authz_step1( _URIs=[], _ChallengeType, #le_state{ nonce=Nonce }, URIChallengeMap ) ->
+	{ ok, URIChallengeMap, Nonce };
 
-	AuthzRet = letsencrypt_api:authorization(Uri, Key, Jws#{nonce => Nonce}, Opts),
-	%io:format("authzret= ~p~n", [AuthzRet]),
+authz_step1( _URIs=[ Uri | T ], ChallengeType,
+			 LEState=#le_state{ nonce=Nonce, key=Key, jws=Jws, opts=Opts },
+			 URIChallengeMap ) ->
+
+	AuthzRet = letsencrypt_api:authorization( Uri, Key, Jws#{ nonce => Nonce },
+											  Opts ),
+
+	trace_utils:debug_fmt( "Authzret for URI '~s': ~p.", [ AuthzRet, Uri ] ),
 
 	case AuthzRet of
-		%{error, Err, Nonce2} ->
-		%    {error, Err, Nonce2};
 
-		{ok, Authz, _, Nonce2} ->
+		%T={ error, _Error, _Nonce } ->
+		%    T;
+
+		{ ok, Authz, _, NewNonce } ->
 			% get challenge
 			% map(
 			%	type,
 			%	url,
 			%	token
 			% )
-			[Challenge] = lists:filter(fun(C) ->
-					maps:get(<<"type">>, C, error) =:= bin(ChallengeType)
+
+
+
+			[ Challenge ] = lists:filter(
+				fun( CMap ) ->
+					maps:get( <<"type">>, CMap, _Default=error )
+						=:= atom_to_binary( ChallengeType )
 				end,
-				maps:get(<<"challenges">>, Authz)
+				maps:get( <<"challenges">>, Authz )
 			),
 
-			authz_step1(T, ChallengeType, State#state{nonce=Nonce2},
-						Challenges#{Uri => Challenge})
+			authz_step1(T, ChallengeType, LEState#le_state{ nonce=Nonce2 },
+						Challenges#{ Uri => Challenge } )
 	end.
 
-% authz_step2(Challenges, State).
-%
-% 2d part Authorization, executed after challenge initialization.
-% Notify acme server we're good to proceed to challenges.
-%
--spec authz_step2(list(binary()), state()) -> {ok, nonce()} | {error, binary(), nonce()}.
-authz_step2([], #state{nonce=Nonce}) ->
-	{ok, Nonce};
-authz_step2([{_Uri, Challenge}|T], State=#state{nonce=Nonce, key=Key, jws=Jws, opts=Opts}) ->
-	{ok, _, _, Nonce2 } = letsencrypt_api:challenge(Challenge, Key, Jws#{nonce => Nonce}, Opts),
-	authz_step2(T, State#state{nonce=Nonce2}).
 
-% challenge_init(Mode, State, ChallengeType, Challenges)
+
+% Second step of the authorization process, executed after challenge
+% initialization.
 %
-% Initialize local configuration to serve given challenge
-% Depends on challenge type & mode
+% Notifies the ACME server the challenges are good to proceed.
+%
+-spec authz_step2( [ { bin_uri(), challenge() } ], le_state()) ->
+		  { 'ok', nonce() } | {'error', binary(), nonce() }.
+authz_step2( _Pairs=[], #le_state{ nonce=Nonce } ) ->
+	{ ok, Nonce };
+
+authz_step2( _Pairs=[ {_Uri, Challenge } | T ],
+			 LEState=#le_state{ nonce=Nonce, key=Key, jws=Jws, opts=Opts } ) ->
+	{ ok, _, _, OtherNonce } = letsencrypt_api:challenge( Challenge, Key,
+											  Jws#{ nonce => Nonce }, Opts ),
+
+	authz_step2( T, LEState#le_state{ nonce=OtherNonce } ).
+
+
+
+% Initializes the local configuration to serve specified challenge type.
+%
+% Depends on challenge type & mode.
 %
 % TODO: ChallengeType is included in Challenges (<<"type">> key). To refactor
 %
--spec challenge_init(mode(), state(), challenge_type(), map()) -> ok.
-challenge_init(webroot, #state{webroot_path=WPath, account_key=AccntKey}, 'http-01', Challenges) ->
-	maps:fold(
-		fun(_K, #{<<"token">> := Token}, _Acc) ->
-			Thumbprint = letsencrypt_jws:keyauth(AccntKey, Token),
-			file:write_file(<<(bin(WPath))/binary, $/, ?WEBROOT_CHALLENGE_PATH/binary, $/, Token/binary>>,
-							Thumbprint)
-		end,
-		0, Challenges
-	);
-challenge_init(slave, _, _, _) ->
+-spec challenge_init( le_mode(), le_state(), challenge_type(), map() ) -> void().
+challenge_init( _Mode=webroot, #le_state{ webroot_path=BinWPath,
+										  account_key=AccntKey },
+				_ChallengeType='http-01', Challenges ) ->
+
+	[ begin
+
+		ChalWebPath = file_utils:join(
+						  [ BinWPath, ?webroot_challenge_path, Token ] ),
+
+		Thumbprint = letsencrypt_jws:keyauth( AccntKey, Token ),
+
+		% Hopefully the default modes are fine:
+		file_utils:write_whole( ChalWebPath, Thumbprint, _Modes=[] )
+
+	  end || #{ <<"token">> := Token } <- maps:values( Challenges ) ];
+
+challenge_init( _Mode=slave, _LEState, _ChallengeType, _Challenges ) ->
 	ok;
-challenge_init(standalone, #state{port=Port, domain=Domain, account_key=AccntKey}, ChallengeType, Challenges) ->
-	%io:format("init standalone challenge for ~p~n", [ChallengeType]),
-	{ok, _} = case ChallengeType of
+
+challenge_init( _Mode=standalone, #le_state{ port=Port, domain=Domain,
+									   account_key=AccntKey },
+				ChallengeType, Challenges ) ->
+
+	%trace_utils:debug_fmt( "Init standalone challenge for ~p.",
+	%                       [ ChallengeType ] ),
+
+	{ok, _ } = case ChallengeType of
+
 		'http-01' ->
 			% elli webserver callback args is:
 			% #{Domain => #{
@@ -715,47 +927,55 @@ challenge_init(standalone, #state{port=Port, domain=Domain, account_key=AccntKey
 			%     ...
 			% }}
 			%
-			Thumbprints = maps:from_list(lists:map(
-				fun(#{<<"token">> := Token}) ->
-					{Token, letsencrypt_jws:keyauth(AccntKey, Token)}
-				end, maps:values(Challenges)
-			)),
+
+			% Iterating on values:
+			Thumbprints = maps:from_list(
+				[ { Token, letsencrypt_jws:keyauth( AccntKey, Token ) }
+				  || #{ <<"token">> := Token } <- maps:values( Challenges ) ] ),
+
 			elli:start_link([
-				{name    , {local, letsencrypt_elli_listener}},
-				{callback, letsencrypt_elli_handler},
-				{callback_args, [#{Domain => Thumbprints}]},
-				{port    , Port}
-			]);
+				{ name, { local, letsencrypt_elli_listener } },
+				{ callback, letsencrypt_elli_handler },
+				{ callback_args, [ #{ Domain => Thumbprints } ] },
+				{ port, Port } ] );
+
+		%'tls-sni-01' ->
+		%   TODO
 
 		_ ->
-			io:format("standalone mode: unknown ~p challenge type~n", [ChallengeType])
-		% TODO
-		%'tls-sni-01' ->
-	end,
+			trace_utils:error_fmt( "Standalone mode: unsupported ~p challenge "
+								   "type.", [ ChallengeType ] ),
 
-	ok.
+			throw( { unsupported_challenge_type, ChallengeType, standalone } )
 
-% challenge_destroy(Mode, State)
+	end.
+
+
+% Cleans up challenge context after it has been fullfilled (with success or not); in:
 %
-% cleanup challenge context after it has been fullfilled (with success or not).
-% 'webroot' mode:
-%	- delete token file
-% 'standalone' mode:
-%	- stop internal webserver
-% 'slave' mode:
-%	- _nothing to do_
+% - 'webroot' mode: delete token file
+% - 'standalone' mode: stop internal webserver
+% - 'slave' mode: nothing to do
 %
-% returns: 'ok'
-%
--spec challenge_destroy(mode(), state()) -> ok.
-challenge_destroy(webroot, #state{webroot_path=WPath, challenges=Challenges}) ->
-	maps:fold(fun(_K, #{<<"token">> := Token}, _) ->
-		file:delete(<<(bin(WPath))/binary, $/, ?WEBROOT_CHALLENGE_PATH/binary, $/, Token/binary>>)
-	end, 0, Challenges),
-	ok;
-challenge_destroy(standalone, _) ->
-	% stop http server
-	elli:stop(letsencrypt_elli_listener),
-	ok;
-challenge_destroy(slave, _) ->
+-spec challenge_destroy( le_mode(), le_state() ) -> void().
+challenge_destroy( _Mode=webroot,
+				   #le_state{ webroot_path=BinWPath, challenges=Challenges } ) ->
+
+	[ begin
+
+		  ChalWebPath = file_utils:join(
+						  [ BinWPath, ?webroot_challenge_path, Token ] ),
+
+		  file_utils:remove_file( ChalWebPath )
+
+	  end || #{ <<"token">> := Token } <- maps:values( Challenges ) ];
+
+
+challenge_destroy( _Mode=standalone, _LEState ) ->
+
+	% Stop http server:
+	elli:stop( letsencrypt_elli_listener );
+
+
+challenge_destroy( _Modeslave, _LEState ) ->
 	ok.

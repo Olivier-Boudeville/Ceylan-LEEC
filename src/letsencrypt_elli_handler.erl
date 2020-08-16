@@ -16,31 +16,51 @@
 -behaviour(elli_handler).
 
 -include_lib("elli/include/elli.hrl").
--export([handle/2, handle_event/3]).
+-export([ handle/2, handle_event/3 ]).
 
 
-handle(Req, Args) ->
-    %io:format("Elli: ~p~n~p~n", [Req, Args]),
-    handle(elli_request:method(Req), elli_request:path(Req), Req, Args).
+% Handles specified requests, returns a reply with an http code.
+handle( Req, Args ) ->
+	%trace_utils:debug_fmt( "Elli: ~p~n~p", [ Req, Args ] ),
+	handle( elli_request:method( Req ), elli_request:path( Req ), Req, Args ).
 
 
-handle('GET', [<<".well-known">>, <<"acme-challenge">>, Token], Req, [Thumbprints]) ->
-    %NOTE: when testing on travis with local boulder instance, Host header may contain port number
-    %      I dunno if it can happens againts production boulder, but this line filters it out
-    [Host|_]   = binary:split(elli_request:get_header(<<"Host">>, Req, <<>>), <<":">>),
-    %io:format("ELLI: host= ~p~n", [Host]),
 
-    case maps:get(Host, Thumbprints, undefined) of
-        #{Token := Thumbprint} ->
-            %io:format("match: ~p -> ~p~n", [Token, Thumbprint]),
-            {200, [{<<"Content-Type">>, <<"text/plain">>}], Thumbprint};
+handle( 'GET', [ <<".well-known">>, <<"acme-challenge">>, Token ], Req,
+		[ Thumbprints ] ) ->
 
-        _X     ->
-            %io:format("nomatch: ~p -> ~p~n", [Token, _X]),
-            {404, [], <<"Not Found">>}
-    end.
+	% NOTE: when testing on Travis with local boulder instance, Host header may
+	% contain port number; I dunno if it can happen against production boulder,
+	% but these lines filter it out:
+
+	Header = elli_request:get_header( <<"Host">>, Req, <<>> ),
+
+	[ Host | _Port ] = binary:split( Header, <<":">> ),
+
+	%trace_utils:debug_fmt( "ELLI: host=~p.", [ Host ] ),
+
+	case maps:get( Host, Thumbprints, _Def=undefined ) of
+
+		#{ Token := Thumbprint } ->
+
+			%trace_utils:debug_fmt( "Token match: ~p -> ~p.",
+			%                       [ Token, Thumbprint ] ),
+
+			{ 200, [ { <<"Content-Type">>, <<"text/plain">> } ], Thumbprint };
+
+		Other ->
+
+			%trace_utils:debug_fmt( "No token match: ~p -> ~p.",
+			%                       [ Token, Other ] ),
+
+			{ 404, [], <<"Not Found">> }
+
+	end.
 
 
-% request events. Unused
-handle_event(_, _, _) ->
-    ok.
+% Handles specified request events.
+%
+% Unused
+%
+handle_event( _, _, _ ) ->
+	ok.
