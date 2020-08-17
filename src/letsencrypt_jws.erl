@@ -25,13 +25,13 @@
 
 
 % Shorthands:
--type ssl_privatekey() :: letsencrypt:ssl_privatekey().
+-type ssl_private_key() :: letsencrypt:ssl_private_key().
 -type jws() :: letsencrypt:jws().
 
 
 
 % Initializes a RSA JWS with specified private key.
--spec init( ssl_privatekey() ) -> jws().
+-spec init( ssl_private_key() ) -> jws().
 init( _PrivateKey=#{ b64 := { N, E } } ) ->
 	#{ alg => 'RS256',
 	   jwk => #{ kty => 'RSA',
@@ -44,7 +44,7 @@ init( _PrivateKey=#{ b64 := { N, E } } ) ->
 % Builds and returns the JWS body, see ref:
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-6.2.
 %
--spec encode( ssl_privatekey(), jws(), map() | 'empty' ) -> binary().
+-spec encode( ssl_private_key(), jws(), map() | 'empty' ) -> binary().
 encode( _PrivateKey=#{ raw := RSAKey }, Jws, Content) ->
 
 	Protected = letsencrypt_utils:b64encode( jiffy:encode( Jws ) ),

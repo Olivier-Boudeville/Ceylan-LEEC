@@ -19,6 +19,7 @@ LEEC_RELEASES = $(LEEC_RELEASE_ARCHIVE_BZ2) \
 				$(LEEC_RELEASE_ARCHIVE_ZIP) \
 				$(LEEC_RELEASE_ARCHIVE_XZ)
 
+all:
 
 # First target for default:
 help: help-intro help-leec

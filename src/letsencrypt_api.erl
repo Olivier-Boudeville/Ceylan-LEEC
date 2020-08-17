@@ -15,111 +15,171 @@
 -module(letsencrypt_api).
 -author("Guillaume Bour <guillaume@bour.cc>").
 
--export([directory/2, nonce/2, account/4, order/5, order/4, authorization/4, challenge/4,
-		 finalize/5, certificate/4, status/1]).
+-export([ get_directory_map/2, get_nonce/2, get_account/4,
+		  request_order/5, get_order/4, request_authorization/4,
+		  notify_ready_for_challenge/4, finalize_order/5, get_certificate/4,
+		  binary_to_status/1 ]).
 
--import(letsencrypt_utils, [str/1]).
+
+-type json_http_body() :: map().
+
+-type header_map() :: map().
+
+-type bin_content() :: binary().
+
+-type option_map() :: map().
+
+% Not 'prod':
+-type environment() :: 'default' | 'staging'.
+
+
+% Shorthands:
+
+-type uri() :: letsencrypt:uri().
+-type ssl_private_key() :: letsencrypt:ssl_private_key().
+-type bin_domain() :: letsencrypt:bin_domain().
+-type bin_key() :: letsencrypt:bin_key().
+-type bin_csr_key() :: letsencrypt:bin_csr_key().
+-type directory_map() :: letsencrypt:directory_map().
+-type bin_uri() :: letsencrypt:bin_uri().
+-type json_map_decoded() :: letsencrypt:json_map_decoded().
+-type nonce() :: letsencrypt:nonce().
+-type jws() :: letsencrypt:jws().
+-type order_map() :: letsencrypt:order_map().
+-type bin_certificate() :: letsencrypt:bin_certificate().
 
 
 -ifdef(TEST).
-	-define(STAGING_API_URL, <<"https://127.0.0.1:14000/dir">>).
-	-define(DEFAULT_API_URL, <<"">>).
+	-define( staging_api_url, <<"https://127.0.0.1:14000/dir">> ).
+	-define( default_api_url, <<"">> ).
 -else.
-	-define(STAGING_API_URL, <<"https://acme-staging-v02.api.letsencrypt.org/directory">>).
-	-define(DEFAULT_API_URL, <<"https://acme-v02.api.letsencrypt.org/directory">>).
+
+	-define( staging_api_url,
+			 <<"https://acme-staging-v02.api.letsencrypt.org/directory">> ).
+
+	-define( default_api_url,
+			 <<"https://acme-v02.api.letsencrypt.org/directory">> ).
+
 -endif.
 
 -ifdef(DEBUG).
-	-define(debug(Fmt, Args), io:format(Fmt, Args)).
+	-define( debug( Fmt, Args ), trace_utils:debug_fmt( Fmt, Args ) ).
 -else.
-	-define(debug(Fmt, Args), ok).
+	-define( debug( Fmt, Args ), ok ).
 -endif.
 
--spec status(binary()) -> atom().
-status(<<"pending">>)    -> pending;
-status(<<"processing">>) -> processing;
-status(<<"valid">>)      -> valid;
-status(<<"invalid">>)    -> invalid;
-status(<<"revoked">>)    -> revoked;
-status(_Status)       ->
-	io:format("unknown status: ~p~n", [_Status]),
-	unknown.
+
+% Name of the ETS table storing current connections:
+-define( connection_table, leec_connections ).
+
+
+% Returns the status corresponding to specified binary.
+-spec binary_to_status( binary() ) -> letsencrypt:status().
+binary_to_status( <<"pending">> ) ->
+	pending;
+
+binary_to_status( <<"processing">> ) ->
+	processing;
+
+binary_to_status( <<"valid">> ) ->
+	valid;
+
+binary_to_status( <<"invalid">> ) ->
+	invalid;
+
+binary_to_status( <<"revoked">> ) ->
+	revoked;
+
+binary_to_status( InvalidBinStatus ) ->
+	trace_utils:error_fmt( "Invalid status: '~p'.", [ InvalidBinStatus ] ),
+	throw( { invalid_status, InvalidBinStatus } ).
+
+
 
 %% PRIVATE
 
-% tcpconn({Prototype, Hostname/IP, Port})
+
+% Returns a suitable TCP connection.
 %
-% returns: {ok, ConnID}
+% If a connection to the given Host:Port is already opened, returns it, either
+% opens a new connection.
 %
-% Opened connections are stored in `conns` ets. If a connection to the given Host:Port
-% is already opened, returns it, either open a new connection.
+% Opened connections are stored in the ?connection_table ETS table.
 %
-% TODO: checks connection is still alive (ping ?)
--spec tcpconn({http|https, string(), integer()}) -> {ok, pid()}.
-tcpconn(Key={Proto, Host, Port}) ->
-	case ets:info(conns) of
-		% Does not exist:
+% TODO: checks connection is still alive (ping?)
+%
+-spec get_tcp_connection( { net_utils:protocol_type(),
+		net_utils:string_host_name(), net_utils:tcp_port() } ) ->
+		  shotgun:connection().
+get_tcp_connection( ConnectTriplet={ Proto, Host, Port } ) ->
+
+	case ets:info( ?connection_table ) of
+
+		% Table does not exist, let's create it:
 		undefined ->
-			ets:new(conns, [set, named_table]);
+			ets:new( ?connection_table, [ set, named_table ] );
 
 		_ ->
 			ok
 	end,
 
-	case ets:lookup(conns, Key) of
-		% not found
+	case ets:lookup( ?connection_table, ConnectTriplet ) of
+
+		% Not found:
 		[] ->
 			trace_utils:debug_fmt( "Opening connection to ~s:~B, with the "
 				"'~s' scheme.", [ Host, Port, Proto ] ),
 
-			Conn = case shotgun:open(Host, Port, Proto) of
+			Conn = case shotgun:open( Host, Port, Proto ) of
 
-				{ok, Connection} ->
+				{ ok, Connection } ->
 				   Connection;
 
-				{error,gun_open_failed} ->
+				{ error, gun_open_failed } ->
 				   throw( { gun_open_failed, Host, Port, Proto } )
 
 		   end,
-			ets:insert(conns, {Key, Conn}),
-			{ok, Conn};
-		[{_, Conn}] ->
-			{ok, Conn}
+
+			ets:insert( ?connection_table, { ConnectTriplet, Conn } ),
+			Conn;
+
+		[ { _ConnectTriplet, Conn } ] ->
+			Conn
+
 	end.
 
 
 
-% Decodes http body as json if asked, or return it as is.
+% Decodes http body as JSON if requested in options, or returns it as is.
 %
-% Returns {ok, Result} with added json structure if required.
+% Returns {ok, Result} with added JSON structure if required.
 %
--spec decode( Option :: map(), Result :: map() ) -> {ok, map()}.
-decode(#{json := true}, Response=#{body := Body}) ->
-	Payload = jiffy:decode(Body, [return_maps, use_nil]),
-	{ok, Response#{json => Payload}};
+-spec decode( Option :: map(), Response :: map() ) -> json_http_body().
+decode( #{ json := true }, Response=#{ body := Body } ) ->
+	Payload = jiffy:decode( Body, [ return_maps, use_nil ] ),
+	Response#{ json => Payload};
 
-decode(_, Response) ->
-	{ok, Response}.
+decode( _, Response ) ->
+	Response.
 
 
-% request(get|post, Uri, Headers, Content, Options)
-%
-% Query Uri (get or post) and return results.
-%
+
+% Query an URI (GET or POST) and returns results:
 % returns:
-%	{ok, #{status_coe, body, headers}}    :: query succeed
-%	{error, invalid_method}               :: Method MUST be either 'get' or 'post'
-%   {error, term()}                       :: query failed
+%	{ok, #{status_coe, body, headers}}: query succeed
+%	{error, invalid_method}           : Method MUST be either 'get' or 'post'
+%   {error, term()}                   : query failed
 %
 % TODO: is 'application/jose+json' content type always required?
 %       (check acme documentation)
--spec request(get|post, string()|binary(), map(), nil|binary(), map()) ->
-	shotgun:result()|{error, invalid_method}.
-request(Method, Uri, Headers, Content, Opts=#{netopts := Netopts}) ->
+%
+-spec request( 'get' | 'post', uri(), header_map(), 'nil' | bin_content(),
+		   option_map() ) -> shotgun:result() | { 'error', term() }.
+request( Method, Uri, Headers, BinContent, Opts=#{ netopts := Netopts } ) ->
 
 	% Port may not be specified:
 	UriMap = #{ scheme := Scheme, host := Host, path := Path } =
-		uri_string:parse(str(Uri)),
+		uri_string:parse( Uri ),
 
 	Proto = list_to_atom( Scheme ),
 
@@ -135,107 +195,114 @@ request(Method, Uri, Headers, Content, Opts=#{netopts := Netopts}) ->
 
 	Port = maps:get( port, UriMap, DefaultPort ),
 
-	Headers2 = Headers#{<<"content-type">> => <<"application/jose+json">>},
+	ContentHeaders = Headers#{ <<"content-type">> =>
+								   <<"application/jose+json">> },
 
 	% We want to reuse connection if it already exists:
-	{ok, Conn} = tcpconn({Proto, Host, Port}),
+	Conn = get_tcp_connection( { Proto, Host, Port } ),
 
 	Result = case Method of
 
 		get ->
-			shotgun:get(Conn, Path, Headers2, Netopts);
+			shotgun:get( Conn, Path, ContentHeaders, Netopts );
 
 		post ->
-			shotgun:post(Conn, Path, Headers2, Content, Netopts);
+			shotgun:post( Conn, Path, ContentHeaders, BinContent, Netopts );
 
 		_ ->
-			{error, invalid_method}
+			{ error, { invalid_method, Method } }
 
 	end,
 
-	?debug("~p(~p) => ~p~n", [Method, Uri, Result]),
+	?debug( "~p(~p) => ~p.", [ Method, Uri, Result ] ),
+
 	case Result of
-		{ok, Response=#{headers := RHeaders}} ->
+
+		{ ok, Response=#{ headers := RHeaders } } ->
 			R = Response#{
-				  nonce    => proplists:get_value(<<"replay-nonce">>, RHeaders, nil),
-				  location => proplists:get_value(<<"location">>, RHeaders, nil)
+				nonce => proplists:get_value( <<"replay-nonce">>, RHeaders,
+											  _Def=nil ),
+				location => proplists:get_value( <<"location">>, RHeaders,
+												 _Def=nil )
 			},
-			decode(Opts, R);
-		_ -> Result
+			decode( Opts, R );
+
+		_ ->
+			Result
+
 	end.
+
 
 %%
 %% PUBLIC FUNCTIONS
 %%
 
-% directory(Environment, Options)
+
+% Returns a directory map listing all ACME protocol URLs (ref:
+% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.1.1).
 %
-% Get directory map listing all acme protocol urls.
-% ref: https://www.rfc-editor.org/rfc/rfc8555.html#section-7.1.1
-%
-% returns:
-%	{ok, Directory} where Directory is a map containing protocol urls
-%
--spec directory(default|staging, map()) -> {ok, map()}.
-directory(Env, Opts) ->
+-spec get_directory_map( environment(), option_map() ) ->
+		  letsencrypt:directory_map().
+get_directory_map( Env, Opts ) ->
+
 	Uri = case Env of
-		staging -> ?STAGING_API_URL;
-		_       -> ?DEFAULT_API_URL
+
+		staging ->
+			?staging_api_url;
+
+		_ ->
+			?default_api_url
+
 	end,
-	?debug("Getting directory at ~p~n", [Uri]),
 
-	{ok, #{json := Directory}} = request(get, Uri, #{}, nil, Opts#{json => true}),
-	{ok, Directory}.
+	?debug( "Getting directory map at ~s.", [ Uri ] ),
 
-% nonce(Directory, Options)
-%
-% Get a fresh nonce.
-% ref: https://www.rfc-editor.org/rfc/rfc8555.html#section-7.2
-%
-% returns:
-%	{ok, Nonce}
-%
--spec nonce(map(), map()) -> {ok, binary()}.
-nonce(#{<<"newNonce">> := Uri}, Opts) ->
-	{ok, #{nonce := Nonce}} = request(get, Uri, #{}, nil, Opts),
-	{ok, Nonce}.
+	{ ok, #{ json := DirectoryMap } } =
+		request( get, Uri, #{}, nil, Opts#{ json => true } ),
 
-% account(Directory, Key, Jws, Opts)
+	DirectoryMap.
+
+
+
+% Gets and returns a fresh nonce; see
+% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.2
 %
-% Request new account.
-% ref: https://www.rfc-editor.org/rfc/rfc8555.html#section-7.3.1
+-spec get_nonce( directory_map(), option_map() ) -> nonce().
+get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, Opts ) ->
+	{ ok, #{ nonce := Nonce } } = request( get, Uri, #{}, nil, Opts ),
+	Nonce.
+
+
+% Request a new account, see
+% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.3.1.
 %
-% returns:
-%	{ok, Response, Location, Nonce}
+% Returns {Response, Location, Nonce}, where:
 %		- Response is json (decoded as map)
 %		- Location is create account url
 %		- Nonce is a new valid replay-nonce
 %
-% NOTE: tos are automatically agreed, this should not be the case
+% NOTE: TOS are automatically agreed, this should not be the case
 % TODO: checks 201 Created response
 %
--spec account(map(), binary(), map(), map()) -> {ok, map(), binary(), binary()}.
-account(#{<<"newAccount">> := Uri}, Key, Jws, Opts) ->
-	Payload = #{
-		termsOfServiceAgreed => true,
-		contact              => []
-	},
-	Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, Payload),
+-spec get_account( directory_map(), bin_key(), jws(), option_map() ) ->
+		  { json_map_decoded(), bin_uri(), nonce() }.
+get_account( _DirMap=#{ <<"newAccount">> := Uri }, Key, Jws, Opts ) ->
 
-	{ok, #{
-	   json     := Resp,
-	   location := Location,
-	   nonce    := Nonce
-	}} = request(post, Uri, #{}, Req, Opts#{json => true}),
-	{ok, Resp, Location, Nonce}.
+	Payload = #{ termsOfServiceAgreed => true,
+				 contact => [] },
 
-% order(Directory, Domain, Key, Jws, Opts)
+	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, Payload ),
+
+	{ ok, #{ json := Resp, location := Location, nonce := Nonce } } =
+		request( post, Uri, #{}, Req, Opts#{ json => true } ),
+
+	{ Resp, Location, Nonce }.
+
+
+
+% Requests a new order, see https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.
 %
-% Request new order.
-% ref: https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4
-%
-% returns:
-%	{ok, Response, Location, Nonce}
+% Returns {Response, Location, Nonce}, where:
 %		- Response is json (decoded as map)
 %		- Location is create account url
 %		- Nonce is a new valid replay-nonce
@@ -243,125 +310,110 @@ account(#{<<"newAccount">> := Uri}, Key, Jws, Opts) ->
 % TODO: support multiple domains
 %		checks 201 created
 %
--spec order(map(), binary(), binary(), map(), map()) -> {ok, map(), binary(), binary()}.
-order(#{<<"newOrder">> := Uri}, Domain, Key, Jws, Opts) ->
-	Payload = #{
-		identifiers => [#{
-			type => dns,
-			value => Domain
-		 }]
-	},
-	Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, Payload),
+-spec request_order( directory_map(), bin_domain(), bin_key(), jws(), option_map() ) ->
+		  { json_map_decoded(), bin_uri(), nonce() }.
+request_order( _DirMap=#{ <<"newOrder">> := Uri }, BinDomain, Key, Jws, Opts ) ->
 
-	{ok, #{
-		json     := Resp,
-		location := Location,
-		nonce    := Nonce
-	}} = request(post, Uri, #{}, Req, Opts#{json => true}),
-	{ok, Resp, Location, Nonce}.
+	Payload = #{ identifiers => [ #{ type => dns, value => BinDomain } ] },
 
-% order(Uri, Key, Jws, Opts)
+	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, Payload ),
+
+	{ok, #{	json := Resp, location := Location,	nonce := Nonce } } =
+		request( post, Uri, #{}, Req, Opts#{ json => true } ),
+
+	{ Resp, Location, Nonce }.
+
+
+
+% Returns order state.
+-spec get_order( bin_uri(), bin_key(), jws(), option_map() ) ->
+		  { json_map_decoded(), bin_uri(), nonce() }.
+get_order( Uri, Key, Jws, Opts ) ->
+
+	% POST-as-GET implies no payload:
+
+	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, empty ),
+
+	{ ok, #{ json := Resp, location := Location, nonce := Nonce	} } =
+		request( post, Uri, #{}, Req, Opts#{ json=> true } ),
+
+	{ Resp, Location, Nonce }.
+
+
+
+% Requests authorization for given identifier, see
+% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.1.
 %
-% Get order state.
-%
-order(Uri, Key, Jws, Opts) ->
-	% POST-as-GET = no payload
-	Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, empty),
-
-	{ok, #{
-		json     := Resp,
-		location := Location,
-		nonce    := Nonce
-	}} = request(post, Uri, #{}, Req, Opts#{json=> true}),
-
-	{ok, Resp, Location, Nonce}.
-
-% authorization(Uri, Key, Jws, Opts)
-%
-% Request authorization for given identifier.
-% ref: https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.1
-%
-% returns:
-%	{ok, Response, Location, Nonce}
+% Returns {Response, Location, Nonce}, where:
 %		- Response is json (decoded as map)
 %		- Location is create account url
 %		- Nonce is a new valid replay-nonce
 %
-%
--spec authorization(binary(), binary(), map(), map()) -> {ok, map(), binary(), binary()}.
-authorization(Uri, Key, Jws, Opts) ->
-	% POST-as-GET = no payload
-	Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, empty),
+-spec request_authorization( bin_uri(), bin_key(), jws(), option_map() ) ->
+		  { json_map_decoded(), bin_uri(), nonce() }.
+request_authorization( Uri, Key, Jws, Opts ) ->
 
-	{ok, #{
-		json     := Resp,
-		location := Location,
-		nonce    := Nonce
-	}} = request(post, Uri, #{}, Req, Opts#{json=> true}),
-	{ok, Resp, Location, Nonce}.
+	% POST-as-GET implies no payload:
 
-% challenge(Challenge, Key, Jws, Opts)
+	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, empty ),
+
+	{ ok, #{ json := Resp, location := Location, nonce := Nonce	} } =
+		request( post, Uri, #{}, Req, Opts#{ json=> true } ),
+
+	{ Resp, Location, Nonce }.
+
+
+
+% Notifies the ACME server that we are ready for challenge validation (see
+% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.5.1).
 %
-% Notifies acme server we are ready for challenge validation.
-% ref: https://www.rfc-editor.org/rfc/rfc8555.html#section-7.5.1
-%
-% returns:
-%	{ok, Response, Location, Nonce}
+% Returns {Response, Location, Nonce}, where:
 %		- Response is json (decoded as map)
 %		- Location is create account url
 %		- Nonce is a new valid replay-nonce
 %
--spec challenge(map(), binary(), map(), map()) -> {ok, map(), binary(), binary()}.
-challenge(#{<<"url">> := Uri}, Key, Jws, Opts) ->
-	% POST-as-GET = no payload
-	Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, #{}),
+-spec notify_ready_for_challenge( directory_map(), bin_key(), jws(),
+			  option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
+notify_ready_for_challenge( _DirMap=#{ <<"url">> := Uri }, Key, Jws, Opts ) ->
 
-	{ok, #{
-	   json     := Resp,
-	   location := Location,
-	   nonce    := Nonce
-	}} = request(post, Uri, #{}, Req, Opts#{json => true}),
-	{ok, Resp, Location, Nonce}.
+	% POST-as-GET implies no payload:
+	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, #{} ),
 
-% finalize(Order, Csr, Key, Jws, Opts)
+	{ ok, #{ json := Resp, location := Location, nonce := Nonce } } =
+		request( post, Uri, #{}, Req, Opts#{ json => true } ),
+
+	{ Resp, Location, Nonce }.
+
+
+
+% Finalizes order once a challenge has been validated, see
+% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.
 %
-% Finalize order once a challenge has been validated.
-% ref: https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4
-%
-% returns:
-%
-% finalize order
--spec finalize(map(), binary(), letsencrypt:ssl_privatekey(), map(), map()) ->
-		  {ok, map(), binary(), binary()}.
-finalize(#{<<"finalize">> := Uri}, Csr, Key, Jws, Opts) ->
-	Payload = #{
-		csr => Csr
-	},
+-spec finalize_order( directory_map(), bin_csr_key(), bin_key(), jws(),
+			  option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
+finalize_order( _DirMap=#{ <<"finalize">> := Uri }, Csr, Key, Jws, Opts ) ->
 
-	Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, Payload),
+	Payload = #{ csr => Csr },
 
-	{ok, #{
-	   json     := Resp,
-	   location := Location,
-	   nonce    := Nonce
-	}} = request(post, Uri, #{}, Req, Opts#{json => true}),
-	{ok, Resp, Location, Nonce}.
+	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, Payload ),
+
+	{ ok, #{ json := Resp, location := Location, nonce := Nonce } } =
+		request( post, Uri, #{}, Req, Opts#{ json => true } ),
+
+	{ Resp, Location, Nonce }.
 
 
-% certificate(Order, Key, Jws, Opts)
-%
-% Download certificate (for finalized order.
-% ref: https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.2
-%
-% returns:
-%	{ok, Cert}
-%
--spec certificate(map(), letsencrypt:ssl_privatekey(), map(), map()) -> {ok, binary()}.
-certificate(#{<<"certificate">> := Uri}, Key, Jws, Opts) ->
-	% POST-as-GET = no payload
-	Req = letsencrypt_jws:encode(Key, Jws#{url => Uri}, empty),
 
-	{ok, #{
-	   body := Cert
-	}} = request(post, Uri, #{}, Req, Opts),
-	{ok, Cert}.
+% Downloads certificate for finalized order (see
+% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.2) and returns it.
+%
+-spec get_certificate( order_map(), ssl_private_key(), jws(), option_map() ) ->
+		  bin_certificate().
+get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, Opts ) ->
+
+	% POST-as-GET implies no payload:
+	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, empty ),
+
+	{ ok, #{ body := BinCert } } = request( post, Uri, #{}, Req, Opts ),
+
+	BinCert.

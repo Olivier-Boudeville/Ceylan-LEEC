@@ -23,11 +23,13 @@
 
 % Shorthands:
 
--type maybe( T ) :: T | 'undefined'.
--type void() :: any().
-
--type file_name() :: file_utils:file_name().
 -type directory_path() :: file_utils:directory_path().
+-type bin_directory_path() :: file_utils:bin_directory_path().
+-type file_path() :: file_utils:file_path().
+
+-type key_file_info() :: letsencrypt:key_file_info().
+-type san() :: letsencrypt:san().
+-type bin_certificate() :: letsencrypt:bin_certificate().
 
 
 
@@ -43,12 +45,16 @@ create_private_key( undefined, CertDirPath ) ->
 
 	DefaultFilename = text_utils:format( "letsencrypt-~B.key", [ Uniq ] ),
 
+	% Safety measure:
+	DefaultPath = file_utils:join( CertDirPath, DefaultFilename ),
+	false = file_utils:is_existing_file( DefaultPath ),
+
 	create_private_key( { new, DefaultFilename }, CertDirPath );
 
 
 create_private_key( { new, KeyFilename }, CertDirPath ) ->
 
-	KeyFilePath = file_utils:join( CertDirPath, KeyFile ),
+	KeyFilePath = file_utils:join( CertDirPath, KeyFilename ),
 
 	case file_utils:is_existing_file( KeyFilePath ) of
 
@@ -125,9 +131,9 @@ get_cert_request( BinDomain, BinCertDirPath, SANs) ->
 
 	%trace_utils:debug_fmt( "CSR file path: ~s.", [ CertFilePath ] ),
 
-	generate_certificate( request, BinDomain, CertFile, KeyFile, SANs),
+	generate_certificate( request, BinDomain, CertFilePath, KeyFilePath, SANs ),
 
-	RawCsr = file_utils:read_whole( CertFile ),
+	RawCsr = file_utils:read_whole( CertFilePath ),
 
 	[ { 'CertificationRequest', Csr, not_encrypted } ] =
 		public_key:pem_decode( RawCsr ),
@@ -143,13 +149,15 @@ get_cert_request( BinDomain, BinCertDirPath, SANs) ->
 %
 % Used for the tls-sni-01 challenge.
 %
--spec generate_autosigned_certificate( net_utils:string_fqdn(), file_path(), [ san() ] ) ->
-		  file_path().
+-spec generate_autosigned_certificate( net_utils:string_fqdn(), file_path(),
+									   [ san() ] ) -> file_path().
 generate_autosigned_certificate( Domain, KeyFilePath, SANs ) ->
 
-	CertFilePath =
-"/tmp/"++Domain++"-tlssni-autosigned.pem",
-	generate_certificate(request, Domain, CertFilePath, KeyFile, SANs),
+	CertFilePath = file_utils:join(
+		system_utils:get_default_temporary_directory(),
+		Domain ++ "-tlssni-autosigned.pem" ),
+
+	generate_certificate(request, Domain, CertFilePath, KeyFilePath, SANs ),
 
 	CertFilePath.
 
@@ -165,7 +173,7 @@ generate_certificate( request, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 					fun( San, Acc ) ->
 							<<Acc/binary, ", DNS:", San/binary>>
 					end,
-					_Acc0=<<"subjectAltName=DNS:", BinDomain/binary>>,
+					_Acc0= <<"subjectAltName=DNS:", BinDomain/binary>>,
 					_List=SANs ),
 
 	Cmd = executable_utils:get_default_openssl_executable_path()
@@ -197,8 +205,8 @@ generate_certificate( request, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 %
 % Domain certificate only.
 %
--spec write_certificate( net_utils:string_fqdn(), binary(), directory_path() ) ->
-		  file_path().
+-spec write_certificate( net_utils:string_fqdn(), bin_certificate(),
+						 directory_path() ) -> file_path().
 write_certificate( Domain, BinDomainCert, CertDirPath ) ->
 
 	CertFilePath = file_utils:join( CertDirPath, Domain ++ ".crt" ),

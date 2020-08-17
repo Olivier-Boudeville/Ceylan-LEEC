@@ -22,21 +22,26 @@
 
 
 % Public API:
--export([ make_cert/2, make_cert_bg/2, get_challenge/0 ]).
+-export([ make_cert/3, make_cert_bg/3, get_challenge/1 ]).
 
 
 % FSM API:
--export([ start/1, stop/0, init/1, handle_event/3, handle_sync_event/4,
+-export([ start/1, stop/1, init/1, handle_event/3, handle_sync_event/4,
 		  handle_info/3, terminate/3, code_change/4 ]).
 
 
 % FSM state-related callbacks:
 -export([ idle/3, pending/3, valid/3, finalize/3 ]).
 
--type maybe( T ) :: T | 'undefined'.
--type void() :: any().
+% Not involving Myriad's parse transform here:
+%-type maybe( T ) :: T | 'undefined'.
+%-type void() :: any().
+%-type table( K, V ) :: map_hashtable:map_hashtable( K, V ).
 
--type domain() :: net_utils:string_fqdn() | net_utils:bin_fqdn().
+
+-type bin_domain() :: net_utils:bin_fqdn().
+
+-type domain() :: net_utils:string_fqdn() | bin_domain().
 
 
 % URI format compatible with the shotgun library:
@@ -50,9 +55,12 @@
 
 -type challenge() :: term().
 
+% Supposedly:
+-type token() :: ustring().
+
 -type thumbprint() :: term().
 
--type thumbprint_map() :: map( token(), thumbprint() ).
+-type thumbprint_map() :: table( token(), thumbprint() ).
 
 
 % All known information regarding a challenge.
@@ -62,18 +70,39 @@
 -type challenge_map() :: map().
 
 
+-type string_uri() :: ustring().
+
 -type bin_uri() :: binary().
 
--type uri_challenge_type_map() :: map( bin_uri(), challenge_type() ).
+-type uri() :: string_uri() | bin_uri().
 
 
--type type_challenge_map() :: map( challenge_type(), challenge_map() ).
+-type uri_challenge_type_map() :: table( bin_uri(), challenge_type() ).
+
+
+-type type_challenge_map() :: table( challenge_type(), challenge_map() ).
 
 -type option_map() :: map().
 
+-type operation() :: any().
+
+% ACME directory, mapping URIs to operations.
+-type directory_map() :: table( operation(), uri() ).
+
 -type nonce() :: binary().
 
--type san() :: text_utils:ustring().
+
+% Subject Alternative Name, i.e. values to be associated with a security
+% certificate using a subjectAltName field; see
+% https://en.wikipedia.org/wiki/Subject_Alternative_Name.
+%
+-type san() :: ustring().
+
+-type order_map() :: map().
+
+
+% JSON element decoded as a map:
+-type json_map_decoded() :: map().
 
 
 % JSON Web Signature:
@@ -87,7 +116,30 @@
 		'b64' => { binary(), binary() },
 		'file' => string() }.
 
--type key_file_info() :: { 'new', file_name() } | file_path() }.
+-type key_file_info() :: { 'new', file_name() } | file_path().
+
+
+% A certificate, as a binary:
+-type bin_certificate() :: binary().
+
+% A key, as a binary:
+-type bin_key() :: binary().
+
+% A CSR key, as a binary:
+-type bin_csr_key() :: bin_key().
+
+
+-export_type([ bin_domain/0, domain/0, le_mode/0,
+			   challenge_type/0, challenge/0, token/0,
+			   thumbprint/0, thumbprint_map/0, challenge_map/0,
+			   string_uri/0, bin_uri/0, uri/0,
+			   uri_challenge_type_map/0,
+			   type_challenge_map/0, option_map/0, operation/0, nonce/0,
+			   san/0, order_map/0, json_map_decoded/0, jws/0,
+			   ssl_private_key/0, key_file_info/0,
+			   bin_certificate/0, bin_key/0, bin_csr_key/0 ]).
+
+
 
 -define( webroot_challenge_path, <<"/.well-known/acme-challenge">> ).
 
@@ -98,12 +150,12 @@
 	% ACME environment:
 	env = prod :: staging | prod,
 
-	% ACME directory (map operation -> uri):
-	directory = undefined :: maybe( map() ),
+	% ACME directory:
+	directory_map = undefined :: maybe( directory_map() ),
 
 	%acme_srv = ?DEFAULT_API_URL :: uri() | string(),
 
-	key_file = undefined :: maybe( key_file_info() ),
+	key_file_info = undefined :: maybe( key_file_info() ),
 
 	% Directory where certificates are to be stored:
 	cert_dir_path = <<"/tmp">> :: bin_directory_path(),
@@ -112,7 +164,7 @@
 	mode = undefined :: maybe( le_mode() ),
 
 	% If mode is 'webroot':
-	webroot_path = undefined :: maybe( bin_directory_path() ).
+	webroot_path = undefined :: maybe( bin_directory_path() ),
 
 	% If mode is 'standalone':
 	port = 80 :: net_utils:tcp_port(),
@@ -124,7 +176,7 @@
 
 	nonce = undefined :: maybe( nonce() ),
 
-	domain = undefined :: maybe( binary() ),
+	domain = undefined :: maybe( net_utils:bin_fqdn() ),
 
 	sans = [] :: [ san() ],
 
@@ -136,13 +188,13 @@
 
 	account_key = undefined,
 
-	order = undefined,
+	order = undefined :: maybe( order_map() ),
 
 	% Known challenges, per type:
 	challenges = #{} :: type_challenge_map(),
 
-	% certificate/csr key file:
-	cert_key_file = undefined :: maybe( file_utils:file_path() ),
+	% Path to certificate/csr key file:
+	cert_key_file_path = undefined :: maybe( file_path() ),
 
 	% API options:
 	opts = #{ netopts => #{ timeout => 30000 } } :: option_map()
@@ -153,20 +205,21 @@
 
 -type fsm_pid() :: pid().
 
-
-% A certificate, as a binary:
--type bin_certificate() :: binary().
-
-% A key, as a binary:
--type bin_key() :: binary().
-
--type status() :: atom().
+% FSM status:
+-type status() :: 'pending' | 'processing' | 'valid' | 'invalid' | 'revoked'.
 
 
 
 % Shorthands:
 
--type directory_path() :: file_utils:directory_path().
+-type count() :: basic_utils:count().
+-type ustring() :: text_utils:ustring().
+
+-type file_name() :: file_utils:file_name().
+-type file_path() :: file_utils:file_path().
+
+%-type directory_path() :: file_utils:directory_path().
+-type bin_directory_path() :: file_utils:bin_directory_path().
 
 
 
@@ -195,11 +248,9 @@ stop( FsmPid ) ->
 -spec init( [ atom() | { atom(), any() } ] ) -> { 'ok', 'idle', le_state() }.
 init( Args ) ->
 
-	SetupLEState = setup_mode( getopts( Args, #le_state{} ) ),
+	LEState = setup_mode( getopts( Args, #le_state{} ) ),
 
-	KeyLEState = update_key_info( SetupLEState ),
-
-	trace_utils:debug_fmt( "[~w] Initial state: ~p", [ self(), KeyLEState ] ),
+	trace_utils:debug_fmt( "[~w] Initial state: ~p", [ self(), LEState ] ),
 
 	% Creates key & initialises JWS:
 	Key = letsencrypt_ssl:create_private_key( LEState#le_state.key_file_info,
@@ -207,23 +258,18 @@ init( Args ) ->
 
 	Jws = letsencrypt_jws:init( Key ),
 
-	% Request directory:
-	{ ok, Directory } = letsencrypt_api:directory( LEState#le_state.env,
-												   LEState#le_state.opts ),
+	DirectoryMap = letsencrypt_api:get_directory_map( LEState#le_state.env,
+													  LEState#le_state.opts ),
 
 	% Gets first nonce:
-	{ ok, Nonce } = letsencrypt_api:nonce( Directory, LEState#le_state.opts ),
+	Nonce = letsencrypt_api:get_nonce( DirectoryMap, LEState#le_state.opts ),
 
 	{ ok, _LEStateName=idle,
-	  LEState#le_state{ directory=Directory, key=Key, jws=Jws, nonce=Nonce } }.
+	  LEState#le_state{ directory_map=DirectoryMap,
+						key=Key,
+						jws=Jws,
+						nonce=Nonce } }.
 
-
-
-% Updates if need the key info, typically so there is a unique key filename per
-% Let's Encrypt instance.
-%
-update_key_info( le_state() ) -> le_state().
-update_key_info( LEState=#letstate{ key_file_info=
 
 %%
 %% PUBLIC funs
@@ -283,13 +329,13 @@ make_cert_bg( FsmPid, Domain, Opts=#{async := Async} ) ->
 			{ creation_error, Error };
 
 		ok ->
-			case wait_valid( 20 ) of
+			case wait_valid( FsmPid, _Count=20 ) of
 
 				ok ->
 					Status = gen_fsm:sync_send_event( FsmPid, finalize,
 													  Timeout ),
 
-					case wait_finalized( Status, 20 ) of
+					case wait_finalized( FsmPid, Status, _Count=20 ) of
 
 						P={ ok, _SomeRes } ->
 							%trace_utils:debug_fmt( "OK for '~s': ~p",
@@ -337,8 +383,8 @@ make_cert_bg( FsmPid, Domain, Opts=#{async := Async} ) ->
 %   #{Challenge => Thumbrint} if ok,
 %	'error' if fails
 %
--spec get_challenge() -> 'error' | challenge_map().
-get_challenge() ->
+-spec get_challenge( fsm_pid() ) -> 'error' | challenge_map().
+get_challenge( FsmPid ) ->
 
 	case catch gen_fsm:sync_send_event( FsmPid, get_challenge ) of
 
@@ -379,32 +425,32 @@ idle( get_challenge, _, LEState ) ->
 %  - 'pending' waiting for challenges to be complete
 %
 idle( { create, Domain, _CertOpts }, _,
-	  LEState=#le_state{ directory=Dir, key=Key, jws=Jws, nonce=Nonce,
+	  LEState=#le_state{ directory_map=DirMap, key=Key, jws=Jws, nonce=Nonce,
 						 opts=Opts } ) ->
 
 	% 'http-01' or 'tls-sni-01'
 	% TODO: validate type
-	ChallengeType = maps:get( challenge, Opts, _Default='http-01'),
+	ChallengeType = maps:get( challenge, Opts, _Default='http-01' ),
 
 	%Conn  = get_conn(LEState),
 	%Nonce = get_nonce(Conn, LEState),
 	%TODO: SANs
 	%SANs  = maps:get(san, Opts, []),
 
-	{ ok, Accnt, Location, Nonce2 } = letsencrypt_api:account( Dir, Key,
+	{ Accnt, LocationURI, NewNonce } = letsencrypt_api:get_account( DirMap, Key,
 											 Jws#{ nonce => Nonce }, Opts ),
 
 	AccntKey = maps:get( <<"key">>, Accnt ),
 
-	Jws2 = #{ alg => maps:get( alg, Jws),
-			  nonce => Nonce2,
-			  kid   => Location },
+	NewJws = #{ alg => maps:get( alg, Jws ),
+				nonce => NewNonce,
+				kid   => LocationURI },
 
 	BinDomain = text_utils:ensure_binary( Domain ),
 
 	%TODO: checks order is ok
 	{ ok, Order, OrderLocation, Nonce3 } =
-		letsencrypt_api:order( Dir, BinDomain, Key, Jws2, Opts ),
+		letsencrypt_api:order( DirMap, BinDomain, Key, NewJws, Opts ),
 
 	% We need to keep trace of order location:
 	Order2 = Order#{ <<"location">> => OrderLocation },
@@ -418,13 +464,13 @@ idle( { create, Domain, _CertOpts }, _,
 	AuthUris = maps:get( <<"authorizations">>, Order ),
 
 	AuthzResp = authz( ChallengeType, AuthUris,
-		LEState#le_state{ domain=Domain, jws=Jws2, account_key=AccntKey,
+		LEState#le_state{ domain=Domain, jws=NewJws, account_key=AccntKey,
 						  nonce=Nonce3 } ),
 
 	{ StateName, Reply, Challenges, Nonce5 } = case AuthzResp of
 
 		{ error, Err, Nonce3 } ->
-			{ idle, {error, Err}, nil, Nonce3 };
+			{ idle, { error, Err }, nil, Nonce3 };
 
 
 		{ ok, Xchallenges, Nonce4 } ->
@@ -432,7 +478,7 @@ idle( { create, Domain, _CertOpts }, _,
 
 	end,
 
-	{reply, Reply, StateName, LEState#le_state{ domain=Domain, jws=Jws2,
+	{reply, Reply, StateName, LEState#le_state{ domain=BinDomain, jws=NewJws,
 		nonce=Nonce5, order=Order2, challenges=Challenges, sans=[],
 		account_key=AccntKey } }.
 
@@ -529,102 +575,124 @@ valid( _Action, _Domain,
 
 	challenge_destroy( Mode, LEState ),
 
-	%NOTE: keyfile is required for csr generation.
-
 	KeyFilename = text_utils:binary_to_string( BinDomain ) ++ ".key",
 
-	#{ file := KeyFilePath } = letsencrypt_ssl:create_private_key(
-								 { new, KeyFilename }, CertDirPath ),
+	% KeyFilePath is required for csr generation:
+	#{ file := KeyFilePath } =
+		letsencrypt_ssl:create_private_key( { new, KeyFilename }, CertDirPath ),
 
-	Csr = letsencrypt_ssl:get_cert_request( BinDomain, CertPath, SANs),
+	Csr = letsencrypt_ssl:get_cert_request( BinDomain, CertDirPath, SANs ),
 
-	{ok, FinOrder, _, Nonce2} = letsencrypt_api:finalize(Order, Csr, Key,
-														 Jws#{nonce => Nonce}, Opts),
+	{ ok, FinOrder, _, FinNonce } = letsencrypt_api:finalize( Order, Csr, Key,
+											 Jws#{ nonce => Nonce }, Opts ),
 
-	{reply, letsencrypt_api:status(maps:get(<<"status">>, FinOrder, nil)), finalize,
-	 LEState#le_state{order=FinOrder#{<<"location">> => maps:get(<<"location">>, Order)},
-				 cert_key_file=KeyFile, nonce=Nonce2}}.
+	BinStatus = maps:get( <<"status">>, FinOrder, nil ),
 
-% state 'finalize'
+	Status = letsencrypt_api:binary_to_status( BinStatus ),
+
+	LocOrder = FinOrder#{ <<"location">> => maps:get( <<"location">>, Order ) },
+
+	{ reply, Status, finalize, LEState#le_state{ order=LocOrder,
+								 cert_key_file_path=KeyFilePath, nonce=FinNonce } }.
+
+
+
+% Management of the 'finalize' state.
 %
 % When order is being finalized, and certificate generation is ongoing.
 %
-% finalize(processing)
-%
 % Wait for certificate generation being complete (order status == 'valid').
 %
-% returns:
-%	Status : order status
+% Returns the order status.
 %
-% transition:
+% Transitions to:
 %   state 'processing' : still ongoing
 %   state 'valid'      : certificate is ready
-finalize(processing, _, LEState=#le_state{order=Order, key=Key, jws=Jws, nonce=Nonce, opts=Opts}) ->
-	{ok, Order2, _, Nonce2} = letsencrypt_api:order(
-		maps:get(<<"location">>, Order, nil),
-		Key, Jws#{nonce => Nonce}, Opts),
-	{reply, letsencrypt_api:status(maps:get(<<"status">>, Order2, nil)), finalize,
-	 LEState#le_state{order=Order2, nonce=Nonce2}
-	};
+%
+finalize( processing, _Domain, LEState=#le_state{ order=OrderMap, key=Key, jws=Jws,
+												  nonce=Nonce, opts=Opts } ) ->
 
-% finalize(valid)
+	Loc = maps:get( <<"location">>, OrderMap, nil ),
+
+	{ NewOrderMap, _Loc, NewNonce } =
+		letsencrypt_api:get_order( Loc, Key, Jws#{ nonce => Nonce }, Opts ),
+
+	BinStatus = maps:get( <<"status">>, NewOrderMap, nil ),
+
+	Status = letsencrypt_api:binary_to_status( BinStatus ),
+
+	{ reply, Status, finalize,
+	  LEState#le_state{ order=NewOrderMap, nonce=NewNonce } };
+
+
+% Downloads certificate and saves it into file.
 %
-% Download certificate & save into file.
-%
-% returns;
-%	#{key, cert}
+% Returns #{key, cert} where;
 %		- Key is certificate private key filename
 %		- Cert is certificate PEM filename
 %
-% transition:
-%   state 'idle' : fsm complete, going back to initial state
-finalize(valid, _, LEState=#le_state{order=Order, domain=Domain, cert_key_file=KeyFile,
-								cert_dir_path=CertPath, key=Key, jws=Jws, nonce=Nonce,
-								opts=Opts}) ->
-	% download certificate
-	{ok, Cert} = letsencrypt_api:certificate(Order, Key, Jws#{nonce => Nonce}, Opts),
-	CertFile   = letsencrypt_ssl:certificate(str(Domain), Cert, CertPath),
-
-	{reply, {ok, #{key => bin(KeyFile), cert => bin(CertFile)}}, idle,
-	 LEState#le_state{nonce=undefined}};
-
-% finalize(Status)
+% Transitions to state 'idle': fsm complete, going back to initial state.
 %
+finalize( valid, _Domain, LEState=#le_state{ order=OrderMap, domain=BinDomain,
+						cert_key_file_path=KeyFilePath, cert_dir_path=CertDirPath,
+						key=Key, jws=Jws, nonce=Nonce, opts=Opts } ) ->
+
+	BinKeyFilePath = text_utils:string_to_binary( KeyFilePath ),
+
+	% Downloads certificate:
+	BinCert = letsencrypt_api:get_certificate( OrderMap, Key,
+							Jws#{ nonce => Nonce }, Opts ),
+
+	CertFilePath = letsencrypt_ssl:write_certificate( BinDomain, BinCert,
+													  CertDirPath ),
+
+	BinCertFilePath = text_utils:string_to_binary( CertFilePath ),
+
+	{ reply, { ok, #{ key => BinKeyFilePath, cert => BinCertFilePath } }, idle,
+	  LEState#le_state{ nonce=undefined } };
+
+
 % Any other order status leads to exception.
-%
-finalize(Status, _, LEState) ->
-	io:format("unknown finalize status ~p~n", [Status]),
-	{reply, {error, Status}, finalize, LEState}.
+finalize( UnexpectedStatus, _Domain, LEState ) ->
+
+	trace_utils:error_fmt( "Unknown finalize status: ~p.",
+						  [ UnexpectedStatus ] ),
+
+	{ reply, { error, UnexpectedStatus }, finalize, LEState }.
 
 
-%%%
-%%%
-%%%
+
+% Callback section.
+
+handle_event( reset, _StateName, LEState=#le_state{ mode=Mode } ) ->
+	%trace_utils:debug_fmt( "Reset from ~p state.", [ StateName ] ),
+	challenge_destroy( Mode, LEState ),
+	{ next_state, idle, LEState };
+
+handle_event( _, StateName, LEState ) ->
+	trace_utils:debug_fmt( "Async event: ~p.", [ StateName ] ),
+	{ next_state, StateName, LEState }.
 
 
-handle_event(reset, _StateName, LEState=#le_state{mode=Mode}) ->
-	%io:format("reset from ~p state~n", [StateName]),
-	challenge_destroy(Mode, LEState),
-	{next_state, idle, LEState};
 
-handle_event(_, StateName, LEState) ->
-	io:format("async evt: ~p~n", [StateName]),
-	{next_state, StateName, LEState}.
+handle_sync_event( stop, _, _, _ ) ->
+	{ stop, normal, ok, #le_state{} };
 
-handle_sync_event(stop,_,_,_) ->
-	{stop, normal, ok, #le_state{}};
-handle_sync_event(_,_, StateName, LEState) ->
-	io:format("sync evt: ~p~n", [StateName]),
-	{reply, ok, StateName, LEState}.
+handle_sync_event( _, _, StateName, LEState ) ->
+	trace_utils:debug_fmt( "Sync event: ~p.", [ StateName ] ),
+	{ reply, ok, StateName, LEState }.
 
-handle_info(_, StateName, LEState) ->
-	{next_state, StateName, LEState}.
 
-terminate(_,_,_) ->
+handle_info( _, StateName, LEState ) ->
+	{ next_state, StateName, LEState }.
+
+
+terminate( _, _, _ ) ->
 	ok.
 
-code_change(_, StateName, LEState, _) ->
-	{ok, StateName, LEState}.
+
+code_change( _, StateName, LEState, _ ) ->
+	{ ok, StateName, LEState }.
 
 
 
@@ -684,10 +752,14 @@ setup_mode( #le_state{ mode=webroot, webroot_path=undefined } ) ->
 	throw( webroot_path_missing );
 
 setup_mode( LEState=#le_state{ mode=webroot, webroot_path=BinWebrootPath } ) ->
+
 	% TODO: check directory is writable
-	ChallengeDirPath = file_utils:join( WebrootPath, ?webroot_challenge_path ),
+	ChallengeDirPath =
+		file_utils:join( BinWebrootPath, ?webroot_challenge_path ),
+
 	file_utils:create_directory_if_not_existing( ChallengeDirPath,
 												 create_parents ),
+
 	LEState;
 
 setup_mode( LEState=#le_state{ mode=standalone, port=_Port } ) ->
@@ -719,7 +791,7 @@ wait_valid( FsmPid, C ) ->
 
 % (helper)
 -spec wait_valid( fsm_pid(), count(), count() ) -> 'ok' | { 'error', any() }.
-wait_valid( FsmPid, 0, _C ) ->
+wait_valid( _FsmPid, 0, _C ) ->
 	{ error, timeout };
 
 wait_valid( FsmPid, Count, Max ) ->
@@ -748,19 +820,19 @@ wait_valid( FsmPid, Count, Max ) ->
 %   - {error, Err} if another error
 %   - {'ok', Response} if succeed
 %
--spec wait_finalized( status(), count() ) ->
+-spec wait_finalized( fsm_pid(), status(), count() ) ->
 		  { 'ok', map() } | { 'error', 'timeout' | any() }.
-wait_finalized( Status, C ) ->
-	wait_finalized( Status, C, C ).
+wait_finalized( FsmPid, Status, C ) ->
+	wait_finalized( FsmPid, Status, C, C ).
 
 
+% (helper)
 -spec wait_finalized( status(), count(), count() ) ->
 		  { 'ok', map() } | { 'error', 'timeout' | any() }.
-
-wait_finalized( _Status, _Count=0, _Max ) ->
+wait_finalized( _FsmPid, _Status, _Count=0, _Max ) ->
 	{ error, timeout };
 
-wait_finalized( Status, Count, Max ) ->
+wait_finalized( FsmPid, Status, Count, Max ) ->
 
 	case gen_fsm:sync_send_event( FsmPid, Status, _Timeout=15000 ) of
 
@@ -769,11 +841,11 @@ wait_finalized( Status, Count, Max ) ->
 
 		valid ->
 			timer:sleep( 500 * ( Max - Count + 1 ) ),
-			wait_finalized( valid, Count-1, Max );
+			wait_finalized( FsmPid, valid, Count-1, Max );
 
 		processing  ->
 			timer:sleep( 500 * ( Max - Count + 1 ) ),
-			wait_finalized( processing, Count-1, Max );
+			wait_finalized( FsmPid, processing, Count-1, Max );
 
 		{ _, Error } ->
 			{ error, Error };
@@ -832,8 +904,8 @@ authz_step1( _URIs=[ Uri | T ], ChallengeType,
 			 LEState=#le_state{ nonce=Nonce, key=Key, jws=Jws, opts=Opts },
 			 URIChallengeMap ) ->
 
-	AuthzRet = letsencrypt_api:authorization( Uri, Key, Jws#{ nonce => Nonce },
-											  Opts ),
+	AuthzRet =
+		letsencrypt_api:authorization( Uri, Key, Jws#{ nonce => Nonce }, Opts ),
 
 	trace_utils:debug_fmt( "Authzret for URI '~s': ~p.", [ AuthzRet, Uri ] ),
 
@@ -843,25 +915,19 @@ authz_step1( _URIs=[ Uri | T ], ChallengeType,
 		%    T;
 
 		{ ok, Authz, _, NewNonce } ->
-			% get challenge
-			% map(
-			%	type,
-			%	url,
-			%	token
-			% )
 
-
+			BinChallengeType = atom_to_binary( ChallengeType ),
 
 			[ Challenge ] = lists:filter(
 				fun( CMap ) ->
 					maps:get( <<"type">>, CMap, _Default=error )
-						=:= atom_to_binary( ChallengeType )
+						=:= BinChallengeType
 				end,
 				maps:get( <<"challenges">>, Authz )
 			),
 
-			authz_step1(T, ChallengeType, LEState#le_state{ nonce=Nonce2 },
-						Challenges#{ Uri => Challenge } )
+			authz_step1( T, ChallengeType, LEState#le_state{ nonce=NewNonce },
+						 URIChallengeMap#{ Uri => Challenge } )
 	end.
 
 

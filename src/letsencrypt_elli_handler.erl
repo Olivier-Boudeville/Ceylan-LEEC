@@ -50,8 +50,8 @@ handle( 'GET', [ <<".well-known">>, <<"acme-challenge">>, Token ], Req,
 
 		Other ->
 
-			%trace_utils:debug_fmt( "No token match: ~p -> ~p.",
-			%                       [ Token, Other ] ),
+			trace_utils:debug_fmt( "No token match: ~p -> ~p.",
+			                       [ Token, Other ] ),
 
 			{ 404, [], <<"Not Found">> }
 

@@ -69,6 +69,11 @@ LEEC_BEAM := $(LEEC_SRC)
 LEEC_INC = -I$(LEEC_TOP)/include
 
 
+ERLANG_COMPILER_BASE_WARNING_OPT = -W2 +warn_export_all +warn_export_vars +warn_shadow_vars +warn_obsolete_guards +warn_unused_import
+
+
+#+warnings_as_errors
+
 # In an OTP/rebar3-style application layout, at compilation time, libraries
 # making use of Myriad will expect its includes to be located in:
 #
