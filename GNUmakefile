@@ -1,12 +1,12 @@
 LEEC_TOP = .
 
 
-.PHONY: help help-intro help-leec                                        \
+.PHONY: all-rebar help help-intro help-leec                              \
 		all register-version-in-header register-leec list-beam-dirs      \
 		add-prerequisite-plts link-plt                                   \
 		send-release release release-zip release-bz2 release-xz          \
 		prepare-release clean-release clean-archive                      \
-		info-paths info-compile
+		check-types check-cross-references info-paths info-compile
 
 MODULES_DIRS = src #doc test priv
 
@@ -19,7 +19,12 @@ LEEC_RELEASES = $(LEEC_RELEASE_ARCHIVE_BZ2) \
 				$(LEEC_RELEASE_ARCHIVE_ZIP) \
 				$(LEEC_RELEASE_ARCHIVE_XZ)
 
-all:
+all: all-rebar
+
+all-rebar:
+	@$(REBAR3_EXEC) upgrade
+	@$(REBAR3_EXEC) compile
+
 
 # First target for default:
 help: help-intro help-leec
@@ -100,6 +105,14 @@ clean-release:
 
 clean-archive:
 	-@cd .. && /bin/rm -f $(LEEC_RELEASES)
+
+
+check-types:
+	@$(REBAR3_EXEC) dialyzer
+
+
+check-cross-references:
+	@$(REBAR3_EXEC) xref
 
 
 info-paths:

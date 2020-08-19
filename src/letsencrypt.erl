@@ -13,7 +13,7 @@
 %% limitations under the License.
 
 
-% Main module for Erlang Let's Encrypt.
+% Main module for LEEC, the Ceylan Let's Encrypt Erlang fork.
 -module(letsencrypt).
 
 -author("Guillaume Bour <guillaume@bour.cc>").
@@ -22,16 +22,22 @@
 
 
 % Public API:
--export([ make_cert/3, make_cert_bg/3, get_challenge/1 ]).
+-export([ start/1, obtain_certificate_for/3, stop/1,
+		  get_challenge/1 ]).
+
+
+% For spawn purpose:
+-export([ obtain_cert_helper/3 ].
 
 
 % FSM API:
--export([ start/1, stop/1, init/1, handle_event/3, handle_sync_event/4,
-		  handle_info/3, terminate/3, code_change/4 ]).
+-export([ init/1, handle_event/3, handle_sync_event/4, handle_info/3,
+		  terminate/3, code_change/4 ]).
 
 
 % FSM state-related callbacks:
 -export([ idle/3, pending/3, valid/3, finalize/3 ]).
+
 
 % Not involving Myriad's parse transform here:
 %-type maybe( T ) :: T | 'undefined'.
@@ -84,10 +90,24 @@
 
 -type option_map() :: map().
 
--type operation() :: any().
 
-% ACME directory, mapping URIs to operations.
--type directory_map() :: table( operation(), uri() ).
+% Known keys:
+%  - async :: boolean()
+%  - callback :: fun/1
+%  - netopts :: map() => #{ timeout => non_neg_integer() }
+%  - challenge :: challenge_type()
+%
+-type api_opts() :: option_map().
+
+
+% ACME operations that may be triggered:
+-type acme_operation() :: <<"newNonce">>
+						| <<"newAccount">>
+						| text_utils:bin_string().
+
+
+% ACME directory, converting operations into the URIs to access for them.
+-type directory_map() :: table( acme_operation(), uri() ).
 
 -type nonce() :: binary().
 
@@ -97,6 +117,9 @@
 % https://en.wikipedia.org/wiki/Subject_Alternative_Name.
 %
 -type san() :: ustring().
+
+-type bin_san() :: text_utils:bin_string().
+
 
 -type order_map() :: map().
 
@@ -114,7 +137,7 @@
 -type ssl_private_key() :: #{
 		'raw' => crypto:rsa_private(),
 		'b64' => { binary(), binary() },
-		'file' => string() }.
+		'file' => file_utils:file_path() }.
 
 -type key_file_info() :: { 'new', file_name() } | file_path().
 
@@ -135,7 +158,7 @@
 			   string_uri/0, bin_uri/0, uri/0,
 			   uri_challenge_type_map/0,
 			   type_challenge_map/0, option_map/0, operation/0, nonce/0,
-			   san/0, order_map/0, json_map_decoded/0, jws/0,
+			   san/0, bin_san/0, order_map/0, json_map_decoded/0, jws/0,
 			   ssl_private_key/0, key_file_info/0,
 			   bin_certificate/0, bin_key/0, bin_csr_key/0 ]).
 
@@ -148,12 +171,10 @@
 -record( le_state, {
 
 	% ACME environment:
-	env = prod :: staging | prod,
+	env = prod :: 'staging' | 'prod',
 
 	% ACME directory:
 	directory_map = undefined :: maybe( directory_map() ),
-
-	%acme_srv = ?DEFAULT_API_URL :: uri() | string(),
 
 	key_file_info = undefined :: maybe( key_file_info() ),
 
@@ -174,6 +195,7 @@
 
 	% State-related data:
 
+	% Current nonce:
 	nonce = undefined :: maybe( nonce() ),
 
 	domain = undefined :: maybe( net_utils:bin_fqdn() ),
@@ -181,9 +203,9 @@
 	sans = [] :: [ san() ],
 
 	% SSL private key information:
-	key = undefined :: maybe( ssl_private_key() ),
+	private_key = undefined :: maybe( ssl_private_key() ),
 
-	% JSON Web Signature:
+	% JSON Web Signature of the private key:
 	jws = undefined :: maybe( jws() ),
 
 	account_key = undefined,
@@ -197,7 +219,7 @@
 	cert_key_file_path = undefined :: maybe( file_path() ),
 
 	% API options:
-	opts = #{ netopts => #{ timeout => 30000 } } :: option_map()
+	api_opts = #{ netopts => #{ timeout => 30000 } } :: api_opts()
 
 }).
 
@@ -223,25 +245,86 @@
 
 
 
-% Starts letsencrypt service.
--spec start( list() ) -> { 'ok', fsm_pid() }
-			  | {'error', { 'already_started', fsm_pid() } }.
+% Public API.
+
+
+% Starts an instance of the letsencrypt service.
+-spec start( [ term() ] ) -> { 'ok', fsm_pid() }
+						   | {'error', { 'already_started', fsm_pid() } }.
 start( Args ) ->
+
+	json_utils:start_parser(),
+
+	% Not registered on purpose, to allow for concurrent ACME interactions
+	% (i.e. multiple, parallel instances).
+	%
+	% Calls init/1 and returns its outcome:
+	%
 	gen_fsm:start_link( ?MODULE, Args, _Opts=[] ).
 
 
-% Stops letsencrypt service.
--spec stop( fsm_pid() ) -> 'ok'.
+
+% Generates, synchronously (in a blocking manner) or not, a new certificate for
+% the specified domain (FQDN).
+%
+% Parameters:
+%	- Domain: domain name to generate an ACME certificate for
+%	- ApiOpts  : API-level user options
+%			* async (bool): if true, blocks until complete and returns
+%				generated certificate filename
+%							if false, immediately returns
+%			* callback: function executed when async = true once domain
+%				certificate has been successfully generated
+%
+% Returns:
+%	- 'async' if async is set (the default)
+%	- {error, Err} if something goes bad
+%
+-spec obtain_certificate_for( Domain :: domain(), fsm_pid(), api_opts() ) ->
+		  { 'ok', #{ cert => bin_certificate(), key => bin_key() } }
+		| { 'error', 'invalid' }
+		| 'async'.
+obtain_certificate_for( Domain, FsmPid, ApiOpts=#{ async := false } ) ->
+
+	trace_utils:debug_fmt( "FSM ~w requested to generate async certificate "
+						   "for domain '~s'.", [ FsmPid, Domain ] ),
+
+	obtain_cert_helper( Domain, FsmPid, ApiOpts );
+
+% Default to async = true:
+obtain_certificate_for( Domain, FsmPid, ApiOpts ) ->
+
+	trace_utils:debug_fmt( "FSM ~w requested to generate sync certificate "
+						   "for domain '~s'.", [ FsmPid, Domain ] ),
+
+	_Pid = erlang:spawn_link( ?MODULE, obtain_cert_helper,
+							  [ Domain, FsmPid, ApiOpts#{ async => true } ] ),
+
+	async.
+
+
+
+% Stops the specified instance of letsencrypt service.
+-spec stop( fsm_pid() ) -> void().
 stop( FsmPid ) ->
-	%NOTE: maintain compatibility with 17.X versions
+
+	% NOTE: maintain compatibility with 17.X versions
 	%gen_fsm:stop()
-	gen_fsm:sync_send_all_state_event( FsmPid, stop ).
+
+	gen_fsm:sync_send_all_state_event( FsmPid, stop ),
+
+	json_utils:stop_parser().
 
 
-% Initializes the state machine:
-%   - init ssl & jws
-%   - fetch ACME directory
-%   - get valid nonce
+
+
+% FSM internal API.
+
+
+% Initializes the LEEC state machine:
+% - init ssl private key and its JWS
+% - fetch ACME directory
+% - get valid nonce
 %
 % Transitions to the 'idle' state.
 %
@@ -250,79 +333,41 @@ init( Args ) ->
 
 	LEState = setup_mode( getopts( Args, #le_state{} ) ),
 
-	trace_utils:debug_fmt( "[~w] Initial state: ~p", [ self(), LEState ] ),
+	trace_utils:debug_fmt( "[~w] Initial state: ~p.", [ self(), LEState ] ),
 
-	% Creates key & initialises JWS:
-	Key = letsencrypt_ssl:create_private_key( LEState#le_state.key_file_info,
-											  LEState#le_state.cert_dir_path ),
+	% Creates private key and initialises its JWS:
+	PrivateKey = letsencrypt_ssl:create_private_key(
+		LEState#le_state.key_file_info, LEState#le_state.cert_dir_path ),
 
-	Jws = letsencrypt_jws:init( Key ),
+	Jws = letsencrypt_jws:init( PrivateKey ),
+
+	Opts = LEState#le_state.opts,
 
 	DirectoryMap = letsencrypt_api:get_directory_map( LEState#le_state.env,
-													  LEState#le_state.opts ),
+													  Opts ),
 
-	% Gets first nonce:
-	Nonce = letsencrypt_api:get_nonce( DirectoryMap, LEState#le_state.opts ),
+	FirstNonce = letsencrypt_api:get_nonce( DirectoryMap, Opts ),
 
 	{ ok, _LEStateName=idle,
 	  LEState#le_state{ directory_map=DirectoryMap,
-						key=Key,
+						private_key=PrivateKey,
 						jws=Jws,
-						nonce=Nonce } }.
+						nonce=FirstNonce } }.
 
-
-%%
-%% PUBLIC funs
-%%
-
-
-% Generates a new certificate for specified domain (FQDN).
-%
-% params:
-%	- Domain: domain name to generate an ACME certificate for
-%	- Opts  : dictionary of options
-%			* async (bool): if true, make_cert() blocks until complete and returns
-%				generated certificate filename
-%						  if false, immediately returns
-%			* callback: function executed when async = true once domain certificate
-%						has been successfully generated
-% returns:
-%	- 'async' if async is set (default)
-%	- {error, Err} if something goes bad
-%
--spec make_cert( fsm_pid(), Domain :: domain(), option_map() ) ->
-		  {'ok', #{ cert => bin_certificate(), key => bin_key() } }
-			  | {'error','invalid'}
-			  | 'async'.
-make_cert( FsmPid, Domain, Opts=#{ async := false } ) ->
-
-	trace_utils:debug_fmt( "Generating async certificate for domain '~s'.",
-						   [ Domain ] ),
-
-	make_cert_bg( FsmPid, Domain, Opts );
-
-% Default to async = true:
-make_cert( FsmPid, Domain, Opts ) ->
-
-	trace_utils:debug_fmt( "Generating sync certificate for domain '~s'.",
-						   [ Domain ] ),
-
-	_Pid = erlang:spawn( ?MODULE, make_cert_bg,
-						[ FsmPid, Domain, Opts#{ async => true } ] ),
-	async.
 
 
 % (spawn helper)
--spec make_cert_bg( fsm_pid(), Domain :: domain(), option_map() ) ->
+-spec obtain_cert_helper( Domain :: domain(), fsm_pid(), api_opts() ) ->
 		  { 'ok', map() } | { 'error', 'invalid' }.
-make_cert_bg( FsmPid, Domain, Opts=#{async := Async} ) ->
+obtain_cert_helper( Domain, FsmPid, ApiOpts=#{ async := Async } ) ->
 
 	BinDomain = text_utils:ensure_binary( Domain ),
 
 	Timeout = 15000,
 
+	% Expected to trigger idle( { create, BinDomain, Opts }, _, LEState } ):
 	Ret = case gen_fsm:sync_send_event( FsmPid,
-							{ create, BinDomain, Opts }, Timeout ) of
+							{ create, BinDomain, ApiOpts }, Timeout ) of
 
 		{ error, Error } ->
 			trace_utils:error_fmt( "Creation error: ~p.", [ Error ] ),
@@ -332,33 +377,34 @@ make_cert_bg( FsmPid, Domain, Opts=#{async := Async} ) ->
 			case wait_valid( FsmPid, _Count=20 ) of
 
 				ok ->
-					Status = gen_fsm:sync_send_event( FsmPid, finalize,
-													  Timeout ),
+					Status =
+						gen_fsm:sync_send_event( FsmPid, finalize, Timeout ),
 
 					case wait_finalized( FsmPid, Status, _Count=20 ) of
 
 						P={ ok, _SomeRes } ->
-							%trace_utils:debug_fmt( "OK for '~s': ~p",
+							%trace_utils:debug_fmt( "OK for '~s': ~p.",
 							%                     [ Domain, SomeRes ] ),
 							P;
 
 						Error ->
-							%trace_utils:debug_fmt( "Error for '~s': ~p",
+							%trace_utils:error_fmt( "Error for '~s': ~p.",
 							%                     [ Domain, Error ] ),
 							Error
 
 					end;
 
 				OtherError ->
-					gen_fsm:send_all_state_event( FsmPid, reset ),
-					trace_utils:debug_fmt( "Reset for '~s': ~p",
+					trace_utils:debug_fmt( "Reset for '~s': ~p.",
 										   [ Domain, OtherError ] ),
+					gen_fsm:send_all_state_event( FsmPid, reset ),
 					OtherError
 
 			end;
 
 		Other ->
-			trace_utils:error_fmt("Unexpected after create: ~p", [ Other ] ),
+			trace_utils:error_fmt( "Unexpected return after create: ~p",
+								   [ Other ] ),
 			throw( { unexpected_create, Other } )
 
 	end,
@@ -366,7 +412,11 @@ make_cert_bg( FsmPid, Domain, Opts=#{async := Async} ) ->
 	case Async of
 
 		true ->
-			Callback = maps:get( callback, Opts, _Default=fun(_) -> ok end),
+			Callback = maps:get( callback, ApiOpts,
+				_Default=fun( _Ret ) ->
+					trace_utils:warning( "Default async callback called." )
+				end ),
+
 			Callback( Ret );
 
 		_ ->
@@ -375,6 +425,7 @@ make_cert_bg( FsmPid, Domain, Opts=#{async := Async} ) ->
 	end,
 
 	%trace_utils:debug_fmt( "Return for '~s': ~p", [ Domain, Ret ] ),
+
 	Ret.
 
 
@@ -400,60 +451,62 @@ get_challenge( FsmPid ) ->
 
 
 
-%%
-%% gen_server API
-%%
+% Section for gen_fsm API:
 
 
 % State 'idle', used when awaiting for certificate request.
 %
 % idle(get_challenge) :: nothing done
 %
-idle( get_challenge, _, LEState ) ->
+idle( get_challenge, _From, LEState ) ->
 	{ reply, no_challenge, idle, LEState };
 
-% idle( {create, Domain, Opts} ).
+
+% idle( {create, Domain, ApiOpts} ): starts the creation procedure.
 %
 % Starts a new certificate delivery process:
 %  - create new account
 %  - create new order
 %  - require authorization (returns challenges list)
-%  - initiate choosen challenge
+%  - initiate chosen challenge
 %
 % Transition to:
 %  - 'idle' if process failed
 %  - 'pending' waiting for challenges to be complete
 %
-idle( { create, Domain, _CertOpts }, _,
-	  LEState=#le_state{ directory_map=DirMap, key=Key, jws=Jws, nonce=Nonce,
-						 opts=Opts } ) ->
+idle( { create, BinDomain, ApiOpts }, _From,
+	  LEState=#le_state{ directory_map=DirMap, private_key=PrivKey, jws=Jws,
+						 nonce=Nonce } ) ->
 
 	% 'http-01' or 'tls-sni-01'
 	% TODO: validate type
-	ChallengeType = maps:get( challenge, Opts, _Default='http-01' ),
+	ChallengeType = maps:get( challenge, ApiOpts, _DefaultChlg='http-01' ),
 
-	%Conn  = get_conn(LEState),
-	%Nonce = get_nonce(Conn, LEState),
-	%TODO: SANs
-	%SANs  = maps:get(san, Opts, []),
-
-	{ Accnt, LocationURI, NewNonce } = letsencrypt_api:get_account( DirMap, Key,
-											 Jws#{ nonce => Nonce }, Opts ),
+	{ Accnt, LocationUri, AccountNonce } = letsencrypt_api:get_account( DirMap,
+								PrivKey, Jws#{ nonce => Nonce }, ApiOpts ),
 
 	AccntKey = maps:get( <<"key">>, Accnt ),
 
-	NewJws = #{ alg => maps:get( alg, Jws ),
-				nonce => NewNonce,
-				kid   => LocationURI },
+	AccntJws = #{ alg => maps:get( alg, Jws ),
+					nonce => AccountNonce,
+					kid   => LocationUri },
 
-	BinDomain = text_utils:ensure_binary( Domain ),
+	% Subject Alternative Names:
+	Sans = maps:get( san, ApiOpts, _DefaultSans=[] ),
 
-	%TODO: checks order is ok
-	{ ok, Order, OrderLocation, Nonce3 } =
-		letsencrypt_api:order( DirMap, BinDomain, Key, NewJws, Opts ),
+	BinSans = text_utils:strings_to_binaries( Sans ),
+
+	BinDomains = [ BinDomain | BinSans ],
+
+	% TODO: checks order is ok
+	{ Order, OrderLocation, OrderNonce } = letsencrypt_api:request_order(
+							DirMap, BinDomains, PrivKey, AccntJws, ApiOpts ),
 
 	% We need to keep trace of order location:
-	Order2 = Order#{ <<"location">> => OrderLocation },
+	LocOrder = Order#{ <<"location">> => OrderLocation },
+
+	AuthLEState = LEState#le_state{ domain=BinDomain, jws=AccntJws,
+		account_key=AccntKey, nonce=OrderNonce, sans=Sans },
 
 	% Nonce2 = letsencrypt_api:new_reg( Conn, BasePath, Key,
 	%                                   JWS#{nonce => Nonce} ),
@@ -463,24 +516,20 @@ idle( { create, Domain, _CertOpts }, _,
 
 	AuthUris = maps:get( <<"authorizations">>, Order ),
 
-	AuthzResp = authz( ChallengeType, AuthUris,
-		LEState#le_state{ domain=Domain, jws=NewJws, account_key=AccntKey,
-						  nonce=Nonce3 } ),
+	AuthzResp = authz( ChallengeType, AuthUris, AuthLEState ),
 
-	{ StateName, Reply, Challenges, Nonce5 } = case AuthzResp of
+	{ StateName, Reply, Challenges, FinalNonce } = case AuthzResp of
 
-		{ error, Err, Nonce3 } ->
-			{ idle, { error, Err }, nil, Nonce3 };
+		{ error, Err, ErrAuthNonce } ->
+			{ idle, { error, Err }, nil, ErrAuthNonce };
 
-
-		{ ok, Xchallenges, Nonce4 } ->
-			{ pending, ok, Xchallenges, Nonce4 }
+		{ ok, Xchallenges, AuthNonce } ->
+			{ pending, ok, Xchallenges, AuthNonce }
 
 	end,
 
-	{reply, Reply, StateName, LEState#le_state{ domain=BinDomain, jws=NewJws,
-		nonce=Nonce5, order=Order2, challenges=Challenges, sans=[],
-		account_key=AccntKey } }.
+	{ reply, Reply, StateName, AuthLEState#le_state{ nonce=FinalNonce,
+								  order=LocOrder, challenges=Challenges } }.
 
 
 
@@ -570,8 +619,8 @@ pending( _CheckAction, _Domain,
 %
 valid( _Action, _Domain,
 	   LEState=#le_state{ mode=Mode, domain=BinDomain, sans=SANs,
-						  cert_dir_path=CertDirPath, order=Order, key=Key, jws=Jws,
-						  nonce=Nonce, opts=Opts } ) ->
+						  cert_dir_path=CertDirPath, order=Order, key=Key,
+						  jws=Jws, nonce=Nonce, opts=Opts } ) ->
 
 	challenge_destroy( Mode, LEState ),
 
@@ -593,7 +642,7 @@ valid( _Action, _Domain,
 	LocOrder = FinOrder#{ <<"location">> => maps:get( <<"location">>, Order ) },
 
 	{ reply, Status, finalize, LEState#le_state{ order=LocOrder,
-								 cert_key_file_path=KeyFilePath, nonce=FinNonce } }.
+							 cert_key_file_path=KeyFilePath, nonce=FinNonce } }.
 
 
 
@@ -609,13 +658,13 @@ valid( _Action, _Domain,
 %   state 'processing' : still ongoing
 %   state 'valid'      : certificate is ready
 %
-finalize( processing, _Domain, LEState=#le_state{ order=OrderMap, key=Key, jws=Jws,
-												  nonce=Nonce, opts=Opts } ) ->
+finalize( processing, _Domain, LEState=#le_state{ order=OrderMap, key=Key,
+								  jws=Jws, nonce=Nonce, api_opts=ApiOpts } ) ->
 
 	Loc = maps:get( <<"location">>, OrderMap, nil ),
 
 	{ NewOrderMap, _Loc, NewNonce } =
-		letsencrypt_api:get_order( Loc, Key, Jws#{ nonce => Nonce }, Opts ),
+		letsencrypt_api:get_order( Loc, Key, Jws#{ nonce => Nonce }, ApiOpts ),
 
 	BinStatus = maps:get( <<"status">>, NewOrderMap, nil ),
 
@@ -634,16 +683,18 @@ finalize( processing, _Domain, LEState=#le_state{ order=OrderMap, key=Key, jws=J
 % Transitions to state 'idle': fsm complete, going back to initial state.
 %
 finalize( valid, _Domain, LEState=#le_state{ order=OrderMap, domain=BinDomain,
-						cert_key_file_path=KeyFilePath, cert_dir_path=CertDirPath,
-						key=Key, jws=Jws, nonce=Nonce, opts=Opts } ) ->
+					cert_key_file_path=KeyFilePath, cert_dir_path=CertDirPath,
+					key=Key, jws=Jws, nonce=Nonce, api_opts=ApiOpts } ) ->
 
 	BinKeyFilePath = text_utils:string_to_binary( KeyFilePath ),
 
 	% Downloads certificate:
 	BinCert = letsencrypt_api:get_certificate( OrderMap, Key,
-							Jws#{ nonce => Nonce }, Opts ),
+							Jws#{ nonce => Nonce }, ApiOpts ),
 
-	CertFilePath = letsencrypt_ssl:write_certificate( BinDomain, BinCert,
+	Domain = text_utils:binary_to_string( BinDomain ),
+
+	CertFilePath = letsencrypt_ssl:write_certificate( Domain, BinCert,
 													  CertDirPath ),
 
 	BinCertFilePath = text_utils:string_to_binary( CertFilePath ),
@@ -696,20 +747,20 @@ code_change( _, StateName, LEState, _ ) ->
 
 
 
-%%
-%% PRIVATE functions
-%%
+
+% Helpers.
 
 
-% Parses letsencrypt:start() options.
+% Parses letsencrypt:start/1 options.
 %
 % Available options are:
-%   - staging: runs in staging environment (running on production either)
+%   - staging: runs in staging environment (otherwise running in production)
 %   - key_file_path: reuse an existing TLS key
-%   - cert_dir_path: path to read/save ssl certificate, key and csr request
+%   - cert_dir_path: path to read/save TLS certificates, keys and csr requests
 %   - http_timeout: timeout for acme api requests (seconds)
 %
-% Returns LEState (type record 'le_state') filled with options values
+% Returns LEState (type record 'le_state') filled with corresponding options
+% values.
 %
 -spec getopts( [ atom() | { atom(), any() } ], le_state() ) -> le_state().
 getopts( _Opts=[], LEState ) ->
@@ -753,17 +804,18 @@ setup_mode( #le_state{ mode=webroot, webroot_path=undefined } ) ->
 
 setup_mode( LEState=#le_state{ mode=webroot, webroot_path=BinWebrootPath } ) ->
 
-	% TODO: check directory is writable
 	ChallengeDirPath =
 		file_utils:join( BinWebrootPath, ?webroot_challenge_path ),
 
+	% TODO: check directory is writable.
 	file_utils:create_directory_if_not_existing( ChallengeDirPath,
 												 create_parents ),
 
 	LEState;
 
-setup_mode( LEState=#le_state{ mode=standalone, port=_Port } ) ->
-	% TODO: checking port is unused?
+setup_mode( LEState=#le_state{ mode=standalone, port=Port } )
+  when is_integer( Port ) ->
+	% TODO: check port is unused?
 	LEState;
 
 setup_mode( LEState=#le_state{ mode=slave } ) ->
@@ -890,14 +942,16 @@ authz( ChallengeType, AuthzUris, LEState=#le_state{ mode=Mode } ) ->
 %
 % returns:
 %   {ok, Challenges, Nonce}
-%		- Challenges is map of Uri -> Challenge, where Challenge is of ChallengeType type
+%		- Challenges is map of Uri -> Challenge, where Challenge is of
+%		ChallengeType type
 %		- Nonce is a new valid replay-nonce
 %
 -spec authz_step1( [ bin_uri() ], challenge_type(), le_state(),
 				   uri_challenge_type_map() ) ->
 		  { 'ok', uri_challenge_type_map(), nonce() }
 		| { 'error', 'uncaught' | binary(), nonce() }.
-authz_step1( _URIs=[], _ChallengeType, #le_state{ nonce=Nonce }, URIChallengeMap ) ->
+authz_step1( _URIs=[], _ChallengeType, #le_state{ nonce=Nonce },
+			 URIChallengeMap ) ->
 	{ ok, URIChallengeMap, Nonce };
 
 authz_step1( _URIs=[ Uri | T ], ChallengeType,
@@ -957,7 +1011,8 @@ authz_step2( _Pairs=[ {_Uri, Challenge } | T ],
 %
 % TODO: ChallengeType is included in Challenges (<<"type">> key). To refactor
 %
--spec challenge_init( le_mode(), le_state(), challenge_type(), map() ) -> void().
+-spec challenge_init( le_mode(), le_state(), challenge_type(), map() ) ->
+		  void().
 challenge_init( _Mode=webroot, #le_state{ webroot_path=BinWPath,
 										  account_key=AccntKey },
 				_ChallengeType='http-01', Challenges ) ->
@@ -1017,15 +1072,16 @@ challenge_init( _Mode=standalone, #le_state{ port=Port, domain=Domain,
 	end.
 
 
-% Cleans up challenge context after it has been fullfilled (with success or not); in:
-%
+% Cleans up challenge context after it has been fullfilled (with success or
+% not); in:
+
 % - 'webroot' mode: delete token file
 % - 'standalone' mode: stop internal webserver
 % - 'slave' mode: nothing to do
 %
 -spec challenge_destroy( le_mode(), le_state() ) -> void().
 challenge_destroy( _Mode=webroot,
-				   #le_state{ webroot_path=BinWPath, challenges=Challenges } ) ->
+			   #le_state{ webroot_path=BinWPath, challenges=Challenges } ) ->
 
 	[ begin
 

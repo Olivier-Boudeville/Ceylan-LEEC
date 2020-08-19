@@ -62,7 +62,7 @@
 
 -endif.
 
--ifdef(DEBUG).
+-ifdef(LEEC_DEBUG).
 	-define( debug( Fmt, Args ), trace_utils:debug_fmt( Fmt, Args ) ).
 -else.
 	-define( debug( Fmt, Args ), ok ).
@@ -156,8 +156,10 @@ get_tcp_connection( ConnectTriplet={ Proto, Host, Port } ) ->
 %
 -spec decode( Option :: map(), Response :: map() ) -> json_http_body().
 decode( #{ json := true }, Response=#{ body := Body } ) ->
-	Payload = jiffy:decode( Body, [ return_maps, use_nil ] ),
-	Response#{ json => Payload};
+	%JiffyOpts = [ return_maps, use_nil ],
+	JsxOpts = [ fixme ],
+	Payload = json_utils:from_json( Body, [ return_maps, use_nil ] ),
+	Response#{ json => Payload };
 
 decode( _, Response ) ->
 	Response.
@@ -238,7 +240,7 @@ request( Method, Uri, Headers, BinContent, Opts=#{ netopts := Netopts } ) ->
 %%
 
 
-% Returns a directory map listing all ACME protocol URLs (ref:
+% Returns a directory map listing all ACME protocol URLs (see
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.1.1).
 %
 -spec get_directory_map( environment(), option_map() ) ->
@@ -250,7 +252,7 @@ get_directory_map( Env, Opts ) ->
 		staging ->
 			?staging_api_url;
 
-		_ ->
+		prod ->
 			?default_api_url
 
 	end,
@@ -273,6 +275,7 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, Opts ) ->
 	Nonce.
 
 
+
 % Request a new account, see
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.3.1.
 %
@@ -284,23 +287,24 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, Opts ) ->
 % NOTE: TOS are automatically agreed, this should not be the case
 % TODO: checks 201 Created response
 %
--spec get_account( directory_map(), bin_key(), jws(), option_map() ) ->
+-spec get_account( directory_map(), ssl_private_key(), jws(), api_opts() ) ->
 		  { json_map_decoded(), bin_uri(), nonce() }.
-get_account( _DirMap=#{ <<"newAccount">> := Uri }, Key, Jws, Opts ) ->
+get_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws, Opts ) ->
 
 	Payload = #{ termsOfServiceAgreed => true,
 				 contact => [] },
 
-	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, Payload ),
+	Req = letsencrypt_jws:encode( PrivKey, Jws#{ url => Uri }, Payload ),
 
-	{ ok, #{ json := Resp, location := Location, nonce := Nonce } } =
+	{ ok, #{ json := Resp, location := LocationUri, nonce := NewNonce } } =
 		request( post, Uri, #{}, Req, Opts#{ json => true } ),
 
-	{ Resp, Location, Nonce }.
+	{ Resp, LocationUri, NewNonce }.
 
 
 
-% Requests a new order, see https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.
+% Requests a new order, see
+% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.
 %
 % Returns {Response, Location, Nonce}, where:
 %		- Response is json (decoded as map)
@@ -310,13 +314,16 @@ get_account( _DirMap=#{ <<"newAccount">> := Uri }, Key, Jws, Opts ) ->
 % TODO: support multiple domains
 %		checks 201 created
 %
--spec request_order( directory_map(), bin_domain(), bin_key(), jws(), option_map() ) ->
-		  { json_map_decoded(), bin_uri(), nonce() }.
-request_order( _DirMap=#{ <<"newOrder">> := Uri }, BinDomain, Key, Jws, Opts ) ->
+-spec request_order( directory_map(), [ bin_domain() ], ssl_private_key(),
+		 jws(), option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
+request_order( _DirMap=#{ <<"newOrder">> := Uri }, BinDomains, Key, Jws,
+			   ApiOpts ) ->
 
-	Payload = #{ identifiers => [ #{ type => dns, value => BinDomain } ] },
+	Idns = [ #{ type => dns, value => BinDomain } || BinDomain <- BinDomains ],
 
-	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, Payload ),
+	Payload = #{ identifiers => Idns },
+
+	Req = letsencrypt_jws:encode( PrivKey, Jws#{ url => Uri }, Payload ),
 
 	{ok, #{	json := Resp, location := Location,	nonce := Nonce } } =
 		request( post, Uri, #{}, Req, Opts#{ json => true } ),

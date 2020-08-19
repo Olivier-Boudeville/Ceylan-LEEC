@@ -6,7 +6,11 @@
    [kernel,
 	stdlib,
 	shotgun,
-	jiffy,
+
+	% Select the JSON parser to use:
+	jsx
+	%jiffy,
+
 	elli
    ]},
   {env,[]},

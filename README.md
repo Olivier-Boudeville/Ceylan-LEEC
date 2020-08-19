@@ -12,6 +12,7 @@ The main differences introduced by LEEC are:
 - more comments, more spell-checking
 - more typing, more runtime checking
 - dependency onto [Ceylan-Myriad](https://github.com/Olivier-Boudeville/Ceylan-Myriad) added, to benefit from its facilities
+- JSON parser can be JSX (the default), or Jiffy
 - fixed the compilation with Erlang version 23.0 and higher (ex: w.r.t. to http_uri/uri_string, to the dependencies such as Jiffy, and newer Cowboy for the examples)
 - allow for concurrent certificate requests (ex: if having multiple virtual hosts all requesting new certificates at webserver start-up); so generating non-overlapping certificates and not using a *registered* gen_fsm anymore
 - connect_timeout deprecated in favor of http_timeout
@@ -41,7 +42,7 @@ Modes
 
 Validation challenges
 - [x] http-01 (http)
-- [ ] dns-01
+- [ ] dns-01
 - [ ] proof-of-possession-01
 
 ## Prerequisites
@@ -69,8 +70,8 @@ Both **/path/to/webroot** and **/path/to/certs** MUST be writable by the erlang 
  $> $(cd /path/to/webroot && python -m SimpleHTTPServer 80)&
  $> ./rebar3 shell
  $erl> application:ensure_all_started(letsencrypt).
- $erl> letsencrypt:start([{mode,webroot},{webroot_dir_path,"/path/to/webroot"},{cert_dir_path,"/path/to/certs"}]).
- $erl> letsencrypt:make_cert(<<"mydomain.tld">>, #{async => false}).
+ $erl> {ok, FsmPid } = letsencrypt:start([{mode,webroot},{webroot_dir_path,"/path/to/webroot"},{cert_dir_path,"/path/to/certs"}]).
+ $erl> letsencrypt:obtain_certificate_for( <<"mydomain.tld">>, FsmPid, #{async => false}).
 {ok, #{cert => <<"/path/to/certs/mydomain.tld.crt">>, key => <<"/path/to/certs/mydomain.tld.key">>}}
  $erl> ^C
 
@@ -83,8 +84,7 @@ Both **/path/to/webroot** and **/path/to/certs** MUST be writable by the erlang 
 
 **Explanations**:
 
-  During the certification process, letsencrypt server returns a challenge and then tries to query the challenge
-  file from the domain name asked to be certified.
+  During the certification process, letsencrypt server returns a challenge and then tries to query the challenge file from the domain name asked to be certified.
   So letsencrypt-erlang is writing challenge file under **/path/to/webroot** directory.
   Finally, keys and certificates are written in **/path/to/certs** directory.
 
@@ -116,7 +116,6 @@ Params is a list of parameters, choose from the followings:
 	Must be writable by erlang process
   * **{http_timeout, Timeout}** (integer, optional, default to 30000): http queries timeout
 	(in milliseconds)
-  * **{connect_timeout, Timeout}** is **deprecated**, replaced by **http_timeout**
 
 
   Mode-specific parameters:
@@ -131,7 +130,7 @@ Params is a list of parameters, choose from the followings:
   returns:
 	* **{ok, Pid}** with Pid the server process pid
 
-* **letsencrypt:make_cert(Domain, Opts) :: generate a new certificate for the considered domain name**:
+* **letsencrypt:obtain_certificate_for(Domain, Opts) :: generate a new certificate for the considered domain name**:
   * **Domain**: domain name (string or binary)
   * **Opts**: options map
 	* **async** = true|false (optional, _true_ by default):
@@ -150,19 +149,19 @@ Params is a list of parameters, choose from the followings:
   examples:
 	* sync mode (shell is locked several seconds waiting result)
   ```erlang
-	> letsencrypt:make_cert(<<"mydomain.tld">>, #{async => false}).
+	> letsencrypt:obtain_certificate_for(<<"mydomain.tld">>, #{async => false}).
 	{ok, #{cert => <<"/path/to/cert">>, key => <<"/path/to/key">>}}
 
 	> % domain tld is incorrect
-	> letsencrypt:make_cert(<<"invalid.tld">>, #{async => false}).
+	> letsencrypt:obtain_certificate_for(<<"invalid.tld">>, #{async => false}).
 	{error, <<"Error creating new authz :: Name does not end in a public suffix">>}
 
 	> % domain web server does not return challenge file (ie 404 error)
-	> letsencrypt:make_cert(<<"example.com">>, #{async => false}).
+	> letsencrypt:obtain_certificate_for(<<"example.com">>, #{async => false}).
 	{error, <<"Invalid response from http://example.com/.well-known/acme-challenge/Bt"...>>}
 
 	> % returned challenge is wrong
-	> letsencrypt:make_cert(<<"example.com">>, #{async => false}).
+	> letsencrypt:obtain_certificate_for(<<"example.com">>, #{async => false}).
 	{error,<<"Error parsing key authorization file: Invalid key authorization: 1 parts">>}
 	or
 	{error,<<"Error parsing key authorization file: Invalid key authorization: malformed token">>}
@@ -172,7 +171,7 @@ Params is a list of parameters, choose from the followings:
 	* async mode ('async' is written immediately)
   ```erlang
 	> F = fun({Status, Result}) -> io:format("completed: ~p (result= ~p)~n") end.
-	> letsencrypt:make_cert(<<"example.com">>, #{async => true, callback => F}).
+	> letsencrypt:obtain_certificate_for(<<"example.com">>, #{async => true, callback => F}).
 	async
 	>
 	...
@@ -181,13 +180,13 @@ Params is a list of parameters, choose from the followings:
 
 	* SAN (**not available currently**)
   ```erlang
-	> letsencrypt:make_cert(<<"example.com">>, #{async => false, san => [<<"www.example.com">>]}).
+	> letsencrypt:obtain_certificate_for(<<"example.com">>, #{async => false, san => [<<"www.example.com">>]}).
 	{ok, #{cert => <<"/path/to/cert">>, key => <<"/path/to/key">>}}
   ```
 
 	* explicit **'http-01'** challenge
   ```erlang
-	> letsencrypt:make_cert(<<"example.com">>, #{async => false, challenge => 'http-01'}).
+	> letsencrypt:obtain_certificate_for(<<"example.com">>, #{async => false, challenge => 'http-01'}).
 	{ok, #{cert => <<"/path/to/cert">>, key => <<"/path/to/key">>}}
   ```
 
@@ -211,7 +210,7 @@ on_complete({State, Data}) ->
 
 main() ->
 	letsencrypt:start([{mode,webroot}, staging, {cert_dir_path,"/path/to/certs"}, {webroot_dir_path, "/var/www/html"]),
-	letsencrypt:make_cert(<<"mydomain.tld">>, #{callback => fun on_complete/1}),
+	letsencrypt:obtain_certificate_for(<<"mydomain.tld">>, #{callback => fun on_complete/1}),
 
 	ok.
 ```
@@ -236,7 +235,7 @@ main() ->
 	),
 
 	letsencrypt:start([{mode,slave}, staging, {cert_dir_path,"/path/to/certs"}]),
-	letsencrypt:make_cert(<<"mydomain.tld">>, #{callback => fun on_complete/1}),
+	letsencrypt:obtain_certificate_for(<<"mydomain.tld">>, #{callback => fun on_complete/1}),
 
 	ok.
 ```
@@ -290,10 +289,33 @@ on_complete({State, Data}) ->
 
 main() ->
 	letsencrypt:start([{mode,standalone}, staging, {cert_dir_path,"/path/to/certs"}, {port, 80)]),
-	letsencrypt:make_cert(<<"mydomain.tld">>, #{callback => fun on_complete/1}),
+	letsencrypt:obtain_certificate_for(<<"mydomain.tld">>, #{callback => fun on_complete/1}),
 
 	ok.
 ```
+
+
+## JSON parsers
+
+If wanting to switch from jsx to jiffy, following files shall be updated:
+- rebar.config
+- src/letsencrypt.app.src
+- in Myriad:
+   - conf/myriad.app.src
+   - conf/rebar.config.template
+
+
+## About this fork
+
+This is mostly a reckless fork, with some many differences (conventions, Myriad integration, whitespace cleanup) that a pull request is hardly conceivable.
+
+By some ways the fork is safer and more robust than the original, by others not (ex: test coverage, continuous integration).
+
+Despite the apparences, it remained nevertheless very close to the original (just differences of form, mainly).
+
+Most of the elements of [this pull request](https://github.com/gbour/letsencrypt-erlang/pull/16/) from Marc Worrell have also been integrated.
+
+
 
 ## License
 

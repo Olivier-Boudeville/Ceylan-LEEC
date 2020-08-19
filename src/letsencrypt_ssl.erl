@@ -30,31 +30,31 @@
 -type key_file_info() :: letsencrypt:key_file_info().
 -type san() :: letsencrypt:san().
 -type bin_certificate() :: letsencrypt:bin_certificate().
-
+-type ssl_private_key() :: letsencrypt:ssl_private_key().
 
 
 % Creates private key.
--spec create_private_key( maybe( key_file_info() ), directory_path() ) ->
-		  letsencrypt:ssl_private_key().
-create_private_key( undefined, CertDirPath ) ->
+-spec create_private_key( maybe( key_file_info() ), bin_directory_path() ) ->
+		  ssl_private_key().
+create_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 
 	% If not set, forges a unique filename to allow for multiple, concurrent
 	% instances:
-	%
+
 	Uniq = basic_utils:get_process_specific_value(),
 
-	DefaultFilename = text_utils:format( "letsencrypt-~B.key", [ Uniq ] ),
+	DefaultFilename = text_utils:format( "letsencrypt-agent-~B.key", [ Uniq ] ),
 
 	% Safety measure:
-	DefaultPath = file_utils:join( CertDirPath, DefaultFilename ),
+	DefaultPath = file_utils:join( BinCertDirPath, DefaultFilename ),
 	false = file_utils:is_existing_file( DefaultPath ),
 
-	create_private_key( { new, DefaultFilename }, CertDirPath );
+	create_private_key( { new, DefaultFilename }, BinCertDirPath );
 
 
-create_private_key( { new, KeyFilename }, CertDirPath ) ->
+create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 
-	KeyFilePath = file_utils:join( CertDirPath, KeyFilename ),
+	KeyFilePath = file_utils:join( BinCertDirPath, KeyFilename ),
 
 	case file_utils:is_existing_file( KeyFilePath ) of
 
@@ -76,13 +76,12 @@ create_private_key( { new, KeyFilename }, CertDirPath ) ->
 			ok;
 
 		{ _ReturnCode=0, CommandOutput } ->
-			trace_utils:warning_fmt(
-			  "Command output when creating private key: ~s",
-			  [ CommandOutput ] );
+			trace_utils:warning_fmt( "Private key creation successful, yet "
+			  "following output was made: ~s.", [ CommandOutput ] );
 
 		{ ErrorCode, CommandOutput } ->
 			trace_utils:error_fmt(
-			  "Command for creating private key failed (error code: ~B): ~s",
+			  "Command for creating private key failed (error code: ~B): ~s.",
 			  [ ErrorCode, CommandOutput ] ),
 			throw( { private_key_generation_failed, ErrorCode, CommandOutput } )
 
@@ -98,11 +97,11 @@ create_private_key( { new, KeyFilename }, CertDirPath ) ->
 
 	end,
 
-	% Now load it and return it as a ssl_private_key():
-	create_private_key( KeyFilePath, CertDirPath );
+	% Now load it, and return it as a ssl_private_key():
+	create_private_key( KeyFilePath, BinCertDirPath );
 
 
-create_private_key( KeyFilePath, _CertDirPath ) ->
+create_private_key( _KeyFileInfo=KeyFilePath, _BinCertDirPath ) ->
 
 	PemContent = file_utils:read_whole( KeyFilePath ),
 
@@ -112,6 +111,7 @@ create_private_key( KeyFilePath, _CertDirPath ) ->
 	#'RSAPrivateKey'{ modulus=N, publicExponent=E, privateExponent=D } =
 		public_key:pem_entry_decode( KeyEntry ),
 
+	% Returning a corresponding ssl_private_key():
 	#{ raw => [ E, N, D ],
 	   b64 => { letsencrypt_utils:b64encode( binary:encode_unsigned( N ) ),
 				letsencrypt_utils:b64encode( binary:encode_unsigned( E ) ) },
@@ -119,9 +119,10 @@ create_private_key( KeyFilePath, _CertDirPath ) ->
 
 
 
+% Returns a CSR certificate request.
 -spec get_cert_request( net_utils:bin_fqdn(), bin_directory_path(),
 						[ san() ] ) -> letsencrypt:ssl_csr().
-get_cert_request( BinDomain, BinCertDirPath, SANs) ->
+get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 
 	Domain = text_utils:binary_to_string( BinDomain ),
 
@@ -144,6 +145,21 @@ get_cert_request( BinDomain, BinCertDirPath, SANs) ->
 
 
 
+% Generates a domain certificate.
+-spec get_domain_certificate( bin_domain(), bin_certificate(),
+							  bin_directory_path() ) -> file_path().
+get_domain_certificate( BinDomain, BinDomainCert, BinCertDirPath ) ->
+
+	Domain = text_utils:binary_to_string( BinDomain ),
+
+	CertFilePath = file_utils:join( BinCertDirPath, Domain ++ ".crt" ),
+
+	file_utils:write_whole( CertFilePath, BinDomainCert ),
+
+	CertFilePath.
+
+
+
 % Create temporary (1 day) certificate with subjectAlternativeName, returns its
 % path.
 %
@@ -157,11 +173,8 @@ generate_autosigned_certificate( Domain, KeyFilePath, SANs ) ->
 		system_utils:get_default_temporary_directory(),
 		Domain ++ "-tlssni-autosigned.pem" ),
 
-	generate_certificate(request, Domain, CertFilePath, KeyFilePath, SANs ),
-
-	CertFilePath.
-
-
+	generate_certificate( autosigned, Domain, CertFilePath, KeyFilePath,
+						  SANs ).
 
 
 % Generates certificate.
@@ -169,12 +182,43 @@ generate_autosigned_certificate( Domain, KeyFilePath, SANs ) ->
 						file_path(), file_path(), [ san() ] ) -> void().
 generate_certificate( request, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 
-	BinAltNames = lists:foldl(
-					fun( San, Acc ) ->
-							<<Acc/binary, ", DNS:", San/binary>>
-					end,
-					_Acc0= <<"subjectAltName=DNS:", BinDomain/binary>>,
-					_List=SANs ),
+	% First, generates a configuration file, in the same directory as the target
+	% certificate:
+
+	AllNames = [ BinDomain | SANs ],
+
+	% {any_string(), basic_utils:count()} pairs:
+	NumberedNamePairs = lists:zip( AllNames, 
+								   lists:seq( 1, length( AllNames) ) ),
+
+	ConfData = [
+		"[req]\n",
+		"distinguished_name = req_distinguished_name\n",
+		"x509_extensions = v3_req\n",
+		"prompt = no\n",
+		"[req_distinguished_name]\n",
+		"CN = ", BinDomain, "\n",
+		"[v3_req]\n",
+		"subjectAltName = @alt_names\n",
+		"[alt_names]\n"
+	] ++ [
+		[ "DNS.", text_utils:integer_to_string( Index ), " = ", Name, "\n" ] 
+		  || { Name, Index } <- NumberedNamePairs ],
+
+	ConfDir = filename:dirname(OutName),
+
+	ConfFile = filename:join(ConfDir, "letsencrypt_san_openssl." ++ letsencrypt_utils:str(Domain) ++ ".cnf"),
+	ok = file:write_file(ConfFile, Cnf),
+	Cmd = io_lib:format("openssl req -new -key '~s' -sha256 -out '~s' -config '~s'",
+						[Keyfile, OutName, ConfFile]),
+	Cmd1 = case Type of
+		request    -> [Cmd | " -reqexts v3_req" ];
+		autosigned -> [Cmd | " -extensions v3_req -x509 -days 1" ]
+	end,
+	_Status = os:cmd(Cmd1),
+	file:delete(ConfFile),
+	{ok, OutName}.
+
 
 	Cmd = executable_utils:get_default_openssl_executable_path()
 		++ " req -new -key '" ++ KeyfilePath ++ "' -out '"

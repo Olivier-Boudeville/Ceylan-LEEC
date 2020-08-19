@@ -15,13 +15,13 @@
 -module(letsencrypt_utils).
 -author("Guillaume Bour <guillaume@bour.cc>").
 
--export([ b64encode/1, hexdigest/1, hashdigest/2 ]).
+-export([ b64encode/1, jsonb64encode/1, hexdigest/1, hashdigest/2 ]).
 
 -type character() :: integer().
 
 
 
-% Encodes in b64.
+% Encodes specified content in b64.
 -spec b64encode( string() | binary() ) -> binary().
 b64encode( X ) ->
 	Base64 = base64:encode( X ),
@@ -29,6 +29,14 @@ b64encode( X ) ->
 
 
 
+% Encodes specified content first in JSON, then in b64.
+-spec jsonb64encode( string() | binary() ) -> binary().
+jsonb64encode( X ) ->
+	XJson = json_utils:to_json( X ),
+	b64encode( XJson ).
+
+
+% (helper)
 -spec encode_byte( character() ) -> character().
 encode_byte( $+ ) ->
 	$-;
@@ -47,12 +55,12 @@ hexdigest( X ) ->
 	<< <<( hex( H ) ),( hex(L) )>> || <<H:4,L:4>> <= X >>.
 
 
+% (helper)
 hex( C ) when C < 10 ->
 	$0 + C;
 
 hex( C ) ->
 	$a + C - 10.
-
 
 
 % Returns the hexadecimal digest of SHA256 hashed content.

@@ -24,6 +24,15 @@
 -export([ init/1, encode/3, keyauth/2 ]).
 
 
+% Known keys:
+%  termsOfServiceAgreed => boolean()
+%  contact => ustring()
+%
+-type payload() :: table( atom(), term() ).
+
+-type content() :: payload() | 'empty'.
+
+
 % Shorthands:
 -type ssl_private_key() :: letsencrypt:ssl_private_key().
 -type jws() :: letsencrypt:jws().
@@ -44,19 +53,19 @@ init( _PrivateKey=#{ b64 := { N, E } } ) ->
 % Builds and returns the JWS body, see ref:
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-6.2.
 %
--spec encode( ssl_private_key(), jws(), map() | 'empty' ) -> binary().
-encode( _PrivateKey=#{ raw := RSAKey }, Jws, Content) ->
+-spec encode( ssl_private_key(), jws(), content() ) -> binary().
+encode( _PrivateKey=#{ raw := RSAKey }, Jws, Content ) ->
 
-	Protected = letsencrypt_utils:b64encode( jiffy:encode( Jws ) ),
+	Protected = letsencrypt_utils:jsonb64encode( Jws ),
 
 	Payload = case Content of
 
 		% For POST-as-GET queries, payload is just an empty string:
 		empty ->
-			<<"">>;
+			<<>>;
 
 		_ ->
-			letsencrypt_utils:b64encode( jiffy:encode( Content ) )
+			letsencrypt_utils:jsonb64encode( Content )
 
 	end,
 
@@ -65,11 +74,9 @@ encode( _PrivateKey=#{ raw := RSAKey }, Jws, Content) ->
 
 	EncSigned = letsencrypt_utils:b64encode( Signed ),
 
-	jiffy:encode( { [
-		%{ header, { [] } },
-		{ protected, Protected },
-		{ payload, Payload },
-		{ signature, EncSigned } ] } ).
+	json_utils:to_json( #{ <<"protected">> => Protected,
+						   <<"payload">> => Payload,
+						   <<"signature">> => EncSigned } ).
 
 
 
@@ -79,8 +86,8 @@ encode( _PrivateKey=#{ raw := RSAKey }, Jws, Content) ->
 %
 keyauth( _Key=#{ <<"e">> := E, <<"n">> := N, <<"kty">> := Kty }, Token ) ->
 
-	Thumbprint = jiffy:encode( { [ {e, E}, { kty, Kty }, { n, N } ] },
-							   [ force_utf8 ] ),
+	Thumbprint = json_utils:to_json( #{ <<"e">> => E, <<"kty">> => Kty,
+										<<"n">> => N } ),
 
 	ThumbprintHash = crypto:hash( sha256, Thumbprint ),
 
