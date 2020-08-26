@@ -24,6 +24,13 @@
 -export([ init/1, encode/3, keyauth/2 ]).
 
 
+% Not involving Myriad's parse transform here:
+-type table( K, V ) :: map_hashtable:map_hashtable( K, V ).
+
+% Silencing if not compiled with rebar3:
+-export_type([ table/2 ]).
+
+
 % Known keys:
 %  termsOfServiceAgreed => boolean()
 %  contact => ustring()

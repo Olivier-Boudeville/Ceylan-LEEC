@@ -29,7 +29,7 @@ Features:
 - [ ] registering client (with email)
 - [x] issuing RSA certificate
 - [ ] revoking certificate
-- [~] SAN certificate (supplementary domain names)
+- [x] SAN certificate (Subject Alternative Names)
 - [ ] allow EC keys
 - [ ] choose RSA key length
 - [x] unittests
@@ -300,16 +300,13 @@ main() ->
 If wanting to switch from jsx to jiffy, following files shall be updated:
 - rebar.config
 - src/letsencrypt.app.src
-- in Myriad:
-   - conf/myriad.app.src
-   - conf/rebar.config.template
-
+(none in Myriad)
 
 ## About this fork
 
-This is mostly a reckless fork, with some many differences (conventions, Myriad integration, whitespace cleanup) that a pull request is hardly conceivable.
+This is mostly a reckless fork, with so many differences (in terms of conventions, Myriad integration, whitespace cleanup) that a pull request is hardly conceivable.
 
-By some ways the fork is safer and more robust than the original, by others not (ex: test coverage, continuous integration).
+By some ways, the fork is safer and more robust than the original, by others not (ex: test coverage, continuous integration). A goal was to make it easier to understand and maintain.
 
 Despite the apparences, it remained nevertheless very close to the original (just differences of form, mainly).
 

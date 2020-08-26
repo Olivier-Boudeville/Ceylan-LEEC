@@ -8,7 +8,7 @@
 	shotgun,
 
 	% Select the JSON parser to use:
-	jsx
+	jsx,
 	%jiffy,
 
 	elli

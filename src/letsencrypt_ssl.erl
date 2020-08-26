@@ -16,7 +16,9 @@
 -author("Guillaume Bour <guillaume@bour.cc>").
 
 -export([ create_private_key/2, get_cert_request/3,
-		  generate_autosigned_certificate/3, write_certificate/3 ]).
+		  get_domain_certificate/3, generate_certificate/5,
+		  write_certificate/3 ]).
+
 
 -include_lib("public_key/include/public_key.hrl").
 
@@ -27,10 +29,21 @@
 -type bin_directory_path() :: file_utils:bin_directory_path().
 -type file_path() :: file_utils:file_path().
 
+-type bin_domain() :: net_utils:bin_domain().
+
 -type key_file_info() :: letsencrypt:key_file_info().
 -type san() :: letsencrypt:san().
 -type bin_certificate() :: letsencrypt:bin_certificate().
 -type ssl_private_key() :: letsencrypt:ssl_private_key().
+
+
+% Not involving Myriad's parse transform here:
+-type maybe( T ) :: T | 'undefined'.
+-type void() :: any().
+-type table( K, V ) :: map_hashtable:map_hashtable( K, V ).
+
+% Silencing if not compiled with rebar3:
+-export_type([ maybe/1, void/0, table/2 ]).
 
 
 % Creates private key.
@@ -160,27 +173,12 @@ get_domain_certificate( BinDomain, BinDomainCert, BinCertDirPath ) ->
 
 
 
-% Create temporary (1 day) certificate with subjectAlternativeName, returns its
-% path.
+% Generates the specified certificate with subjectAlternativeName, either an
+% actual one, or a temporary (1 day), autosigned one.
 %
-% Used for the tls-sni-01 challenge.
-%
--spec generate_autosigned_certificate( net_utils:string_fqdn(), file_path(),
-									   [ san() ] ) -> file_path().
-generate_autosigned_certificate( Domain, KeyFilePath, SANs ) ->
-
-	CertFilePath = file_utils:join(
-		system_utils:get_default_temporary_directory(),
-		Domain ++ "-tlssni-autosigned.pem" ),
-
-	generate_certificate( autosigned, Domain, CertFilePath, KeyFilePath,
-						  SANs ).
-
-
-% Generates certificate.
 -spec generate_certificate( 'request' | 'autosigned', net_utils:bin_fqdn(),
 						file_path(), file_path(), [ san() ] ) -> void().
-generate_certificate( request, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
+generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 
 	% First, generates a configuration file, in the same directory as the target
 	% certificate:
@@ -188,10 +186,10 @@ generate_certificate( request, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 	AllNames = [ BinDomain | SANs ],
 
 	% {any_string(), basic_utils:count()} pairs:
-	NumberedNamePairs = lists:zip( AllNames, 
-								   lists:seq( 1, length( AllNames) ) ),
+	NumberedNamePairs = lists:zip( AllNames,
+								   lists:seq( 1, length( AllNames ) ) ),
 
-	ConfData = [
+	ConfDataStr = [
 		"[req]\n",
 		"distinguished_name = req_distinguished_name\n",
 		"x509_extensions = v3_req\n",
@@ -202,28 +200,32 @@ generate_certificate( request, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 		"subjectAltName = @alt_names\n",
 		"[alt_names]\n"
 	] ++ [
-		[ "DNS.", text_utils:integer_to_string( Index ), " = ", Name, "\n" ] 
+		[ "DNS.", text_utils:integer_to_string( Index ), " = ", Name, "\n" ]
 		  || { Name, Index } <- NumberedNamePairs ],
 
-	ConfDir = filename:dirname(OutName),
+	ConfDir = file_utils:get_base_path( OutCertPath ),
 
-	ConfFile = filename:join(ConfDir, "letsencrypt_san_openssl." ++ letsencrypt_utils:str(Domain) ++ ".cnf"),
-	ok = file:write_file(ConfFile, Cnf),
-	Cmd = io_lib:format("openssl req -new -key '~s' -sha256 -out '~s' -config '~s'",
-						[Keyfile, OutName, ConfFile]),
-	Cmd1 = case Type of
-		request    -> [Cmd | " -reqexts v3_req" ];
-		autosigned -> [Cmd | " -extensions v3_req -x509 -days 1" ]
+	Domain = text_utils:binary_to_string( BinDomain ),
+
+	ConfFilePath = file_utils:join( ConfDir,
+						"letsencrypt_san_openssl." ++ Domain ++ ".cnf" ),
+
+	file_utils:write_whole( ConfFilePath, ConfDataStr ),
+
+	CertTypeOptStr = case CertType of
+
+		request ->
+			" -reqexts v3_req";
+
+		autosigned ->
+			" -extensions v3_req -x509 -days 1"
+
 	end,
-	_Status = os:cmd(Cmd1),
-	file:delete(ConfFile),
-	{ok, OutName}.
 
-
-	Cmd = executable_utils:get_default_openssl_executable_path()
-		++ " req -new -key '" ++ KeyfilePath ++ "' -out '"
-		++ OutCertPath ++ text_utils:format( "' -subj '/CN=~s' -addext '~s'",
-											 [ BinDomain, BinAltNames ] ),
+	Cmd = text_utils:format(
+			"~s req -new -key '~s' -sha256 -out '~s' -config '~s'",
+			[ executable_utils:get_default_openssl_executable_path(),
+			  KeyfilePath, OutCertPath, ConfFilePath ] ) ++ CertTypeOptStr,
 
 	case system_utils:run_executable( Cmd ) of
 
@@ -241,7 +243,10 @@ generate_certificate( request, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 			  [ ErrorCode, CommandOutput ] ),
 			throw( { certificate_generation_failed, ErrorCode, CommandOutput } )
 
-	end.
+	end,
+
+	file_utils:remove_file( ConfFilePath ).
+
 
 
 

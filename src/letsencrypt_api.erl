@@ -27,10 +27,11 @@
 
 -type bin_content() :: binary().
 
--type option_map() :: map().
+-type option_map() :: letsencrypt:option_map().
 
 % Not 'prod':
 -type environment() :: 'default' | 'staging'.
+
 
 
 % Shorthands:
@@ -154,14 +155,13 @@ get_tcp_connection( ConnectTriplet={ Proto, Host, Port } ) ->
 %
 % Returns {ok, Result} with added JSON structure if required.
 %
--spec decode( Option :: map(), Response :: map() ) -> json_http_body().
-decode( #{ json := true }, Response=#{ body := Body } ) ->
-	%JiffyOpts = [ return_maps, use_nil ],
-	JsxOpts = [ fixme ],
-	Payload = json_utils:from_json( Body, [ return_maps, use_nil ] ),
+-spec decode( OptionMap :: option_map(), Response :: map() ) -> 
+					json_http_body().
+decode( _OptionMap=#{ json := true }, Response=#{ body := Body } ) ->
+	Payload = json_utils:from_json( Body ),
 	Response#{ json => Payload };
 
-decode( _, Response ) ->
+decode( _OptionMap, Response ) ->
 	Response.
 
 
@@ -276,7 +276,7 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, Opts ) ->
 
 
 
-% Request a new account, see
+% Requests a new account, see
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.3.1.
 %
 % Returns {Response, Location, Nonce}, where:
@@ -287,7 +287,7 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, Opts ) ->
 % NOTE: TOS are automatically agreed, this should not be the case
 % TODO: checks 201 Created response
 %
--spec get_account( directory_map(), ssl_private_key(), jws(), api_opts() ) ->
+-spec get_account( directory_map(), ssl_private_key(), jws(), option_map() ) ->
 		  { json_map_decoded(), bin_uri(), nonce() }.
 get_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws, Opts ) ->
 
@@ -316,8 +316,8 @@ get_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws, Opts ) ->
 %
 -spec request_order( directory_map(), [ bin_domain() ], ssl_private_key(),
 		 jws(), option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
-request_order( _DirMap=#{ <<"newOrder">> := Uri }, BinDomains, Key, Jws,
-			   ApiOpts ) ->
+request_order( _DirMap=#{ <<"newOrder">> := Uri }, BinDomains, PrivKey, Jws,
+			   OptionMap ) ->
 
 	Idns = [ #{ type => dns, value => BinDomain } || BinDomain <- BinDomains ],
 
@@ -325,8 +325,8 @@ request_order( _DirMap=#{ <<"newOrder">> := Uri }, BinDomains, Key, Jws,
 
 	Req = letsencrypt_jws:encode( PrivKey, Jws#{ url => Uri }, Payload ),
 
-	{ok, #{	json := Resp, location := Location,	nonce := Nonce } } =
-		request( post, Uri, #{}, Req, Opts#{ json => true } ),
+	{ok, #{ json := Resp, location := Location, nonce := Nonce } } =
+		request( post, Uri, #{}, Req, OptionMap#{ json => true } ),
 
 	{ Resp, Location, Nonce }.
 
@@ -364,7 +364,7 @@ request_authorization( Uri, Key, Jws, Opts ) ->
 
 	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, empty ),
 
-	{ ok, #{ json := Resp, location := Location, nonce := Nonce	} } =
+	{ ok, #{ json := Resp, location := Location, nonce := Nonce } } =
 		request( post, Uri, #{}, Req, Opts#{ json=> true } ),
 
 	{ Resp, Location, Nonce }.
