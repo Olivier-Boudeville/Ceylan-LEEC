@@ -1,5 +1,4 @@
-[![Build Status](https://travis-ci.org/gbour/letsencrypt-erlang.svg?branch=master)](https://travis-ci.org/gbour/letsencrypt-erlang)
-[![Hex.pm](https://img.shields.io/hexpm/v/letsencrypt.svg)](https://hex.pm/packages/letsencrypt)
+**NOTE: still in-development, not usable at all yet!**
 
 # LEEC: letsencrypt-erlang-ceylan
 

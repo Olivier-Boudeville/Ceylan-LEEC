@@ -20,9 +20,12 @@
 -type character() :: integer().
 
 
+% Shorthand:
+-type binary_b64() :: letsencrypt:binary_b64().
+
 
 % Encodes specified content in b64.
--spec b64encode( string() | binary() ) -> binary().
+-spec b64encode( string() | binary() ) -> binary_b64()().
 b64encode( X ) ->
 	Base64 = base64:encode( X ),
 	<< <<(encode_byte( B )):8>> || <<B:8>> <= Base64, B =/= $= >>.
@@ -30,7 +33,7 @@ b64encode( X ) ->
 
 
 % Encodes specified content first in JSON, then in b64.
--spec jsonb64encode( string() | binary() ) -> binary().
+-spec jsonb64encode( string() | binary() ) -> binary_b64()().
 jsonb64encode( X ) ->
 	XJson = json_utils:to_json( X ),
 	b64encode( XJson ).

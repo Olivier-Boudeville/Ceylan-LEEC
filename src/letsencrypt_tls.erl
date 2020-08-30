@@ -12,7 +12,7 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
--module(letsencrypt_ssl).
+-module(letsencrypt_tls).
 -author("Guillaume Bour <guillaume@bour.cc>").
 
 -export([ create_private_key/2, get_cert_request/3,
@@ -34,7 +34,7 @@
 -type key_file_info() :: letsencrypt:key_file_info().
 -type san() :: letsencrypt:san().
 -type bin_certificate() :: letsencrypt:bin_certificate().
--type ssl_private_key() :: letsencrypt:ssl_private_key().
+-type tls_private_key() :: letsencrypt:tls_private_key().
 
 
 % Not involving Myriad's parse transform here:
@@ -48,7 +48,7 @@
 
 % Creates private key.
 -spec create_private_key( maybe( key_file_info() ), bin_directory_path() ) ->
-		  ssl_private_key().
+								tls_private_key().
 create_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 
 	% If not set, forges a unique filename to allow for multiple, concurrent
@@ -96,7 +96,8 @@ create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 			trace_utils:error_fmt(
 			  "Command for creating private key failed (error code: ~B): ~s.",
 			  [ ErrorCode, CommandOutput ] ),
-			throw( { private_key_generation_failed, ErrorCode, CommandOutput } )
+			throw( { private_key_generation_failed, ErrorCode, CommandOutput,
+					 KeyFilePath } )
 
 	end,
 
@@ -110,7 +111,7 @@ create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 
 	end,
 
-	% Now load it, and return it as a ssl_private_key():
+	% Now load it, and return it as a tls_private_key():
 	create_private_key( KeyFilePath, BinCertDirPath );
 
 
@@ -124,17 +125,17 @@ create_private_key( _KeyFileInfo=KeyFilePath, _BinCertDirPath ) ->
 	#'RSAPrivateKey'{ modulus=N, publicExponent=E, privateExponent=D } =
 		public_key:pem_entry_decode( KeyEntry ),
 
-	% Returning a corresponding ssl_private_key():
-	#{ raw => [ E, N, D ],
-	   b64 => { letsencrypt_utils:b64encode( binary:encode_unsigned( N ) ),
-				letsencrypt_utils:b64encode( binary:encode_unsigned( E ) ) },
-	   file => KeyFilePath }.
+	#tls_private_key#{
+	   raw=[ E, N, D ],
+	   b64_pair={ letsencrypt_utils:b64encode( binary:encode_unsigned( N ) ),
+				  letsencrypt_utils:b64encode( binary:encode_unsigned( E ) ) },
+	   file_path=KeyFilePath }.
 
 
 
 % Returns a CSR certificate request.
 -spec get_cert_request( net_utils:bin_fqdn(), bin_directory_path(),
-						[ san() ] ) -> letsencrypt:ssl_csr().
+						[ san() ] ) -> letsencrypt:tls_csr().
 get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 
 	Domain = text_utils:binary_to_string( BinDomain ),

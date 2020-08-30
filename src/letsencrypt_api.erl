@@ -32,12 +32,14 @@
 % Not 'prod':
 -type environment() :: 'default' | 'staging'.
 
+% For the records introduced:
+-include_lib("letsencrypt/include/letsencrypt.hrl").
 
 
 % Shorthands:
 
 -type uri() :: letsencrypt:uri().
--type ssl_private_key() :: letsencrypt:ssl_private_key().
+-type tls_private_key() :: letsencrypt:tls_private_key().
 -type bin_domain() :: letsencrypt:bin_domain().
 -type bin_key() :: letsencrypt:bin_key().
 -type bin_csr_key() :: letsencrypt:bin_csr_key().
@@ -155,7 +157,7 @@ get_tcp_connection( ConnectTriplet={ Proto, Host, Port } ) ->
 %
 % Returns {ok, Result} with added JSON structure if required.
 %
--spec decode( OptionMap :: option_map(), Response :: map() ) -> 
+-spec decode( OptionMap :: option_map(), Response :: map() ) ->
 					json_http_body().
 decode( _OptionMap=#{ json := true }, Response=#{ body := Body } ) ->
 	Payload = json_utils:from_json( Body ),
@@ -173,19 +175,20 @@ decode( _OptionMap, Response ) ->
 %   {error, term()}                   : query failed
 %
 % TODO: is 'application/jose+json' content type always required?
-%       (check acme documentation)
+%       (check ACME documentation)
 %
--spec request( 'get' | 'post', uri(), header_map(), 'nil' | bin_content(),
+-spec request( 'get' | 'post', uri(), header_map(), maybe( bin_content() ),
 		   option_map() ) -> shotgun:result() | { 'error', term() }.
-request( Method, Uri, Headers, BinContent, Opts=#{ netopts := Netopts } ) ->
+request( Method, Uri, Headers, MaybeBinContent,
+		 OptionMap=#{ netopts := Netopts } ) ->
 
 	% Port may not be specified:
-	UriMap = #{ scheme := Scheme, host := Host, path := Path } =
+	UriMap = #{ scheme := UriSchemeStr, host := UriHost, path := UriPath } =
 		uri_string:parse( Uri ),
 
-	Proto = list_to_atom( Scheme ),
+	UriProtoAtom = text_utils:string_to_atom( UriSchemeStr ),
 
-	DefaultPort = case Proto of
+	DefaultPort = case UriProtoAtom of
 
 		http ->
 			80;
@@ -195,48 +198,62 @@ request( Method, Uri, Headers, BinContent, Opts=#{ netopts := Netopts } ) ->
 
 	end,
 
-	Port = maps:get( port, UriMap, DefaultPort ),
+	UriPort = maps:get( port, UriMap, DefaultPort ),
 
 	ContentHeaders = Headers#{ <<"content-type">> =>
 								   <<"application/jose+json">> },
 
 	% We want to reuse connection if it already exists:
-	Conn = get_tcp_connection( { Proto, Host, Port } ),
+	Connection = get_tcp_connection( { UriProtoAtom, UriHost, UriPort } ),
 
-	Result = case Method of
+	ReqRes = case Method of
 
 		get ->
-			shotgun:get( Conn, Path, ContentHeaders, Netopts );
+			shotgun:get( Connection, UriPath, ContentHeaders, Netopts );
 
 		post ->
-			shotgun:post( Conn, Path, ContentHeaders, BinContent, Netopts );
+			NillableContent = case MaybeBinContent of
+
+				undefined ->
+					nil;
+
+				BinContent ->
+					BinContent
+
+			end,
+
+			shotgun:post( Connection, UriPath, ContentHeaders, NillableContent,
+						  Netopts );
 
 		_ ->
 			{ error, { invalid_method, Method } }
 
 	end,
 
-	?debug( "~p(~p) => ~p.", [ Method, Uri, Result ] ),
+	trace_utils:debug_fmt( "[~w] ~s request to ~p at ~p "
+		"resulted in: ~p.", [ self(), Method, Uri, UriMap, ReqRes ] ),
 
-	case Result of
+	case ReqRes of
 
 		{ ok, Response=#{ headers := RHeaders } } ->
-			R = Response#{
+			% Updates response from its headers:
+			Resp = Response#{
 				nonce => proplists:get_value( <<"replay-nonce">>, RHeaders,
-											  _Def=nil ),
+											  _Def=null ),
 				location => proplists:get_value( <<"location">>, RHeaders,
-												 _Def=nil )
+												 _Def=null )
 			},
-			decode( Opts, R );
+			decode( OptionMap, Resp );
 
 		_ ->
-			Result
+			ReqRes
 
 	end.
 
 
+
 %%
-%% PUBLIC FUNCTIONS
+%% Public functions.
 %%
 
 
@@ -244,8 +261,8 @@ request( Method, Uri, Headers, BinContent, Opts=#{ netopts := Netopts } ) ->
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.1.1).
 %
 -spec get_directory_map( environment(), option_map() ) ->
-		  letsencrypt:directory_map().
-get_directory_map( Env, Opts ) ->
+							   letsencrypt:directory_map().
+get_directory_map( Env, OptionMap ) ->
 
 	Uri = case Env of
 
@@ -257,21 +274,26 @@ get_directory_map( Env, Opts ) ->
 
 	end,
 
-	?debug( "Getting directory map at ~s.", [ Uri ] ),
+	trace_utils:debug_fmt( "[~w] Getting directory map at ~s.",
+						   [ self(), Uri ] ),
 
-	{ ok, #{ json := DirectoryMap } } =
-		request( get, Uri, #{}, nil, Opts#{ json => true } ),
+	{ ok, #{ json := DirectoryMap } } = request( get, Uri, _HeaderMap=#{},
+		 _MaybeBinContent=undefined, OptionMap#{ json => true } ),
 
 	DirectoryMap.
 
 
 
-% Gets and returns a fresh nonce; see
-% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.2
+% Gets and returns a fresh nonce by using the correspoding URI (see
+% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.2).
 %
 -spec get_nonce( directory_map(), option_map() ) -> nonce().
-get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, Opts ) ->
-	{ ok, #{ nonce := Nonce } } = request( get, Uri, #{}, nil, Opts ),
+get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap ) ->
+
+	trace_utils:debug_fmt( "[~w] Getting new nonce at ~s.", [ self(), Uri ] ),
+
+	{ ok, #{ nonce := Nonce } } = request( get, Uri, _HeaderMap=#{},
+									_MaybeBinContent=undefined, OptionMap ),
 	Nonce.
 
 
@@ -284,20 +306,21 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, Opts ) ->
 %		- Location is create account url
 %		- Nonce is a new valid replay-nonce
 %
-% NOTE: TOS are automatically agreed, this should not be the case
 % TODO: checks 201 Created response
 %
--spec get_account( directory_map(), ssl_private_key(), jws(), option_map() ) ->
+-spec get_account( directory_map(), tls_private_key(), jws(), option_map() ) ->
 		  { json_map_decoded(), bin_uri(), nonce() }.
-get_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws, Opts ) ->
+get_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws, OptionMap ) ->
 
+	% Terms of service should not be automatically agreed:
 	Payload = #{ termsOfServiceAgreed => true,
 				 contact => [] },
 
-	Req = letsencrypt_jws:encode( PrivKey, Jws#{ url => Uri }, Payload ),
+	ReqB64 = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri }, Payload ),
 
 	{ ok, #{ json := Resp, location := LocationUri, nonce := NewNonce } } =
-		request( post, Uri, #{}, Req, Opts#{ json => true } ),
+		request( _Method=post, Uri, _Headers=#{}, ReqB64,
+				 OptionMap#{ json => true } ),
 
 	{ Resp, LocationUri, NewNonce }.
 
@@ -308,13 +331,13 @@ get_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws, Opts ) ->
 %
 % Returns {Response, Location, Nonce}, where:
 %		- Response is json (decoded as map)
-%		- Location is create account url
+%		- Location is create account URI
 %		- Nonce is a new valid replay-nonce
 %
 % TODO: support multiple domains
 %		checks 201 created
 %
--spec request_order( directory_map(), [ bin_domain() ], ssl_private_key(),
+-spec request_order( directory_map(), [ bin_domain() ], tls_private_key(),
 		 jws(), option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
 request_order( _DirMap=#{ <<"newOrder">> := Uri }, BinDomains, PrivKey, Jws,
 			   OptionMap ) ->
@@ -325,10 +348,10 @@ request_order( _DirMap=#{ <<"newOrder">> := Uri }, BinDomains, PrivKey, Jws,
 
 	Req = letsencrypt_jws:encode( PrivKey, Jws#{ url => Uri }, Payload ),
 
-	{ok, #{ json := Resp, location := Location, nonce := Nonce } } =
+	{ok, #{ json := OrderJsonMap, location := LocationUri, nonce := Nonce } } =
 		request( post, Uri, #{}, Req, OptionMap#{ json => true } ),
 
-	{ Resp, Location, Nonce }.
+	{ OrderJsonMap, LocationUri, Nonce }.
 
 
 
@@ -339,9 +362,9 @@ get_order( Uri, Key, Jws, Opts ) ->
 
 	% POST-as-GET implies no payload:
 
-	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, empty ),
+	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, _Content=undefined ),
 
-	{ ok, #{ json := Resp, location := Location, nonce := Nonce	} } =
+	{ ok, #{ json := Resp, location := Location, nonce := Nonce } } =
 		request( post, Uri, #{}, Req, Opts#{ json=> true } ),
 
 	{ Resp, Location, Nonce }.
@@ -356,18 +379,19 @@ get_order( Uri, Key, Jws, Opts ) ->
 %		- Location is create account url
 %		- Nonce is a new valid replay-nonce
 %
--spec request_authorization( bin_uri(), bin_key(), jws(), option_map() ) ->
-		  { json_map_decoded(), bin_uri(), nonce() }.
-request_authorization( Uri, Key, Jws, Opts ) ->
+-spec request_authorization( bin_uri(), tls_private_key(), jws(),
+			 option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
+request_authorization( AuthUri, PrivKey, Jws, OptionMap ) ->
 
 	% POST-as-GET implies no payload:
+	B64AuthReq = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=AuthUri },
+										 _Content=undefined ),
 
-	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, empty ),
+	{ ok, #{ json := Resp, location := LocationUri, nonce := Nonce } } =
+		request( _Method=post, AuthUri, _Headers=#{}, B64AuthReq, 
+				 OptionMap#{ json=> true } ),
 
-	{ ok, #{ json := Resp, location := Location, nonce := Nonce } } =
-		request( post, Uri, #{}, Req, Opts#{ json=> true } ),
-
-	{ Resp, Location, Nonce }.
+	{ Resp, LocationUri, Nonce }.
 
 
 
@@ -414,12 +438,12 @@ finalize_order( _DirMap=#{ <<"finalize">> := Uri }, Csr, Key, Jws, Opts ) ->
 % Downloads certificate for finalized order (see
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.2) and returns it.
 %
--spec get_certificate( order_map(), ssl_private_key(), jws(), option_map() ) ->
+-spec get_certificate( order_map(), tls_private_key(), jws(), option_map() ) ->
 		  bin_certificate().
 get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, Opts ) ->
 
 	% POST-as-GET implies no payload:
-	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, empty ),
+	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, _Content=undefined ),
 
 	{ ok, #{ body := BinCert } } = request( post, Uri, #{}, Req, Opts ),
 
