@@ -50,6 +50,8 @@
 
 		   url :: letsencrypt:uri(),
 
+		   kid :: letsencrypt:uri(),
+
 		   jwk :: letsencrypt:key(),
 
 		   nonce = undefined :: maybe( letsencrypt:nonce() ) } ).

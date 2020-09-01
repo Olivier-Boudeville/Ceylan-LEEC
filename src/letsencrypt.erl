@@ -97,7 +97,6 @@
 
 
 
-
 -type string_uri() :: ustring().
 
 -type bin_uri() :: binary().
@@ -192,6 +191,10 @@
 % A binary encoded in base 64:
 -type binary_b64() :: binary().
 
+% Key authorization, a ninary made of a token and of the hash of a key
+% thumbprint, once b64-encoded:
+%
+-type key_auth() :: binary().
 
 % For the records introduced:
 -include_lib("letsencrypt/include/letsencrypt.hrl").
@@ -206,14 +209,16 @@
 
 
 -export_type([ bin_domain/0, domain/0, le_mode/0,
-			   challenge_type/0, challenge/0, token/0,
-			   thumbprint/0, thumbprint_map/0,
+			   challenge_type/0, bin_challenge_type/0,
+			   token/0, thumbprint/0, thumbprint_map/0,
 			   string_uri/0, bin_uri/0, uri/0,
-			   uri_challenge_map/0,
-			   type_challenge_map/0, option_map/0, acme_operation/0, nonce/0,
-			   san/0, bin_san/0, order_map/0, json_map_decoded/0, jws/0,
-			   tls_private_key/0, key_file_info/0,
+			   challenge/0, uri_challenge_map/0, type_challenge_map/0,
+			   user_option/0, option_id/0, option_map/0,
+			   acme_operation/0, directory_map/0, nonce/0,
+			   san/0, bin_san/0, order_map/0, json_map_decoded/0,
+			   key_file_info/0,
 			   bin_certificate/0, bin_key/0, bin_csr_key/0,
+			   jws_algorithm/0, binary_b64/0, key_auth/0,
 			   tls_private_key/0, key/0, jws/0, certificate/0 ]).
 
 
@@ -297,7 +302,7 @@
 
 -type request() :: atom().
 
--type state_name() :: atom().
+-type state_name() :: status().
 
 -type event_type() :: gen_statem:event_type().
 
@@ -393,7 +398,7 @@ obtain_certificate_for( Domain, FsmPid, OptionMap ) ->
 -spec stop( fsm_pid() ) -> void().
 stop( FsmPid ) ->
 
-	trace_utils:trace_fmt( "[~w] Stopping.", [ FsmPid ] ),
+	trace_utils:trace_fmt( "Requesting ~w to stop.", [ FsmPid ] ),
 
 	% No more gen_fsm:sync_send_all_state_event/2 available, so
 	% handle_call_for_all_states/4 will have to be called from all states
@@ -406,7 +411,7 @@ stop( FsmPid ) ->
 	% Not stopped here, as stopping is only going back to the 'idle' state:
 	%json_utils:stop_parser().
 
-	trace_utils:trace_fmt( "[~w] Stopped (result: ~p).", [ FsmPid, Res ] ).
+	trace_utils:trace_fmt( "FSM ~w stopped (result: ~p).", [ FsmPid, Res ] ).
 
 
 
@@ -542,18 +547,21 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 %
 % Defined separately for testing.
 %
--spec get_ongoing_challenges( fsm_pid() ) -> 'error' | challenge_map().
+-spec get_ongoing_challenges( fsm_pid() ) -> 'error' | thumbprint_map().
 get_ongoing_challenges( FsmPid ) ->
 
-	case catch gen_fsm:sync_send_event( FsmPid, get_ongoing_challenges ) of
+	case catch gen_statem:call( _ServerRef=FsmPid,
+								_Request=get_ongoing_challenges ) of
 
 		% Process not started, wrong state, etc.:
-		{'EXIT', Exc } ->
-			trace_utils:error_fmt( "Challenge not obtained: ~p.", [ Exc ] ),
+		{ 'EXIT', ExitReason } ->
+			trace_utils:error_fmt( "Challenge not obtained: ~p.",
+								   [ ExitReason ] ),
 			error;
 
-		ChallengeMap ->
-			ChallengeMap
+		% Not a list thereof?
+		ThumbprintMap ->
+			ThumbprintMap
 
 	end.
 
@@ -602,8 +610,8 @@ get_ongoing_challenges( FsmPid ) ->
 %
 idle( _EventType={ call, From },
 	  _EventContentMsg=_Request={ create, BinDomain, OptionMap },
-	  LEState=#le_state{ directory_map=DirMap, private_key=PrivKey, jws=Jws,
-						 nonce=Nonce } ) ->
+	  _Data=LEState=#le_state{ directory_map=DirMap, private_key=PrivKey,
+							   jws=Jws, nonce=Nonce } ) ->
 
 	% Ex: 'http-01', 'tls-sni-01', etc.:
 	ChallengeType = maps:get( challenge, OptionMap, _DefaultChlg='http-01' ),
@@ -636,7 +644,7 @@ idle( _EventType={ call, From },
 
 	% TODO: checks order is ok
 	{ OrderDecodedJsonMap, OrderLocationUri, OrderNonce } =
-		letsencrypt_api:request_order( DirMap, BinDomains, PrivKey, AccntJws,
+		letsencrypt_api:request_order( DirMap, BinDomains, PrivKey, AccountJws,
 									   OptionMap ),
 
 	% We need to keep trace of order location:
@@ -659,8 +667,11 @@ idle( _EventType={ call, From },
 
 	end,
 
-	{ reply, Reply, NewStateName, AuthLEState#le_state{ nonce=FinalNonce,
-								  order=LocOrder, challenges=Challenges } };
+	FinalLEState = AuthLEState#le_state{ nonce=FinalNonce, order=LocOrder,
+										 challenges=Challenges },
+
+	{ next_state, NewStateName, _NewData=FinalLEState,
+	  _Action={ reply, From, Reply } };
 
 idle( _EventType={ call, From }, _EventContentMsg=_Request=get_ongoing_challenges,
 	  _Data=_LEState ) ->
@@ -700,11 +711,10 @@ pending( _EventType={ call, From }, _EventContentMsg=get_ongoing_challenges,
 		_Thumbprint=letsencrypt_jws:get_key_authorization( AccountKey, Token ) }
 		  || #{ <<"token">> := Token } <- maps:values( TypeChallengeMap ) ] ),
 
-	trace_utils:trace_fmt( "[~w] Returning challenge thumbprint map ~p.",
-						   [ self(), ThumbprintMap ] ),
+	trace_utils:trace_fmt( "[~w] Returning from pending state challenge "
+		"thumbprint map ~p.", [ self(), ThumbprintMap ] ),
 
-	{ next_state, _SameState=pending,
-	  _NewData=LEState#le_state{ nonce=ResultingNonce },
+	{ next_state, _SameState=pending, _Data=LEState,
 	  _Action={ reply, From, _RetValue=ThumbprintMap } };
 
 
@@ -770,22 +780,23 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 						[ self(), AnyState, AuthUri ] ),
 					revoked;
 
-
-				{ AnyState, UnexpectedBinStatus } ->
-
-					trace_utils:error_fmt( "[~w] For auth URI ~s, while '~s', "
-						"received unexpected status '~p'.",
-						[ self(), AuthUri, AnyState, UnexpectedBinStatus ] ),
-
-					throw( { unexpected_auth_status, UnexpectedBinStatus, self(),
-							 AnyState, AuthUri } );
-
 				% By default remains in the current state (including 'pending'):
 				{ AccStateName, AnyBinStatus } ->
 					trace_utils:trace_fmt( "[~w] For auth URI ~s, staying "
 						"in '~s' despite having received status '~p'.",
 						[ self(), AuthUri, AccStateName, AnyBinStatus ] ),
-					AccStateName
+					AccStateName;
+
+				{ AnyOtherState, UnexpectedBinStatus } ->
+
+					trace_utils:error_fmt( "[~w] For auth URI ~s, while '~s', "
+						"received unexpected status '~p'.",
+						[ self(), AuthUri, AnyOtherState,
+						  UnexpectedBinStatus ] ),
+
+					throw( { unexpected_auth_status, UnexpectedBinStatus, self(),
+							 AnyOtherState, AuthUri } )
+
 
 			end,
 
@@ -803,10 +814,16 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 	  _Action={ reply, From, _RetValue=NextStateName } };
 
 
-pending( _EventType={ call, From }, _EventContentMsg=switchTofinalize,
-		 _Data=LEState ) ->
+% Possibly switchTofinalize,
+pending( _EventType={ call, From }, _EventContentMsg=_Request=switchTofinalize,
+		 _Data=_LEState ) ->
+
+	trace_utils:trace_fmt( "[~w] Received, while in 'pending' state, "
+		"request '~s' from ~w, currently ignored.", [ self(), From ] ),
+
 	% { next_state, finalize, ...}?
-	throw( fixme );
+
+	keep_state_and_data;
 
 pending( _EventType={ call, ServerRef }, _EventContentMsg=Request,
 		 _Data=LEState ) ->
@@ -814,6 +831,11 @@ pending( _EventType={ call, ServerRef }, _EventContentMsg=Request,
 								LEState );
 
 pending( EventType, EventContentMsg, _LEState ) ->
+
+	trace_utils:warning_fmt( "[~w] Received, while in 'pending' state, "
+		"event type '~p' and content message '~p'.",
+		[ self(), EventType, EventContentMsg ] ),
+
 	throw( { unexpected_event, EventType, EventContentMsg,
 			 { state, pending } } ).
 
@@ -974,27 +996,6 @@ handle_call_for_all_states( ServerRef, Request, StateName, _LEState ) ->
 	throw( { unexpected_request, Request, ServerRef, StateName } ).
 
 
-
-
-
-handle_event( _, StateName, LEState ) ->
-	trace_utils:debug_fmt( "Async event: ~p.", [ StateName ] ),
-	{ next_state, StateName, LEState }.
-
-
-
-handle_sync_event( stop, _, _, _ ) ->
-	{ stop, normal, ok, #le_state{} };
-
-handle_sync_event( _, _, StateName, LEState ) ->
-	trace_utils:debug_fmt( "Sync event: ~p.", [ StateName ] ),
-	{ reply, ok, StateName, LEState }.
-
-
-handle_info( _, StateName, LEState ) ->
-	{ next_state, StateName, LEState }.
-
-
 terminate( _, _, _ ) ->
 	ok.
 
@@ -1125,8 +1126,8 @@ wait_challenges_valid( FsmPid, Count, MaxCount ) ->
 			ok;
 
 		pending ->
-			timer:sleep( 500 * ( Max - Count + 1 ) ),
-			wait_challenges_valid( FsmPid, Count - 1, Max );
+			timer:sleep( 500 * ( MaxCount - Count + 1 ) ),
+			wait_challenges_valid( FsmPid, Count - 1, MaxCount );
 
 		{ _Other, Error } ->
 			{ error, Error };
@@ -1160,6 +1161,8 @@ wait_finalized( _FsmPid, _Status, _Count=0, _Max ) ->
 
 wait_finalized( FsmPid, Status, Count, Max ) ->
 
+	case gen_statem:call( FsmPid, Status, _Timeout=15000 ) of
+
 	case gen_fsm:sync_send_event( FsmPid, Status, _Timeout=15000 ) of
 
 		P={ ok, _Res } ->
@@ -1185,12 +1188,12 @@ wait_finalized( FsmPid, Status, Count, Max ) ->
 
 % Performs ACME authorization based on selected challenge initialization.
 -spec perform_auth( challenge_type(), [ bin_uri() ], le_state() ) ->
-		  { 'ok', uri_challenge_type_map(), nonce() }
+		  { 'ok', uri_challenge_map(), nonce() }
 		| { 'error', 'uncaught' | binary(), nonce() }.
 perform_auth( ChallengeType, AuthUris, LEState=#le_state{ mode=Mode } ) ->
 
 	trace_utils:trace_fmt( "[~w] Starting authorization procedure with "
-		"challenge '~s' (mode: ~s).", [ self(), ChallengeType, Mode ] ),
+		"challenge type '~s' (mode: ~s).", [ self(), ChallengeType, Mode ] ),
 
 	BinChallengeType = text_utils:atom_to_binary( ChallengeType ),
 
@@ -1202,11 +1205,11 @@ perform_auth( ChallengeType, AuthUris, LEState=#le_state{ mode=Mode } ) ->
 
 	init_for_challenge_type( Mode, LEState, ChallengeType, UriChallengeMap ),
 
-	case perform_auth_step2( maps:to_list( Challenges ),
+	case perform_auth_step2( maps:to_list( UriChallengeMap ),
 							 LEState#le_state{ nonce=Nonce } ) of
 
 		{ ok, NewNonce } ->
-			{ ok, Challenges, NewNonce };
+			{ ok, UriChallengeMap, NewNonce };
 
 		Error ->
 			Error
@@ -1224,7 +1227,7 @@ perform_auth( ChallengeType, AuthUris, LEState=#le_state{ mode=Mode } ) ->
 %		- Nonce is a new valid replay-nonce
 %
 -spec perform_auth_step1( [ bin_uri() ], bin_challenge_type(), le_state(),
-		  uri_challenge_type_map() ) -> { uri_challenge_map(), nonce() }.
+		  uri_challenge_map() ) -> { uri_challenge_map(), nonce() }.
 perform_auth_step1( _AuthUris=[], _BinChallengeType, #le_state{ nonce=Nonce },
 					UriChallengeMap ) ->
 	{ UriChallengeMap, Nonce };
@@ -1291,7 +1294,7 @@ init_for_challenge_type( _ChallengeType='http-01', _Mode=webroot,
 		Thumbprint = letsencrypt_jws:get_key_authorization( AccountKey, Token ),
 
 		% Hopefully the default modes are fine:
-		file_utils:write_whole( ChalWebPath, Thumbprint, _Modes=[] )
+		file_utils:write_whole( ChlgWebPath, Thumbprint, _Modes=[] )
 
 	  end || #{ <<"token">> := Token } <- maps:values( UriChallengeMap ) ];
 

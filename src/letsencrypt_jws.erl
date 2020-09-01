@@ -93,7 +93,7 @@ encode( PrivateKey, Jws, Content ) ->
 %
 % See https://www.rfc-editor.org/rfc/rfc8555.html#section-8.1.
 %
--spec get_key_authorization( key(), token() ) -> binary().
+-spec get_key_authorization( key(), token() ) -> letsencrypt:key_auth().
 get_key_authorization( #key{ kty=Kty, n=N, e=E }, Token ) ->
 
 	Thumbprint = json_utils:to_json( #{ <<"kty">> => Kty, <<"n">> => N,

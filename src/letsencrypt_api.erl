@@ -111,10 +111,10 @@ binary_to_status( InvalidBinStatus ) ->
 %
 % TODO: checks connection is still alive (ping?)
 %
--spec get_tcp_connection( { net_utils:protocol_type(),
-		net_utils:string_host_name(), net_utils:tcp_port() } ) ->
+-spec get_tcp_connection( net_utils:protocol_type(),
+		net_utils:string_host_name(), net_utils:tcp_port() ) ->
 		  shotgun:connection().
-get_tcp_connection( ConnectTriplet={ Proto, Host, Port } ) ->
+get_tcp_connection( Proto, Host, Port ) ->
 
 	case ets:info( ?connection_table ) of
 
@@ -125,6 +125,8 @@ get_tcp_connection( ConnectTriplet={ Proto, Host, Port } ) ->
 		_ ->
 			ok
 	end,
+
+	ConnectTriplet = { Proto, Host, Port },
 
 	case ets:lookup( ?connection_table, ConnectTriplet ) of
 
@@ -178,7 +180,7 @@ decode( _OptionMap, Response ) ->
 %       (check ACME documentation)
 %
 -spec request( 'get' | 'post', uri(), header_map(), maybe( bin_content() ),
-		   option_map() ) -> shotgun:result() | { 'error', term() }.
+		   option_map() ) -> shotgun:result() | basic_utils:base_status().
 request( Method, Uri, Headers, MaybeBinContent,
 		 OptionMap=#{ netopts := Netopts } ) ->
 
@@ -204,7 +206,7 @@ request( Method, Uri, Headers, MaybeBinContent,
 								   <<"application/jose+json">> },
 
 	% We want to reuse connection if it already exists:
-	Connection = get_tcp_connection( { UriProtoAtom, UriHost, UriPort } ),
+	Connection = get_tcp_connection( UriProtoAtom, UriHost, UriPort ),
 
 	ReqRes = case Method of
 
@@ -277,7 +279,7 @@ get_directory_map( Env, OptionMap ) ->
 	trace_utils:debug_fmt( "[~w] Getting directory map at ~s.",
 						   [ self(), Uri ] ),
 
-	{ ok, #{ json := DirectoryMap } } = request( get, Uri, _HeaderMap=#{},
+	{ ok, #{ json := DirectoryMap } } = request( _Method=get, Uri, _Headers=#{},
 		 _MaybeBinContent=undefined, OptionMap#{ json => true } ),
 
 	DirectoryMap.
@@ -292,7 +294,7 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap ) ->
 
 	trace_utils:debug_fmt( "[~w] Getting new nonce at ~s.", [ self(), Uri ] ),
 
-	{ ok, #{ nonce := Nonce } } = request( get, Uri, _HeaderMap=#{},
+	{ ok, #{ nonce := Nonce } } = request( _Method=get, Uri, _Headers=#{},
 									_MaybeBinContent=undefined, OptionMap ),
 	Nonce.
 
@@ -312,6 +314,9 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap ) ->
 		  { json_map_decoded(), bin_uri(), nonce() }.
 get_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws, OptionMap ) ->
 
+	trace_utils:debug_fmt( "[~w] Requesting a new account at ~s.",
+						   [ self(), Uri ] ),
+
 	% Terms of service should not be automatically agreed:
 	Payload = #{ termsOfServiceAgreed => true,
 				 contact => [] },
@@ -319,7 +324,7 @@ get_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws, OptionMap ) ->
 	ReqB64 = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri }, Payload ),
 
 	{ ok, #{ json := Resp, location := LocationUri, nonce := NewNonce } } =
-		request( _Method=post, Uri, _Headers=#{}, ReqB64,
+		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=ReqB64,
 				 OptionMap#{ json => true } ),
 
 	{ Resp, LocationUri, NewNonce }.
@@ -342,14 +347,19 @@ get_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws, OptionMap ) ->
 request_order( _DirMap=#{ <<"newOrder">> := Uri }, BinDomains, PrivKey, Jws,
 			   OptionMap ) ->
 
+	trace_utils:debug_fmt( "[~w] Requesting a new order at ~s.",
+						   [ self(), Uri ] ),
+
 	Idns = [ #{ type => dns, value => BinDomain } || BinDomain <- BinDomains ],
 
 	Payload = #{ identifiers => Idns },
 
-	Req = letsencrypt_jws:encode( PrivKey, Jws#{ url => Uri }, Payload ),
+	Req = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri },
+								  _Content=Payload ),
 
 	{ok, #{ json := OrderJsonMap, location := LocationUri, nonce := Nonce } } =
-		request( post, Uri, #{}, Req, OptionMap#{ json => true } ),
+		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
+				 OptionMap#{ json => true } ),
 
 	{ OrderJsonMap, LocationUri, Nonce }.
 
@@ -358,14 +368,17 @@ request_order( _DirMap=#{ <<"newOrder">> := Uri }, BinDomains, PrivKey, Jws,
 % Returns order state.
 -spec get_order( bin_uri(), bin_key(), jws(), option_map() ) ->
 		  { json_map_decoded(), bin_uri(), nonce() }.
-get_order( Uri, Key, Jws, Opts ) ->
+get_order( Uri, Key, Jws, OptionMap ) ->
+
+	trace_utils:debug_fmt( "[~w] Getting order at ~s.", [ self(), Uri ] ),
 
 	% POST-as-GET implies no payload:
 
-	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, _Content=undefined ),
+	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined ),
 
 	{ ok, #{ json := Resp, location := Location, nonce := Nonce } } =
-		request( post, Uri, #{}, Req, Opts#{ json=> true } ),
+		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
+				 OptionMap#{ json=> true } ),
 
 	{ Resp, Location, Nonce }.
 
@@ -383,13 +396,16 @@ get_order( Uri, Key, Jws, Opts ) ->
 			 option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
 request_authorization( AuthUri, PrivKey, Jws, OptionMap ) ->
 
+	trace_utils:debug_fmt( "[~w] Requesting authorization at ~s.",
+						   [ self(), Uri ] ),
+
 	% POST-as-GET implies no payload:
 	B64AuthReq = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=AuthUri },
 										 _Content=undefined ),
 
 	{ ok, #{ json := Resp, location := LocationUri, nonce := Nonce } } =
-		request( _Method=post, AuthUri, _Headers=#{}, B64AuthReq, 
-				 OptionMap#{ json=> true } ),
+		request( _Method=post, AuthUri, _Headers=#{},
+				 _MaybeBinContent=B64AuthReq, OptionMap#{ json=> true } ),
 
 	{ Resp, LocationUri, Nonce }.
 
@@ -405,13 +421,18 @@ request_authorization( AuthUri, PrivKey, Jws, OptionMap ) ->
 %
 -spec notify_ready_for_challenge( directory_map(), bin_key(), jws(),
 			  option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
-notify_ready_for_challenge( _DirMap=#{ <<"url">> := Uri }, Key, Jws, Opts ) ->
+notify_ready_for_challenge( _DirMap=#{ <<"url">> := Uri }, Key, Jws,
+							OptionMap ) ->
+
+	trace_utils:debug_fmt( "[~w] Notifying ACME server that ready for "
+						   "challenge validation at ~s.", [ self(), Uri ] ),
 
 	% POST-as-GET implies no payload:
-	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, #{} ),
+	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, _Content=#{} ),
 
 	{ ok, #{ json := Resp, location := Location, nonce := Nonce } } =
-		request( post, Uri, #{}, Req, Opts#{ json => true } ),
+		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
+				OptionMap #{ json => true } ),
 
 	{ Resp, Location, Nonce }.
 
@@ -422,14 +443,18 @@ notify_ready_for_challenge( _DirMap=#{ <<"url">> := Uri }, Key, Jws, Opts ) ->
 %
 -spec finalize_order( directory_map(), bin_csr_key(), bin_key(), jws(),
 			  option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
-finalize_order( _DirMap=#{ <<"finalize">> := Uri }, Csr, Key, Jws, Opts ) ->
+finalize_order( _DirMap=#{ <<"finalize">> := Uri }, Csr, Key, Jws,
+				OptionMap ) ->
+
+	trace_utils:debug_fmt( "[~w] Finalizing order at ~s.", [ self(), Uri ] ),
 
 	Payload = #{ csr => Csr },
 
-	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, Payload ),
+	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, Payload ),
 
 	{ ok, #{ json := Resp, location := Location, nonce := Nonce } } =
-		request( post, Uri, #{}, Req, Opts#{ json => true } ),
+		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
+				 OptionMap=#{ json => true } ),
 
 	{ Resp, Location, Nonce }.
 
@@ -440,11 +465,15 @@ finalize_order( _DirMap=#{ <<"finalize">> := Uri }, Csr, Key, Jws, Opts ) ->
 %
 -spec get_certificate( order_map(), tls_private_key(), jws(), option_map() ) ->
 		  bin_certificate().
-get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, Opts ) ->
+get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, OptionMap ) ->
+
+	trace_utils:debug_fmt( "[~w] Downloading certificate at ~s.",
+						   [ self(), Uri ] ),
 
 	% POST-as-GET implies no payload:
-	Req = letsencrypt_jws:encode( Key, Jws#{ url => Uri }, _Content=undefined ),
+	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined ),
 
-	{ ok, #{ body := BinCert } } = request( post, Uri, #{}, Req, Opts ),
+	{ ok, #{ body := BinCert } } = request( _Method=post, Uri, _Headers=#{},
+											_MaybeBinContent=Req, OptionMap ),
 
 	BinCert.
