@@ -22,6 +22,9 @@
 
 -include_lib("public_key/include/public_key.hrl").
 
+% For the records introduced:
+-include_lib("letsencrypt/include/letsencrypt.hrl").
+
 
 % Shorthands:
 
@@ -111,7 +114,7 @@ create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 
 	end,
 
-	% Now load it, and return it as a tls_private_key():
+	% Now load it (next clause), and return it as a tls_private_key():
 	create_private_key( KeyFilePath, BinCertDirPath );
 
 
@@ -119,13 +122,13 @@ create_private_key( _KeyFileInfo=KeyFilePath, _BinCertDirPath ) ->
 
 	PemContent = file_utils:read_whole( KeyFilePath ),
 
-	% ASN.1 DER encoded entry:
+	% A single ASN.1 DER encoded entry:
 	[ KeyEntry ] = public_key:pem_decode( PemContent ),
 
 	#'RSAPrivateKey'{ modulus=N, publicExponent=E, privateExponent=D } =
 		public_key:pem_entry_decode( KeyEntry ),
 
-	#tls_private_key#{
+	#tls_private_key{
 	   raw=[ E, N, D ],
 	   b64_pair={ letsencrypt_utils:b64encode( binary:encode_unsigned( N ) ),
 				  letsencrypt_utils:b64encode( binary:encode_unsigned( E ) ) },

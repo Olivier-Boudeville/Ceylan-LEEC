@@ -167,9 +167,6 @@
 -type bin_san() :: bin_string().
 
 
--type order_map() :: map().
-
-
 % JSON element decoded as a map:
 -type json_map_decoded() :: map().
 
@@ -215,8 +212,7 @@
 			   challenge/0, uri_challenge_map/0, type_challenge_map/0,
 			   user_option/0, option_id/0, option_map/0,
 			   acme_operation/0, directory_map/0, nonce/0,
-			   san/0, bin_san/0, order_map/0, json_map_decoded/0,
-			   key_file_info/0,
+			   san/0, bin_san/0, json_map_decoded/0, key_file_info/0,
 			   bin_certificate/0, bin_key/0, bin_csr_key/0,
 			   jws_algorithm/0, binary_b64/0, key_auth/0,
 			   tls_private_key/0, key/0, jws/0, certificate/0 ]).
@@ -273,10 +269,10 @@
 
 	account_key :: key(),
 
-	order = undefined :: maybe( order_map() ),
+	order = undefined :: maybe( directory_map() ),
 
-	% Known challenges, per type:
-	challenges = #{} :: type_challenge_map(),
+	% Known challenges, per URI:
+	challenges = #{} :: uri_challenge_map(),
 
 	% Path to certificate/csr key file:
 	cert_key_file_path = undefined :: maybe( file_path() ),
@@ -297,7 +293,7 @@
 		gen_statem:state_callback_result( gen_statem:action() ).
 
 
-% FSM status:
+% FSM status (corresponding to state names):
 -type status() :: 'pending' | 'processing' | 'valid' | 'invalid' | 'revoked'.
 
 -type request() :: atom().
@@ -473,7 +469,7 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 	Timeout = ?base_timeout,
 
 	% Expected to trigger idle({create, BinDomain, Opts }, _, LEState):
-	Ret = case gen_statem:call( _ServerRef=FsmPid,
+	CreationRes = case gen_statem:call( _ServerRef=FsmPid,
 				_Request={ create, BinDomain, OptionMap }, Timeout ) of
 
 		% State of FSM shall thus be 'idle' now:
@@ -488,35 +484,41 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 			case wait_challenges_valid( FsmPid ) of
 
 				ok ->
+					% So here the FSM is expected to have switched from
+					% 'pending' to 'valid'. Then:
+
+					% Most probably 'finalize':
 					Status = gen_statem:call( _ServerRef=FsmPid,
-											  _Request=switchTofinalize, Timeout ),
+											  _Req=switchTofinalize, Timeout ),
 
 					case wait_finalized( FsmPid, Status, _Count=20 ) of
 
-						P={ ok, _SomeRes } ->
-							%trace_utils:debug_fmt( "OK for '~s': ~p.",
-							%                     [ Domain, SomeRes ] ),
-							P;
+						ok ->
+							trace_utils:debug_fmt( "Domain '~s' finalized "
+								"for ~w.", [ Domain, FsmPid ] ),
+							ok;
 
 						Error ->
-							%trace_utils:error_fmt( "Error for '~s': ~p.",
-							%                     [ Domain, Error ] ),
+							trace_utils:error_fmt( "Error for FSM ~w when "
+								"finalizing domain '~s': ~p.",
+								[ FsmPid, Domain, Error ] ),
 							Error
 
 					end;
 
+				% Typically {error, timeout}:
 				OtherError ->
-					trace_utils:debug_fmt( "Reset for '~s' after error ~p.",
-										   [ Domain, OtherError ] ),
-					_ = gen_statem:call( _ServerRef=FsmPid, _Request=reset ),
+					trace_utils:debug_fmt( "Reset of FSM ~w for '~s' "
+						"after error ~p.", [ FsmPid, Domain, OtherError ] ),
+					_ = gen_statem:call( _ServerRef=FsmPid, reset ),
 					OtherError
 
 			end;
 
 		Other ->
-			trace_utils:error_fmt( "Unexpected return after create: ~p",
-								   [ Other ] ),
-			throw( { unexpected_create, Other } )
+			trace_utils:error_fmt( "Unexpected return after create for ~w: ~p",
+								   [ FsmPid, Other ] ),
+			throw( { unexpected_create, Other, FsmPid } )
 
 	end,
 
@@ -524,20 +526,22 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 
 		true ->
 			Callback = maps:get( callback, OptionMap,
-				_Default=fun( _Ret ) ->
-					trace_utils:warning( "Default async callback called." )
-				end ),
+				_DefaultCallback=fun( Ret ) ->
+					trace_utils:warning_fmt( "Default async callback called "
+						"for ~w regarding result ~p.", [ FsmPid, Ret ] )
+								 end ),
 
-			Callback( Ret );
+			Callback( CreationRes );
 
 		_ ->
 			ok
 
 	end,
 
-	%trace_utils:debug_fmt( "Return for '~s': ~p", [ Domain, Ret ] ),
+	%trace_utils:debug_fmt( "Return for domain '~s' creation (FSM: ~w): ~p",
+	%                      [ Domain, FsmPid, CreationRes ] ),
 
-	Ret.
+	CreationRes.
 
 
 
@@ -558,6 +562,8 @@ get_ongoing_challenges( FsmPid ) ->
 			trace_utils:error_fmt( "Challenge not obtained: ~p.",
 								   [ ExitReason ] ),
 			error;
+
+		% Could be also 'no_challenge' if in 'idle' state.
 
 		% Not a list thereof?
 		ThumbprintMap ->
@@ -655,20 +661,21 @@ idle( _EventType={ call, From },
 
 	AuthUris = maps:get( <<"authorizations">>, OrderDecodedJsonMap ),
 
-	AuthzResp = perform_auth( ChallengeType, AuthUris, AuthLEState ),
+	AuthTriplet = perform_auth( ChallengeType, AuthUris, AuthLEState ),
 
-	{ NewStateName, Reply, Challenges, FinalNonce } = case AuthzResp of
+	{ NewStateName, Reply, NewUriChallengeMap, FinalNonce } =
+			case AuthTriplet of
 
 		{ error, Err, ErrAuthNonce } ->
-			{ idle, { creation_failed, Err }, nil, ErrAuthNonce };
+			{ idle, { creation_failed, Err }, _ResetChlgMap=#{}, ErrAuthNonce };
 
-		{ ok, Xchallenges, AuthNonce } ->
-			{ pending, creation_pending, Xchallenges, AuthNonce }
+		{ ok, UriChallengeMap, AuthNonce } ->
+			{ pending, creation_pending, UriChallengeMap, AuthNonce }
 
 	end,
 
 	FinalLEState = AuthLEState#le_state{ nonce=FinalNonce, order=LocOrder,
-										 challenges=Challenges },
+										 challenges=NewUriChallengeMap },
 
 	{ next_state, NewStateName, _NewData=FinalLEState,
 	  _Action={ reply, From, Reply } };
@@ -718,8 +725,10 @@ pending( _EventType={ call, From }, _EventContentMsg=get_ongoing_challenges,
 	  _Action={ reply, From, _RetValue=ThumbprintMap } };
 
 
-% Checks if all challenges are completed.
-% Switch to the 'valid' state iff all challenges are validated.
+% Checks if all challenges are completed, and returns the (possibly new) current
+% state.
+%
+% Switches to the 'valid' state iff all challenges are validated.
 %
 % Transitions to:
 %	- 'pending' if at least one challenge is not completed yet
@@ -741,7 +750,7 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 
 			{ AuthJsonMap, _Location, NewNonce } =
 					letsencrypt_api:request_authorization( AuthUri, PrivKey,
-								   Jws#{ nonce => AccNonce }, OptionMap ),
+								   Jws#jws{ nonce=AccNonce }, OptionMap ),
 
 			BinStatus = maps:get( <<"status">>, AuthJsonMap ),
 
@@ -753,7 +762,6 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 				% Only status allowing to remain in 'valid' state:
 				{ valid, <<"valid">> } ->
 					valid;
-
 
 				{ pending, _ } ->
 					pending;
@@ -788,9 +796,8 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 					AccStateName;
 
 				{ AnyOtherState, UnexpectedBinStatus } ->
-
-					trace_utils:error_fmt( "[~w] For auth URI ~s, while '~s', "
-						"received unexpected status '~p'.",
+					trace_utils:error_fmt( "[~w] For auth URI ~s, "
+						"while in '~s' state, received unexpected status '~p'.",
 						[ self(), AuthUri, AnyOtherState,
 						  UnexpectedBinStatus ] ),
 
@@ -806,15 +813,15 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 		_Acc0={ _InitialNextStateName=valid, InitialNonce },
 		_List=AuthorizationsUris ),
 
-	trace_utils:debug_fmt( "[~w] Check resulted in switching from pending "
-						   "to ~s.", [ self(), NextStateName ] ),
+	trace_utils:debug_fmt( "[~w] Check resulted in switching from 'pending' "
+						   "to '~s' state.", [ self(), NextStateName ] ),
 
 	{ next_state, NextStateName,
 	  _NewData=LEState#le_state{ nonce=ResultingNonce },
 	  _Action={ reply, From, _RetValue=NextStateName } };
 
 
-% Possibly switchTofinalize,
+% Possibly switchTofinalize:
 pending( _EventType={ call, From }, _EventContentMsg=_Request=switchTofinalize,
 		 _Data=_LEState ) ->
 
@@ -840,42 +847,71 @@ pending( EventType, EventContentMsg, _LEState ) ->
 			 { state, pending } } ).
 
 
+
 % Management of the 'valid' state.
 %
 % When challenges have been successfully completed, finalizes ACME order and
 % generates TLS certificate.
 %
-% returns:
-%	Status: order status
+% Returns Status, the order status.
 %
 % Transitions to 'finalize' state.
 %
-valid( _EventType=_Action, _EventContentMsg=_Domain,
+valid( _EventType={ call, _ServerRef=From },
+	   _EventContentMsg=_Request=switchTofinalize,
 	   _Data=LEState=#le_state{ mode=Mode, domain=BinDomain, sans=SANs,
-						  cert_dir_path=CertDirPath, order=Order, private_key=PrivKey,
-						  jws=Jws, nonce=Nonce, option_map=OptionMap } ) ->
+			cert_dir_path=BinCertDirPath, order=OrderDirMap,
+			private_key=PrivKey, jws=Jws, nonce=Nonce,
+			option_map=OptionMap } ) ->
 
 	challenge_destroy( Mode, LEState ),
 
 	KeyFilename = text_utils:binary_to_string( BinDomain ) ++ ".key",
 
 	% KeyFilePath is required for csr generation:
-	#{ file := KeyFilePath } =
-		letsencrypt_tls:create_private_key( { new, KeyFilename }, CertDirPath ),
+	CreatedTLSPrivKey = letsencrypt_tls:create_private_key(
+						  { new, KeyFilename }, BinCertDirPath ),
 
-	Csr = letsencrypt_tls:get_cert_request( BinDomain, CertDirPath, SANs ),
+	Csr = letsencrypt_tls:get_cert_request( BinDomain, BinCertDirPath, SANs ),
 
-	{ ok, FinOrder, _, FinNonce } = letsencrypt_api:finalize( Order, Csr, PrivKey,
-											 Jws#{ nonce => Nonce }, OptionMap ),
+	{ FinOrderDirMap, _BinUri, FinNonce } = letsencrypt_api:finalize_order(
+		OrderDirMap, Csr, PrivKey, Jws#jws{ nonce=Nonce }, OptionMap ),
 
-	BinStatus = maps:get( <<"status">>, FinOrder, nil ),
+	BinStatus = case maps:get( <<"status">>, FinOrderDirMap,
+							   undefined_status ) of
 
-	Status = letsencrypt_api:binary_to_status( BinStatus ),
+		undefined_status ->
+			throw( { lacking_status, FinOrderDirMap } );
 
-	LocOrder = FinOrder#{ <<"location">> => maps:get( <<"location">>, Order ) },
+		S ->
+			S
 
-	{ reply, Status, finalize, LEState#le_state{ order=LocOrder,
-							 cert_key_file_path=KeyFilePath, nonce=FinNonce } };
+	end,
+
+	% Expected to be 'finalize':
+	NewStateName = case letsencrypt_api:binary_to_status( BinStatus ) of
+
+		finalize ->
+			finalize;
+
+		OtherStateName ->
+			trace_utils:warning_fmt( "New state after finalizing order is not "
+				"'finalize' but '~s'.", [ OtherStateName ] ),
+			OtherStateName
+
+	end,
+
+	% Update location in finalized order:
+	LocOrderDirMap = FinOrderDirMap#{
+				   <<"location">> => maps:get( <<"location">>, OrderDirMap ) },
+
+	FinalLEState = LEState#le_state{ order=LocOrderDirMap,
+		cert_key_file_path=CreatedTLSPrivKey#tls_private_key.file_path,
+		nonce=FinNonce },
+
+	{ next_state, NewStateName, _NewData=FinalLEState,
+	  _Action={ reply, From, _Reply=NewStateName } };
+
 
 valid( _EventType={ call, ServerRef }, _EventContentMsg=Request,
 	  _Data=LEState ) ->
@@ -884,7 +920,8 @@ valid( _EventType={ call, ServerRef }, _EventContentMsg=Request,
 
 valid( EventType, EventContentMsg, _LEState ) ->
 	throw( { unexpected_event, EventType, EventContentMsg,
-			 { state, valid } } ).
+			 { state, valid }, self() } ).
+
 
 
 % Management of the 'finalize' state.
@@ -923,7 +960,7 @@ finalize( _EventType=processing, _EventContentMsg=_Domain, _Data=LEState=#le_sta
 % Transitions to state 'idle': fsm complete, going back to initial state.
 %
 finalize( _EventType=valid, _EventContentMsg=_Domain, _Data=LEState=#le_state{ order=OrderMap, domain=BinDomain,
-					cert_key_file_path=KeyFilePath, cert_dir_path=CertDirPath,
+					cert_key_file_path=KeyFilePath, cert_dir_path=BinCertDirPath,
 					private_key=PrivKey, jws=Jws, nonce=Nonce, option_map=OptionMap } ) ->
 
 	BinKeyFilePath = text_utils:string_to_binary( KeyFilePath ),
@@ -935,7 +972,7 @@ finalize( _EventType=valid, _EventContentMsg=_Domain, _Data=LEState=#le_state{ o
 	Domain = text_utils:binary_to_string( BinDomain ),
 
 	CertFilePath = letsencrypt_tls:write_certificate( Domain, BinCert,
-													  CertDirPath ),
+													  BinCertDirPath ),
 
 	BinCertFilePath = text_utils:string_to_binary( CertFilePath ),
 
@@ -972,6 +1009,12 @@ finalize( UnexpectedEventType, EventContentMsg, _LEState ) ->
 %
 -spec handle_call_for_all_states( server_ref(), request(), state_name(),
 								  le_state() ) -> state_callback_result().
+handle_call_for_all_states( ServerRef, _Request=get_status, StateName, 
+							_LEState ) ->
+	Res = StateName,
+	{ keep_state_and_data, _Actions={ reply, _From=ServerRef, Res } };
+
+
 handle_call_for_all_states( ServerRef, _Request=stop, StateName,
 							LEState=#le_state{ mode=Mode } ) ->
 
@@ -995,6 +1038,9 @@ handle_call_for_all_states( ServerRef, Request, StateName, _LEState ) ->
 
 	throw( { unexpected_request, Request, ServerRef, StateName } ).
 
+
+
+% Standard callbacks:
 
 terminate( _, _, _ ) ->
 	ok.
@@ -1096,7 +1142,8 @@ setup_mode( #le_state{ mode=Mode } ) ->
 
 
 % Loops a few times on authorization check until challenges are all validated
-% (with increasing waiting times after each attempt).
+% (with increasing waiting times after each attempt); if successful, the FSM
+% should be in 'valid' state when returning.
 %
 % Returns:
 %   - {error, timeout} if failed after X loops
@@ -1105,7 +1152,7 @@ setup_mode( #le_state{ mode=Mode } ) ->
 %
 -spec wait_challenges_valid( fsm_pid() ) -> base_status().
 wait_challenges_valid( FsmPid ) ->
-	Count =20,
+	Count = 20,
 	wait_challenges_valid( FsmPid, Count, Count ).
 
 
@@ -1161,25 +1208,23 @@ wait_finalized( _FsmPid, _Status, _Count=0, _Max ) ->
 
 wait_finalized( FsmPid, Status, Count, Max ) ->
 
-	case gen_statem:call( FsmPid, Status, _Timeout=15000 ) of
+	case gen_statem:call( FsmPid, _Req=get_status, ?base_timeout ) of
 
-	case gen_fsm:sync_send_event( FsmPid, Status, _Timeout=15000 ) of
+		Status ->
+			ok;
 
-		P={ ok, _Res } ->
-			P;
-
-		valid ->
+		S when S =:= valid orelse S =:= processing ->
 			timer:sleep( 500 * ( Max - Count + 1 ) ),
-			wait_finalized( FsmPid, valid, Count-1, Max );
+			wait_finalized( FsmPid, S, Count-1, Max );
 
-		processing  ->
-			timer:sleep( 500 * ( Max - Count + 1 ) ),
-			wait_finalized( FsmPid, processing, Count-1, Max );
-
-		{ _, Error } ->
+		P={ _, Error } ->
+			trace_utils:error_fmt( "wait_finalized received ~p for ~w.",
+								   [ P, FsmPid ] ),
 			{ error, Error };
 
 		Any ->
+			trace_utils:warning_fmt( "wait_finalized received ~p for ~w.",
+									 [ any, FsmPid ] ),
 			Any
 
 	end.
@@ -1270,7 +1315,7 @@ perform_auth_step2( _Pairs=[], #le_state{ nonce=Nonce } ) ->
 perform_auth_step2( _Pairs=[ {_Uri, Challenge } | T ],
 			 LEState=#le_state{ nonce=Nonce, private_key=PrivKey, jws=Jws, option_map=OptionMap } ) ->
 	{ ok, _, _, OtherNonce } = letsencrypt_api:challenge( Challenge, PrivKey,
-											  Jws#{ nonce => Nonce }, OptionMap ),
+											  Jws#jws{ nonce=Nonce }, OptionMap ),
 
 	perform_auth_step2( T, LEState#le_state{ nonce=OtherNonce } ).
 
@@ -1299,17 +1344,17 @@ init_for_challenge_type( _ChallengeType='http-01', _Mode=webroot,
 	  end || #{ <<"token">> := Token } <- maps:values( UriChallengeMap ) ];
 
 
-init_for_challenge_type( _Mode=slave, _LEState, _ChallengeType, _Challenges ) ->
+init_for_challenge_type( _Mode=slave, _LEState, _ChallengeType, _UriChallengeMap ) ->
 	ok;
 
-init_for_challenge_type( _Mode=standalone, #le_state{ port=Port, domain=Domain,
-									   account_key=AccntKey },
-				ChallengeType, Challenges ) ->
+init_for_challenge_type( _Mode=standalone,
+			#le_state{ port=Port, domain=Domain, account_key=AccntKey },
+			ChallengeType, UriChallengeMap ) ->
 
 	%trace_utils:debug_fmt( "Init standalone challenge for ~p.",
 	%                       [ ChallengeType ] ),
 
-	{ok, _ } = case ChallengeType of
+	case ChallengeType of
 
 		'http-01' ->
 			% elli webserver callback args is:
@@ -1322,9 +1367,9 @@ init_for_challenge_type( _Mode=standalone, #le_state{ port=Port, domain=Domain,
 			% Iterating on values:
 			Thumbprints = maps:from_list(
 				[ { Token, letsencrypt_jws:get_key_authorization( AccntKey, Token ) }
-				  || #{ <<"token">> := Token } <- maps:values( Challenges ) ] ),
+				  || #{ <<"token">> := Token } <- maps:values( UriChallengeMap ) ] ),
 
-			elli:start_link([
+			{ ok, _ } = elli:start_link([
 				{ name, { local, letsencrypt_elli_listener } },
 				{ callback, letsencrypt_elli_handler },
 				{ callback_args, [ #{ Domain => Thumbprints } ] },
@@ -1351,7 +1396,7 @@ init_for_challenge_type( _Mode=standalone, #le_state{ port=Port, domain=Domain,
 %
 -spec challenge_destroy( le_mode(), le_state() ) -> void().
 challenge_destroy( _Mode=webroot,
-			   #le_state{ webroot_path=BinWPath, challenges=Challenges } ) ->
+			   #le_state{ webroot_path=BinWPath, challenges=UriChallengeMap } ) ->
 
 	[ begin
 
@@ -1360,11 +1405,10 @@ challenge_destroy( _Mode=webroot,
 
 		  file_utils:remove_file( ChalWebPath )
 
-	  end || #{ <<"token">> := Token } <- maps:values( Challenges ) ];
+	  end || #{ <<"token">> := Token } <- maps:values( UriChallengeMap ) ];
 
 
 challenge_destroy( _Mode=standalone, _LEState ) ->
-
 	% Stop http server:
 	elli:stop( letsencrypt_elli_listener );
 

@@ -31,6 +31,10 @@
 -export_type([ table/2 ]).
 
 
+% For the records introduced:
+-include_lib("letsencrypt/include/letsencrypt.hrl").
+
+
 % Known keys:
 %  - termsOfServiceAgreed :: boolean()
 %  - contact :: ustring()
@@ -46,14 +50,12 @@
 
 
 
-% Initializes a RSA JWS with specified private key.
+% Initializes a RSA JWS with specified TLS private key.
 -spec init( tls_private_key() ) -> jws().
-init( _PrivateKey=#{ b64 := { N, E } } ) ->
+init( #tls_private_key{ b64_pair={ N, E } } ) ->
 	#jws{ alg='RS256',
-		  jwk => #{ kty => 'RSA',
-					<<"n">> => N,
-					<<"e">> => E },
-		  nonce => undefined }.
+		  jwk=#key{ kty='RSA', n=N, e=E },
+		  nonce= undefined }.
 
 
 
@@ -62,7 +64,7 @@ init( _PrivateKey=#{ b64 := { N, E } } ) ->
 %
 % Content is the payload (if any).
 %
--spec encode( tls_private_key(), jws(), content() ) -> binary_b64().
+-spec encode( tls_private_key(), jws(), content() ) -> letsencrypt:binary_b64().
 encode( PrivateKey, Jws, Content ) ->
 
 	Protected = letsencrypt_utils:jsonb64encode( Jws ),
@@ -79,7 +81,7 @@ encode( PrivateKey, Jws, Content ) ->
 	end,
 
 	Signed = crypto:sign( rsa, sha256, <<Protected/binary, $., Payload/binary>>,
-						  PrivateKey#tls_private_key.raw,
+						  PrivateKey#tls_private_key.raw ),
 
 	EncSigned = letsencrypt_utils:b64encode( Signed ),
 
@@ -93,7 +95,8 @@ encode( PrivateKey, Jws, Content ) ->
 %
 % See https://www.rfc-editor.org/rfc/rfc8555.html#section-8.1.
 %
--spec get_key_authorization( key(), token() ) -> letsencrypt:key_auth().
+-spec get_key_authorization( letsencrypt:key(), letsencrypt:token() ) -> 
+								   letsencrypt:key_auth().
 get_key_authorization( #key{ kty=Kty, n=N, e=E }, Token ) ->
 
 	Thumbprint = json_utils:to_json( #{ <<"kty">> => Kty, <<"n">> => N,

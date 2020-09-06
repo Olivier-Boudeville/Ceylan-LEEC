@@ -397,7 +397,7 @@ get_order( Uri, Key, Jws, OptionMap ) ->
 request_authorization( AuthUri, PrivKey, Jws, OptionMap ) ->
 
 	trace_utils:debug_fmt( "[~w] Requesting authorization at ~s.",
-						   [ self(), Uri ] ),
+						   [ self(), AuthUri ] ),
 
 	% POST-as-GET implies no payload:
 	B64AuthReq = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=AuthUri },
@@ -441,22 +441,22 @@ notify_ready_for_challenge( _DirMap=#{ <<"url">> := Uri }, Key, Jws,
 % Finalizes order once a challenge has been validated, see
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.
 %
--spec finalize_order( directory_map(), bin_csr_key(), bin_key(), jws(),
+-spec finalize_order( order_map(), bin_csr_key(), tls_private_key(), jws(),
 			  option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
-finalize_order( _DirMap=#{ <<"finalize">> := Uri }, Csr, Key, Jws,
+finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 				OptionMap ) ->
 
-	trace_utils:debug_fmt( "[~w] Finalizing order at ~s.", [ self(), Uri ] ),
+	trace_utils:debug_fmt( "[~w] Finalizing order at ~s.", [ self(), FinUri ] ),
 
 	Payload = #{ csr => Csr },
 
-	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, Payload ),
+	JWSBody = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=FinUri }, Payload ),
 
-	{ ok, #{ json := Resp, location := Location, nonce := Nonce } } =
-		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
-				 OptionMap=#{ json => true } ),
+	{ ok, #{ json := FinOrderDirMap, location := BinLocUri, nonce := Nonce } } =
+		request( _Method=post, FinUri, _Headers=#{}, _MaybeBinContent=JWSBody,
+				 OptionMap#{ json => true } ),
 
-	{ Resp, Location, Nonce }.
+	{ FinOrderDirMap, BinLocUri, Nonce }.
 
 
 
