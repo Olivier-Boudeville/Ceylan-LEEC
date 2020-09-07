@@ -108,7 +108,7 @@
 %
 % Keys: <<"token">>, 'thumbprint'.
 %
--type challenge() :: table().
+-type challenge() :: table:table().
 
 
 -type uri_challenge_map() :: table( bin_uri(), challenge() ).
@@ -194,7 +194,7 @@
 -type key_auth() :: binary().
 
 % For the records introduced:
--include_lib("letsencrypt/include/letsencrypt.hrl").
+-include("letsencrypt.hrl").
 
 -type tls_private_key() :: #tls_private_key{}.
 
@@ -219,7 +219,7 @@
 
 
 % Where Let's Encrypt will attempt to find answers to its challenges:
--define( webroot_challenge_path, <<"/.well-known/acme-challenge">> ).
+-define( webroot_challenge_path, <<".well-known/acme-challenge">> ).
 
 % Base time-out, in milliseconds:
 -define( base_timeout, 15000 ).
@@ -1009,7 +1009,7 @@ finalize( UnexpectedEventType, EventContentMsg, _LEState ) ->
 %
 -spec handle_call_for_all_states( server_ref(), request(), state_name(),
 								  le_state() ) -> state_callback_result().
-handle_call_for_all_states( ServerRef, _Request=get_status, StateName, 
+handle_call_for_all_states( ServerRef, _Request=get_status, StateName,
 							_LEState ) ->
 	Res = StateName,
 	{ keep_state_and_data, _Actions={ reply, _From=ServerRef, Res } };

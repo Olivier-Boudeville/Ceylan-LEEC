@@ -15,7 +15,9 @@
 -module(letsencrypt_elli_handler).
 -behaviour(elli_handler).
 
--include_lib("elli/include/elli.hrl").
+% Apparently not necessary:
+%-include_lib("elli/include/elli.hrl").
+
 -export([ handle/2, handle_event/3 ]).
 
 

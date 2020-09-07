@@ -26,13 +26,15 @@
 
 % Not involving Myriad's parse transform here:
 -type table( K, V ) :: map_hashtable:map_hashtable( K, V ).
+-type maybe( T ) :: T | 'undefined'.
+
 
 % Silencing if not compiled with rebar3:
 -export_type([ table/2 ]).
 
 
 % For the records introduced:
--include_lib("letsencrypt/include/letsencrypt.hrl").
+-include("letsencrypt.hrl").
 
 
 % Known keys:
@@ -95,7 +97,7 @@ encode( PrivateKey, Jws, Content ) ->
 %
 % See https://www.rfc-editor.org/rfc/rfc8555.html#section-8.1.
 %
--spec get_key_authorization( letsencrypt:key(), letsencrypt:token() ) -> 
+-spec get_key_authorization( letsencrypt:key(), letsencrypt:token() ) ->
 								   letsencrypt:key_auth().
 get_key_authorization( #key{ kty=Kty, n=N, e=E }, Token ) ->
 

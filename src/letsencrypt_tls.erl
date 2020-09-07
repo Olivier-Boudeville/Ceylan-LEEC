@@ -23,7 +23,7 @@
 -include_lib("public_key/include/public_key.hrl").
 
 % For the records introduced:
--include_lib("letsencrypt/include/letsencrypt.hrl").
+-include_lib("letsencrypt.hrl").
 
 
 % Shorthands:

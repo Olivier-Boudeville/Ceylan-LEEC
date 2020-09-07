@@ -33,7 +33,10 @@
 -type environment() :: 'default' | 'staging'.
 
 % For the records introduced:
--include_lib("letsencrypt/include/letsencrypt.hrl").
+-include("letsencrypt.hrl").
+
+% Not involving Myriad's parse transform here:
+-type maybe( T ) :: T | 'undefined'.
 
 
 % Shorthands:
@@ -266,7 +269,7 @@ request( Method, Uri, Headers, MaybeBinContent,
 							   letsencrypt:directory_map().
 get_directory_map( Env, OptionMap ) ->
 
-	Uri = case Env of
+	DirUri = case Env of
 
 		staging ->
 			?staging_api_url;
@@ -277,10 +280,13 @@ get_directory_map( Env, OptionMap ) ->
 	end,
 
 	trace_utils:debug_fmt( "[~w] Getting directory map at ~s.",
-						   [ self(), Uri ] ),
+						   [ self(), DirUri ] ),
 
-	{ ok, #{ json := DirectoryMap } } = request( _Method=get, Uri, _Headers=#{},
-		 _MaybeBinContent=undefined, OptionMap#{ json => true } ),
+	{ ok, #{ json := DirectoryMap } } = request( _Method=get, DirUri, 
+		_Headers=#{}, _MaybeBinContent=undefined, OptionMap#{ json => true } ),
+
+	trace_utils:debug_fmt( "[~w] Obtained directory map: ~p",
+						   [ self(), DirectoryMap ] ),
 
 	DirectoryMap.
 
