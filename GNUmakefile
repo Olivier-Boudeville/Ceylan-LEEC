@@ -2,8 +2,8 @@ LEEC_TOP = .
 
 
 .PHONY: all-rebar help help-intro help-leec                              \
-		all register-version-in-header register-leec list-beam-dirs      \
-		add-prerequisite-plts link-plt                                   \
+		all register-version-in-header register-leec test-leec           \
+		list-beam-dirs add-prerequisite-plts link-plt                    \
 		send-release release release-zip release-bz2 release-xz          \
 		prepare-release clean-release clean-archive                      \
 		check-types check-cross-references info-paths info-compile
@@ -46,6 +46,10 @@ register-version-in-header:
 
 register-leec:
 	@echo "-define( leec_version, \"$(LEEC_VERSION)\" )." >> $(VERSION_FILE)
+
+
+test-leec:
+	@bin/eletsencrypt --config etc/leec-test.yml
 
 
 # Useful to extract internal layout for re-use in upper layers:
