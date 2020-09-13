@@ -40,7 +40,6 @@
 
 
 % Shorthands:
-
 -type uri() :: letsencrypt:uri().
 -type tls_private_key() :: letsencrypt:tls_private_key().
 -type bin_domain() :: letsencrypt:bin_domain().
@@ -160,21 +159,30 @@ get_tcp_connection( Proto, Host, Port ) ->
 
 % Decodes http body as JSON if requested in options, or returns it as is.
 %
-% Returns {ok, Result} with added JSON structure if required.
+% Returns that response, with added JSON structure if required.
 %
 -spec decode( OptionMap :: option_map(), Response :: map() ) ->
 					json_http_body().
 decode( _OptionMap=#{ json := true }, Response=#{ body := Body } ) ->
+	trace_utils:debug_fmt( "Decoding from JSON following body:~n~p",
+						   [ Body ] ),
 	Payload = json_utils:from_json( Body ),
+
+	trace_utils:debug_fmt( "Corresponding payload from JSON:~n~p",
+						   [ Payload ] ),
+
 	Response#{ json => Payload };
 
 decode( _OptionMap, Response ) ->
+	trace_utils:debug_fmt( "Not requested to decode from JSON following "
+						   "response:~n~p", [ Response ] ),
 	Response.
 
 
 
-% Query an URI (GET or POST) and returns results:
-% returns:
+% Queries an URI (GET or POST) and returns results.
+%
+% Returns:
 %	{ok, #{status_coe, body, headers}}: query succeed
 %	{error, invalid_method}           : Method MUST be either 'get' or 'post'
 %   {error, term()}                   : query failed
@@ -182,14 +190,19 @@ decode( _OptionMap, Response ) ->
 % TODO: is 'application/jose+json' content type always required?
 %       (check ACME documentation)
 %
--spec request( 'get' | 'post', uri(), header_map(), maybe( bin_content() ),
-		   option_map() ) -> shotgun:result() | basic_utils:base_status().
+-spec request( 'get' | 'post', uri(), header_map(),
+			   maybe( bin_content() ), option_map() ) -> shotgun:result() .
 request( Method, Uri, Headers, MaybeBinContent,
 		 OptionMap=#{ netopts := Netopts } ) ->
 
+	UriStr = text_utils:ensure_string( Uri ),
+
+	% uri_string:parse/1 will return the same type of strings as the one it is
+	% given.
+	%
 	% Port may not be specified:
-	UriMap = #{ scheme := UriSchemeStr, host := UriHost, path := UriPath } =
-		uri_string:parse( Uri ),
+	UriMap = #{ scheme := UriSchemeStr, host := UriHost,
+				path := UriPath } = uri_string:parse( UriStr ),
 
 	UriProtoAtom = text_utils:string_to_atom( UriSchemeStr ),
 
@@ -231,12 +244,12 @@ request( Method, Uri, Headers, MaybeBinContent,
 						  Netopts );
 
 		_ ->
-			{ error, { invalid_method, Method } }
+			throw( { invalid_method, Method, UriStr } )
 
 	end,
 
-	trace_utils:debug_fmt( "[~w] ~s request to ~p at ~p "
-		"resulted in: ~p.", [ self(), Method, Uri, UriMap, ReqRes ] ),
+	trace_utils:debug_fmt( "[~w] The '~s' request to ~s resulted in:~n~p",
+						   [ self(), Method, UriStr, ReqRes ] ),
 
 	case ReqRes of
 
@@ -251,7 +264,7 @@ request( Method, Uri, Headers, MaybeBinContent,
 			decode( OptionMap, Resp );
 
 		_ ->
-			ReqRes
+			throw( { unexpected_answer, Method, UriStr, ReqRes } )
 
 	end.
 
@@ -282,7 +295,7 @@ get_directory_map( Env, OptionMap ) ->
 	trace_utils:debug_fmt( "[~w] Getting directory map at ~s.",
 						   [ self(), DirUri ] ),
 
-	{ ok, #{ json := DirectoryMap } } = request( _Method=get, DirUri, 
+	#{ json := DirectoryMap } = request( _Method=get, DirUri,
 		_Headers=#{}, _MaybeBinContent=undefined, OptionMap#{ json => true } ),
 
 	trace_utils:debug_fmt( "[~w] Obtained directory map: ~p",
@@ -300,7 +313,7 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap ) ->
 
 	trace_utils:debug_fmt( "[~w] Getting new nonce at ~s.", [ self(), Uri ] ),
 
-	{ ok, #{ nonce := Nonce } } = request( _Method=get, Uri, _Headers=#{},
+	#{ nonce := Nonce } = request( _Method=get, Uri, _Headers=#{},
 									_MaybeBinContent=undefined, OptionMap ),
 	Nonce.
 
@@ -329,7 +342,7 @@ get_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws, OptionMap ) ->
 
 	ReqB64 = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri }, Payload ),
 
-	{ ok, #{ json := Resp, location := LocationUri, nonce := NewNonce } } =
+	#{ json := Resp, location := LocationUri, nonce := NewNonce } =
 		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=ReqB64,
 				 OptionMap#{ json => true } ),
 
@@ -363,7 +376,7 @@ request_order( _DirMap=#{ <<"newOrder">> := Uri }, BinDomains, PrivKey, Jws,
 	Req = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri },
 								  _Content=Payload ),
 
-	{ok, #{ json := OrderJsonMap, location := LocationUri, nonce := Nonce } } =
+	#{ json := OrderJsonMap, location := LocationUri, nonce := Nonce } =
 		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
 				 OptionMap#{ json => true } ),
 
@@ -382,7 +395,7 @@ get_order( Uri, Key, Jws, OptionMap ) ->
 
 	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined ),
 
-	{ ok, #{ json := Resp, location := Location, nonce := Nonce } } =
+	#{ json := Resp, location := Location, nonce := Nonce } =
 		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
 				 OptionMap#{ json=> true } ),
 
@@ -409,7 +422,7 @@ request_authorization( AuthUri, PrivKey, Jws, OptionMap ) ->
 	B64AuthReq = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=AuthUri },
 										 _Content=undefined ),
 
-	{ ok, #{ json := Resp, location := LocationUri, nonce := Nonce } } =
+	#{ json := Resp, location := LocationUri, nonce := Nonce } =
 		request( _Method=post, AuthUri, _Headers=#{},
 				 _MaybeBinContent=B64AuthReq, OptionMap#{ json=> true } ),
 
@@ -436,9 +449,9 @@ notify_ready_for_challenge( _DirMap=#{ <<"url">> := Uri }, Key, Jws,
 	% POST-as-GET implies no payload:
 	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, _Content=#{} ),
 
-	{ ok, #{ json := Resp, location := Location, nonce := Nonce } } =
+	#{ json := Resp, location := Location, nonce := Nonce } =
 		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
-				OptionMap #{ json => true } ),
+				 OptionMap#{ json => true } ),
 
 	{ Resp, Location, Nonce }.
 
@@ -458,7 +471,7 @@ finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 
 	JWSBody = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=FinUri }, Payload ),
 
-	{ ok, #{ json := FinOrderDirMap, location := BinLocUri, nonce := Nonce } } =
+	#{ json := FinOrderDirMap, location := BinLocUri, nonce := Nonce } =
 		request( _Method=post, FinUri, _Headers=#{}, _MaybeBinContent=JWSBody,
 				 OptionMap#{ json => true } ),
 
@@ -479,7 +492,7 @@ get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, OptionMap ) ->
 	% POST-as-GET implies no payload:
 	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined ),
 
-	{ ok, #{ body := BinCert } } = request( _Method=post, Uri, _Headers=#{},
-											_MaybeBinContent=Req, OptionMap ),
+	#{ body := BinCert } = request( _Method=post, Uri, _Headers=#{},
+									_MaybeBinContent=Req, OptionMap ),
 
 	BinCert.

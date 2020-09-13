@@ -90,7 +90,7 @@ Both **/path/to/webroot** and **/path/to/certs** MUST be writable by the erlang 
 ## Escript
 
 **bin/eletsencrypt** escript allows certificates management without any lines of Erlang.
-Configuration is defined in etc/eletsencrypt.yml
+Configuration is defined in etc/eletsencrypt.yml. To be run only from the root of the repository (i.e. as bin/eletsencrypt).
 
 Options:
  * **-h|--help**: show help

@@ -54,18 +54,29 @@
 								tls_private_key().
 create_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 
-	% If not set, forges a unique filename to allow for multiple, concurrent
+	% If not set, forges a unique key filename to allow for multiple, concurrent
 	% instances:
+	%
+	% (ex: "letsencrypt-agent.key-5")
+	%
+	BasePath = file_utils:join( BinCertDirPath, "letsencrypt-agent.key" ),
+	UniqPath = file_utils:get_non_clashing_entry_name_from( BasePath ),
 
-	Uniq = basic_utils:get_process_specific_value(),
+	% Safety measure, not expected to trigger:
+	case file_utils:is_existing_file( UniqPath ) of
 
-	DefaultFilename = text_utils:format( "letsencrypt-agent-~B.key", [ Uniq ] ),
+		true ->
+			throw( { already_existing_agent_key, UniqPath } );
 
-	% Safety measure:
-	DefaultPath = file_utils:join( BinCertDirPath, DefaultFilename ),
-	false = file_utils:is_existing_file( DefaultPath ),
+		false ->
+			ok
 
-	create_private_key( { new, DefaultFilename }, BinCertDirPath );
+	end,
+
+	% Could have been more elegant:
+	UniqFilename = file_utils:get_last_path_element( UniqPath ),
+
+	create_private_key( { new, UniqFilename }, BinCertDirPath );
 
 
 create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
@@ -91,9 +102,13 @@ create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 		{ _ReturnCode=0, _CommandOutput="" } ->
 			ok;
 
-		{ _ReturnCode=0, CommandOutput } ->
-			trace_utils:warning_fmt( "Private key creation successful, yet "
-			  "following output was made: ~s.", [ CommandOutput ] );
+		% Not deserving a warning, as returning in case of success: "Generating
+		% RSA private key, 2048 bit long modulus (2 primes) [...]".
+		%
+		{ _ReturnCode=0, _CommandOutput } ->
+			%trace_utils:info_fmt( "Private key creation successful; "
+			%  "following output was made: ~s.", [ CommandOutput ] );
+			ok;
 
 		{ ErrorCode, CommandOutput } ->
 			trace_utils:error_fmt(
