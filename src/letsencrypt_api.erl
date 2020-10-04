@@ -298,7 +298,7 @@ get_directory_map( Env, OptionMap ) ->
 	#{ json := DirectoryMap } = request( _Method=get, DirUri,
 		_Headers=#{}, _MaybeBinContent=undefined, OptionMap#{ json => true } ),
 
-	trace_utils:debug_fmt( "[~w] Obtained directory map: ~p",
+	trace_utils:debug_fmt( "[~w] Obtained directory map:~n~p",
 						   [ self(), DirectoryMap ] ),
 
 	DirectoryMap.
@@ -313,6 +313,7 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap ) ->
 
 	trace_utils:debug_fmt( "[~w] Getting new nonce at ~s.", [ self(), Uri ] ),
 
+	% Status code: 204 (No content):
 	#{ nonce := Nonce } = request( _Method=get, Uri, _Headers=#{},
 									_MaybeBinContent=undefined, OptionMap ),
 	Nonce.

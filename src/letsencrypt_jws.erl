@@ -69,7 +69,7 @@ init( #tls_private_key{ b64_pair={ N, E } } ) ->
 -spec encode( tls_private_key(), jws(), content() ) -> letsencrypt:binary_b64().
 encode( PrivateKey, Jws, Content ) ->
 
-	Protected = letsencrypt_utils:jsonb64encode( Jws ),
+	Protected = letsencrypt_utils:jsonb64encode( jws_to_map( Jws ) ),
 
 	Payload = case Content of
 
@@ -109,3 +109,60 @@ get_key_authorization( #key{ kty=Kty, n=N, e=E }, Token ) ->
 	B64Hash = letsencrypt_utils:b64encode( ThumbprintHash ),
 
 	<<Token/binary, $., B64Hash/binary>>.
+
+
+% Returns a map-based version of the specified JSON Web Signature record,
+% typically for encoding.
+%
+-spec jws_to_map( jws() ) -> map().
+jws_to_map( #jws{ alg=Alg, url=MaybeUrl, kid=MaybeKid, jwk=MaybeJwk,
+				  nonce=MaybeNonce } ) ->
+
+	AlgMap = #{ alg => Alg },
+
+	UrlMap = case MaybeUrl of
+
+		undefined ->
+			AlgMap;
+
+		Url ->
+			AlgMap#{ url => Url }
+
+	end,
+
+	KidMap = case MaybeKid of
+
+		undefined ->
+			UrlMap;
+
+		Kid ->
+			UrlMap#{ kid => key_to_map( Kid ) }
+
+	end,
+
+	JwkMap = case MaybeJwk of
+
+		undefined ->
+			KidMap;
+
+		Jwk ->
+			KidMap#{ jwk => key_to_map( Jwk ) }
+
+	end,
+
+	case MaybeNonce of
+
+		undefined ->
+			JwkMap;
+
+		Nonce ->
+			JwkMap#{ nonce => Nonce }
+
+	end.
+
+
+
+% Returns a map-based version of the specified key record, typically for
+% encoding.
+%
+-spec key_to_map( key() ) -> map().

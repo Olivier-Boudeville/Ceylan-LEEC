@@ -33,14 +33,19 @@ b64encode( X ) ->
 
 
 % Encodes specified content first in JSON, then in b64.
--spec jsonb64encode( string() | binary() ) -> binary_b64().
-jsonb64encode( X ) ->
+%-spec jsonb64encode( string() | binary() ) -> binary_b64().
+-spec jsonb64encode( map() ) -> binary_b64().
+jsonb64encode( X ) when is_map( X ) ->
 
 	trace_utils:debug_fmt( "Encoding in JSON then b64:~n~p", [ X ] ),
 	XJson = json_utils:to_json( X ),
 	trace_utils:debug_fmt( "JSON result:~n~p", [ XJson ] ),
 
-	b64encode( XJson ).
+	b64encode( XJson );
+
+jsonb64encode( X ) ->
+	throw( { invalid_content_to_jsonb64encode, X } ).
+
 
 
 % (helper)
