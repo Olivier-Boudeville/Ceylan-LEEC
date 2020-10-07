@@ -47,6 +47,7 @@
 
 
 % Shorthands:
+-type key() :: letsencrypt:key().
 -type tls_private_key() :: letsencrypt:tls_private_key().
 -type jws() :: letsencrypt:jws().
 
@@ -166,3 +167,5 @@ jws_to_map( #jws{ alg=Alg, url=MaybeUrl, kid=MaybeKid, jwk=MaybeJwk,
 % encoding.
 %
 -spec key_to_map( key() ) -> map().
+key_to_map( #key{ kty=Kty, n=N, e=E } ) ->
+	#{ <<"kty">> => Kty, <<"n">> => N, <<"e">> => E }.
