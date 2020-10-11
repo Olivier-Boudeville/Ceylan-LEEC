@@ -15,9 +15,11 @@
 -module(letsencrypt_tls).
 -author("Guillaume Bour <guillaume@bour.cc>").
 
--export([ create_private_key/2, get_cert_request/3,
+-export([ create_private_key/2,
+		  get_cert_request/3,
 		  get_domain_certificate/3, generate_certificate/5,
-		  write_certificate/3 ]).
+		  write_certificate/3,
+		  key_to_map/1, map_to_key/1 ]).
 
 
 -include_lib("public_key/include/public_key.hrl").
@@ -37,6 +39,8 @@
 -type key_file_info() :: letsencrypt:key_file_info().
 -type san() :: letsencrypt:san().
 -type bin_certificate() :: letsencrypt:bin_certificate().
+
+-type key() :: letsencrypt:key().
 -type tls_private_key() :: letsencrypt:tls_private_key().
 
 
@@ -285,3 +289,24 @@ write_certificate( Domain, BinDomainCert, CertDirPath ) ->
 	file_utils:write_whole( CertFilePath, BinDomainCert ),
 
 	CertFilePath.
+
+
+
+% Returns a map-based version of the specified key record, typically for
+% encoding.
+%
+-spec key_to_map( key() ) -> map().
+key_to_map( #key{ kty=Kty, n=N, e=E } ) ->
+	#{ <<"kty">> => Kty, <<"n">> => N, <<"e">> => E }.
+
+
+% Return the key record corresponding to the specified map, typically obtained
+% from a remote server.
+%
+-spec map_to_key( map() ) -> key().
+map_to_key( Map ) ->
+
+	{ [ Kty, N, E ], #{} } = map_hashtable:extract_entries(
+							   [ <<"kty">>, <<"n">>, <<"e">> ], Map ),
+
+	#key{ kty=Kty, n=N, e=E }.

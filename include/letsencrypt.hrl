@@ -20,48 +20,46 @@
 % TLS private key:
 -record( tls_private_key, {
 
-			% Ex: [E, N, D] with E: publicExponent, N: modulus, D:
-			% privateExponent.
-			%
-			raw :: crypto:rsa_private(),
+  % Ex: [E, N, D] with E: publicExponent, N: modulus, D: privateExponent.
+  raw :: crypto:rsa_private(),
 
-			% Ex: b64 encodings of N and E.
-			b64_pair :: { letsencrypt:binary_b64(), letsencrypt:binary_b64() },
+  % Ex: b64 encodings of N and E.
+  b64_pair :: { letsencrypt:binary_b64(), letsencrypt:binary_b64() },
 
-			% Path of the RSA private key encoded in ASN.1 DER:
-			file_path :: file_utils:file_path() } ).
+  % Path of the RSA private key encoded in ASN.1 DER:
+  file_path :: file_utils:file_path() } ).
 
 
 
 % Key (ex: account one):
 -record( key, {
 
-	kty :: 'RSA',
+  kty :: 'RSA',
 
-	n :: term(),
+  n :: text_utils:bin_string(),
 
-	e :: term() } ).
+  e :: text_utils:bin_string() } ).
 
 
 
 % RSA JSON Web Signature:
 -record( jws, {
 
-		   alg = 'RS256' :: letsencrypt:jws_algorithm(),
+  alg = 'RS256' :: letsencrypt:jws_algorithm(),
 
-		   url :: letsencrypt:uri(),
+  url :: letsencrypt:bin_uri(),
 
-		   kid :: letsencrypt:uri(),
+  kid :: letsencrypt:bin_uri(),
 
-		   jwk :: letsencrypt:key(),
+  jwk :: letsencrypt:key(),
 
-		   nonce = undefined :: maybe( letsencrypt:nonce() ) } ).
+  nonce = undefined :: maybe( letsencrypt:nonce() ) } ).
 
 
 
 % Resulting certificate:
 -record( certificate, {
 
-			cert :: letsencrypt:bin_certificate(),
+  cert :: letsencrypt:bin_certificate(),
 
-			key :: letsencrypt:bin_key() } ).
+  key :: letsencrypt:bin_key() } ).

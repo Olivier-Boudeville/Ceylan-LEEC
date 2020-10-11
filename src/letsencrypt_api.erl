@@ -40,6 +40,7 @@
 
 
 % Shorthands:
+-type challenge() :: letsencrypt:challenge().
 -type uri() :: letsencrypt:uri().
 -type tls_private_key() :: letsencrypt:tls_private_key().
 -type bin_domain() :: letsencrypt:bin_domain().
@@ -439,16 +440,16 @@ request_authorization( AuthUri, PrivKey, Jws, OptionMap ) ->
 %		- Location is create account url
 %		- Nonce is a new valid replay-nonce
 %
--spec notify_ready_for_challenge( directory_map(), bin_key(), jws(),
+-spec notify_ready_for_challenge( challenge(), bin_key(), jws(),
 			  option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
-notify_ready_for_challenge( _DirMap=#{ <<"url">> := Uri }, Key, Jws,
+notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
 							OptionMap ) ->
 
 	trace_utils:debug_fmt( "[~w] Notifying ACME server that ready for "
 						   "challenge validation at ~s.", [ self(), Uri ] ),
 
 	% POST-as-GET implies no payload:
-	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, _Content=#{} ),
+	Req = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri }, _Content=#{} ),
 
 	#{ json := Resp, location := Location, nonce := Nonce } =
 		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,

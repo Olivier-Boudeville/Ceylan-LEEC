@@ -60,9 +60,10 @@ Validation challenges
 
 You must execute this example on the server targeted by _mydomain.tld_.
 
-Port 80 (http) must be opened and a webserver listening on it (line 1) and serving **/path/to/webroot/** content.
+Port 80 (http) must be opened and a webserver listening on it (line 1) and serving `/path/to/webroot/` content.
 
-Both **/path/to/webroot** and **/path/to/certs** MUST be writable by the erlang process.
+Both `/path/to/webroot` and `/path/to/certs` must be writable by the Erlang process (at least to create respectively any `/path/to/webroot/.well-known/acme-challenge/ANY_FILE` and `/path/to/certs/ANY_FILE`). One may use groups to isolate users and minimise assigned permissions (use `chgrp`/`chmod` for that, and `touch` to test).
+
 
 ```erlang
 

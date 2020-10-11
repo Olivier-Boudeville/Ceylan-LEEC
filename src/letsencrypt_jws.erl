@@ -47,7 +47,7 @@
 
 
 % Shorthands:
--type key() :: letsencrypt:key().
+%-type key() :: letsencrypt:key().
 -type tls_private_key() :: letsencrypt:tls_private_key().
 -type jws() :: letsencrypt:jws().
 
@@ -137,7 +137,7 @@ jws_to_map( #jws{ alg=Alg, url=MaybeUrl, kid=MaybeKid, jwk=MaybeJwk,
 			UrlMap;
 
 		Kid ->
-			UrlMap#{ kid => key_to_map( Kid ) }
+			UrlMap#{ kid => Kid }
 
 	end,
 
@@ -147,7 +147,7 @@ jws_to_map( #jws{ alg=Alg, url=MaybeUrl, kid=MaybeKid, jwk=MaybeJwk,
 			KidMap;
 
 		Jwk ->
-			KidMap#{ jwk => key_to_map( Jwk ) }
+			KidMap#{ jwk => letsencrypt_tls:key_to_map( Jwk ) }
 
 	end,
 
@@ -160,12 +160,3 @@ jws_to_map( #jws{ alg=Alg, url=MaybeUrl, kid=MaybeKid, jwk=MaybeJwk,
 			JwkMap#{ nonce => Nonce }
 
 	end.
-
-
-
-% Returns a map-based version of the specified key record, typically for
-% encoding.
-%
--spec key_to_map( key() ) -> map().
-key_to_map( #key{ kty=Kty, n=N, e=E } ) ->
-	#{ <<"kty">> => Kty, <<"n">> => N, <<"e">> => E }.
