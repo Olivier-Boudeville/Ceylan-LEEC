@@ -37,9 +37,9 @@ b64encode( X ) ->
 -spec jsonb64encode( map() ) -> binary_b64().
 jsonb64encode( X ) when is_map( X ) ->
 
-	trace_utils:debug_fmt( "Encoding in JSON then b64:~n~p", [ X ] ),
+	trace_utils:debug_fmt( "Encoding in JSON then b64:~n  ~p", [ X ] ),
 	XJson = json_utils:to_json( X ),
-	trace_utils:debug_fmt( "JSON result:~n~p", [ XJson ] ),
+	%trace_utils:debug_fmt( "JSON result:~n~p", [ XJson ] ),
 
 	b64encode( XJson );
 

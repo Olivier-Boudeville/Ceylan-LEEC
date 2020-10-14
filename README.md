@@ -84,6 +84,8 @@ Both `/path/to/webroot` and `/path/to/certs` must be writable by the Erlang proc
 
 **Explanations**:
 
+  The overall process is [explained here](https://ietf-wg-acme.github.io/acme/draft-ietf-acme-acme.html#rfc.section.4).
+
   During the certification process, letsencrypt server returns a challenge and then tries to query the challenge file from the domain name asked to be certified.
   So letsencrypt-erlang is writing challenge file under **/path/to/webroot** directory.
   Finally, keys and certificates are written in **/path/to/certs** directory.

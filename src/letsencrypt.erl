@@ -58,6 +58,9 @@
 
 % Implementation notes:
 %
+% Multiple FSM (Finite State Machines) can be spawned, for parallel certificate
+% management
+%
 % URI format compatible with the shotgun library.
 
 
@@ -108,7 +111,12 @@
 
 % All known information regarding a challenge.
 %
-% Keys: <<"token">>, <<"url">>, 'thumbprint'.
+% As Key => example of associated value:
+% - <<"status">> => <<"pending">>
+% - <<"token">> => <<"qVTx6gQWZO4Dt4gUmnaTQdwTRkpaSnMiRx8L7Grzhl8">>
+% - <<"type">> => <<"http-01">>,
+% - <<"url">> =>
+%     <<"https://acme-staging-v02.api.letsencrypt.org/acme/chall-v3/132509381/-Axkdw">>}}.
 %
 -type challenge() :: table:table().
 
@@ -124,23 +132,16 @@
 
 
 % User options.
-%
-% Known (atom) keys:
-%  - async :: boolean()
-%  - callback :: fun/1
-%  - netopts :: map() => #{ timeout => non_neg_integer() }
-%  - challenge :: challenge_type(), default being 'http-01'
-%
 -type option_id() :: 'async' | 'callback' | 'netopts' | 'challenge'.
 
 
 % Storing user options.
 %
-% Known keys:
+% Known (atom) keys:
 %  - async :: boolean() [if not defined, supposed true]
 %  - callback :: fun/1
 %  - netopts :: map() => #{ timeout => non_neg_integer() }
-%  - challenge :: challenge_type()
+%  - challenge :: challenge_type(), default being 'http-01'
 %
 -type option_map() :: table( option_id(), term() ).
 
@@ -148,21 +149,26 @@
 % ACME operations that may be triggered.
 %
 % Known operations:
-% - <<"newNonce">>
 % - <<"newAccount">>
+% - <<"newNonce">>
+% - <<"newOrder">>
+% - <<"revokeCert">>
 %
 -type acme_operation() :: bin_string().
 
 
-% ACME directory, converting operations into the URIs to access for them.
+% ACME directory, converting operations to trigger into the URIs to access for
+% them.
+%
 -type directory_map() :: table( acme_operation(), uri() ).
 
 -type nonce() :: binary().
 
 
 % Subject Alternative Name, i.e. values to be associated with a security
-% certificate using a subjectAltName field; see
-% https://en.wikipedia.org/wiki/Subject_Alternative_Name.
+% certificate using a subjectAltName field.
+%
+% See https://en.wikipedia.org/wiki/Subject_Alternative_Name.
 %
 -type san() :: ustring().
 
@@ -187,13 +193,15 @@
 
 -type jws_algorithm() :: 'RS256'.
 
-% A binary encoded in base 64:
+% A binary that is encoded in base 64:
 -type binary_b64() :: binary().
 
-% Key authorization, a ninary made of a token and of the hash of a key
+
+% Key authorization, a binary made of a token and of the hash of a key
 % thumbprint, once b64-encoded:
 %
 -type key_auth() :: binary().
+
 
 % For the records introduced:
 -include("letsencrypt.hrl").
@@ -220,7 +228,7 @@
 			   tls_private_key/0, key/0, jws/0, certificate/0 ]).
 
 
-% Where Let's Encrypt will attempt to find answers to its challenges:
+% Where Let's Encrypt will attempt to find answers to its http-01 challenges:
 -define( webroot_challenge_path, <<".well-known/acme-challenge">> ).
 
 % Base time-out, in milliseconds:
@@ -234,7 +242,9 @@
 	% ACME environment:
 	env = prod :: 'staging' | 'prod',
 
-	% ACME directory:
+	% URI directory, fetched from ACME servers at startup (i.e. table of the
+	% URIs to be called depending on needs regarding certificates):
+	%
 	directory_map = undefined :: maybe( directory_map() ),
 
 	key_file_info = undefined :: maybe( key_file_info() ),
@@ -256,19 +266,21 @@
 
 	% State-related data:
 
-	% Current nonce:
+	% Current nonce to be specified, in order to avoid any replay attack:
 	nonce = undefined :: maybe( nonce() ),
 
 	domain = undefined :: maybe( net_utils:bin_fqdn() ),
 
+	% The Subject Alternative Names of interest:
 	sans = [] :: [ san() ],
 
-	% TLS private key information:
+	% The TLS private key that the LEEC agent generated at startup:
 	private_key = undefined :: maybe( tls_private_key() ),
 
-	% JSON Web Signature of the private key:
+	% JSON Web Signature of the private key of the LEEC agent:
 	jws = undefined :: maybe( jws() ),
 
+	% The key returned by the ACME server on account creation:
 	account_key :: key(),
 
 	order = undefined :: maybe( directory_map() ),
@@ -280,11 +292,11 @@
 	cert_key_file_path = undefined :: maybe( file_path() ),
 
 	% API options:
-	option_map = get_default_options() :: option_map()
+	option_map = get_default_options() :: option_map() }).
 
-}).
 
 -type le_state() :: #le_state{}.
+
 
 -type fsm_pid() :: pid().
 
@@ -306,7 +318,7 @@
 
 -type event_content() :: term().
 
--type action() :: gen_statem:action().
+%-type action() :: gen_statem:action().
 
 
 
@@ -333,17 +345,16 @@
 % Public API.
 
 
-% Starts an instance of the letsencrypt service.
+% Starts an instance of the letsencrypt service FSM.
 -spec start( [ user_option() ] ) -> { 'ok', fsm_pid() } | error_term().
 start( UserOptions ) ->
 
 	json_utils:start_parser(),
 
-	% Not registered on purpose, to allow for concurrent ACME interactions
-	% (i.e. multiple, parallel instances).
+	% Not registered in naming service on purpose, to allow for concurrent ACME
+	% interactions (i.e. multiple, parallel instances).
 	%
 	% Calls init/1 on the new process, and returns its outcome:
-	%
 	gen_statem:start_link( ?MODULE, UserOptions, _Opts=[] ).
 
 
@@ -410,7 +421,8 @@ obtain_certificate_for( Domain, FsmPid ) ->
 		  { 'ok', certificate() } | 'async' | error_term().
 obtain_certificate_for( Domain, FsmPid, OptionMap=#{ async := false } ) ->
 
-	trace_utils:debug_fmt( "FSM ~w requested to generate sync certificate "
+	% Still in user process:
+	trace_utils:debug_fmt( "Requesting FSM ~w to generate sync certificate "
 						   "for domain '~s'.", [ FsmPid, Domain ] ),
 
 	% Direct synchronous return:
@@ -420,7 +432,7 @@ obtain_certificate_for( Domain, FsmPid, OptionMap=#{ async := false } ) ->
 % Default to async=true:
 obtain_certificate_for( Domain, FsmPid, OptionMap ) ->
 
-	trace_utils:debug_fmt( "FSM ~w requested to generate async certificate "
+	trace_utils:debug_fmt( "Requesting FSM ~w to generate async certificate "
 						   "for domain '~s'.", [ FsmPid, Domain ] ),
 
 	% Asynchronous (either already true, or set to true if not):
@@ -470,7 +482,7 @@ init( UserOptions ) ->
 
 	LEState = setup_mode( get_options( UserOptions, _Blank=#le_state{} ) ),
 
-	trace_utils:debug_fmt( "[~w] Initial state: ~p.", [ self(), LEState ] ),
+	trace_utils:debug_fmt( "[~w] Initial state:~n  ~p", [ self(), LEState ] ),
 
 	% Creates private key (a tls_private_key()) and initialises its JWS:
 	PrivateKey = letsencrypt_tls:create_private_key(
@@ -480,11 +492,38 @@ init( UserOptions ) ->
 
 	OptionMap = LEState#le_state.option_map,
 
+	% Directory map is akin to:
+	%
+	% #{<<"3TblEIQUCPk">> =>
+	%	  <<"https://community.letsencrypt.org/t/adding-random-entries-to-the-directory/31417">>,
+	%   <<"keyChange">> =>
+	%	  <<"https://acme-staging-v02.api.letsencrypt.org/acme/key-change">>,
+	%   <<"meta">> =>
+	%	  #{<<"caaIdentities">> => [<<"letsencrypt.org">>],
+	%		<<"termsOfService">> =>
+	%	<<"https://letsencrypt.org/documents/LE-SA-v1.2-November-15-2017.pdf">>,
+	%		<<"website">> =>
+	%			<<"https://letsencrypt.org/docs/staging-environment/">>},
+	%   <<"newAccount">> =>
+	%	  <<"https://acme-staging-v02.api.letsencrypt.org/acme/new-acct">>,
+	%   <<"newNonce">> =>
+	%	  <<"https://acme-staging-v02.api.letsencrypt.org/acme/new-nonce">>,
+	%   <<"newOrder">> =>
+	%	  <<"https://acme-staging-v02.api.letsencrypt.org/acme/new-order">>,
+	%   <<"revokeCert">> =>
+	%	  <<"https://acme-staging-v02.api.letsencrypt.org/acme/revoke-cert">>}
+
 	URLDirectoryMap = letsencrypt_api:get_directory_map( LEState#le_state.env,
 														 OptionMap ),
 
 	FirstNonce = letsencrypt_api:get_nonce( URLDirectoryMap, OptionMap ),
 
+	trace_utils:trace_fmt( "[~w][state] Switching initially to 'idle'.",
+						   [ self() ] ),
+
+	% Next transition typically triggered by user code calling
+	% obtain_certificate_for/{2,3}:
+	%
 	{ ok, _NewStateName=idle,
 	  LEState#le_state{ directory_map=URLDirectoryMap,
 						private_key=PrivateKey,
@@ -500,7 +539,9 @@ callback_mode() ->
 
 
 
-% (spawn helper)
+% (spawn helper, to be called either from a dedicated process or not, depending
+% on being async or not)
+%
 -spec obtain_cert_helper( Domain :: domain(), fsm_pid(), option_map() ) ->
 		  { 'ok', certificate() } | error_term().
 obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
@@ -509,7 +550,9 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 
 	Timeout = ?base_timeout,
 
-	% Expected to trigger idle({create, BinDomain, Opts }, _, LEState):
+	% Expected to be in the 'idle' state, hence to trigger idle({create,
+	% BinDomain, Opts }, _, LEState):
+	%
 	CreationRes = case gen_statem:call( _ServerRef=FsmPid,
 				_Request={ create, BinDomain, OptionMap }, Timeout ) of
 
@@ -636,12 +679,13 @@ get_ongoing_challenges( FsmPid ) ->
 
 
 
-% State 'idle', the initial state, used when awaiting for certificate request.
+% State 'idle', the initial state, typically used when awaiting for certificate
+% requests to be triggered.
 %
 % idle(get_ongoing_challenges): nothing done
 %
 -spec idle( event_type(), event_content(), le_state() ) ->
-				  gen_statem:state_callback_result( action() ).
+				  state_callback_result().
 % idle with request {create, BinDomain, OptionMap}: starts the certificate
 % creation procedure.
 %
@@ -660,6 +704,9 @@ idle( _EventType={ call, From },
 	  _Data=LEState=#le_state{ directory_map=DirMap, private_key=PrivKey,
 							   jws=Jws, nonce=Nonce } ) ->
 
+	trace_utils:trace_fmt( "[~w] While idle: received a certificate creation "
+		"request for domain '~s'.", [ self(), BinDomain ] ),
+
 	% Ex: 'http-01', 'tls-sni-01', etc.:
 	ChallengeType = maps:get( challenge, OptionMap, _DefaultChlg='http-01' ),
 
@@ -674,15 +721,31 @@ idle( _EventType={ call, From },
 	end,
 
 	{ AccountDecodedJsonMap, AccountLocationUri, AccountNonce } =
-		letsencrypt_api:get_account( DirMap, PrivKey,
+		letsencrypt_api:create_acme_account( DirMap, PrivKey,
 									 Jws#jws{ nonce=Nonce }, OptionMap ),
+	% Payload decoded from JSON in AccountDecodedJsonMap will be like:
+	%
+	% #{<<"contact">> => [],
+	%   <<"createdAt">> => <<"2020-10-14T10:08:04.774555017Z">>,
+	%   <<"initialIp">> => <<"xx.xx.xx.xx">>,
+	%   <<"key">> =>
+	%      #{<<"e">> => <<"ATAB">>,<<"kty">> => <<"RSA">>,
+	%        <<"n">> =>
+	%            <<"3dPhjJ[...]">>},
+	%   <<"status">> => <<"valid">>}
+
+	% AccountLocationUri will be like:
+	% "https://acme-staging-v02.api.letsencrypt.org/acme/acct/16210968"
 
 	AccountKeyAsMap = maps:get( <<"key">>, AccountDecodedJsonMap ),
 
 	AccountKey = letsencrypt_tls:map_to_key( AccountKeyAsMap ),
 
-	AccountJws = #jws{ alg=Jws#jws.alg, nonce=AccountNonce,
-					   kid=AccountLocationUri },
+	trace_utils:trace_fmt( "[~w] The obtained ACME account key is:~n  ~p",
+						   [ self(), AccountKey ] ),
+
+	AccountJws = #jws{ alg=Jws#jws.alg, kid=AccountLocationUri,
+					   nonce=AccountNonce },
 
 	% Subject Alternative Names:
 	Sans = maps:get( san, OptionMap, _DefaultSans=[] ),
@@ -691,10 +754,10 @@ idle( _EventType={ call, From },
 
 	BinDomains = [ BinDomain | BinSans ],
 
-	% TODO: checks order is ok
+	% TODO: checks order is ok; a status is returned:
 	{ OrderDecodedJsonMap, OrderLocationUri, OrderNonce } =
-		letsencrypt_api:request_order( DirMap, BinDomains, PrivKey, AccountJws,
-									   OptionMap ),
+		letsencrypt_api:request_new_certificate( DirMap, BinDomains, PrivKey,
+												 AccountJws, OptionMap ),
 
 	% We need to keep trace of order location:
 	LocOrder = OrderDecodedJsonMap#{ <<"location">> => OrderLocationUri },
@@ -704,7 +767,7 @@ idle( _EventType={ call, From },
 
 	AuthUris = maps:get( <<"authorizations">>, OrderDecodedJsonMap ),
 
-	AuthPair = perform_auth( ChallengeType, AuthUris, AuthLEState ),
+	AuthPair = perform_authorization( ChallengeType, AuthUris, AuthLEState ),
 
 	{ NewStateName, Reply, NewUriChallengeMap, FinalNonce } =
 			case AuthPair of
@@ -720,6 +783,9 @@ idle( _EventType={ call, From },
 
 	FinalLEState = AuthLEState#le_state{ nonce=FinalNonce, order=LocOrder,
 										 challenges=NewUriChallengeMap },
+
+	trace_utils:trace_fmt( "[~w][state] Switching from 'idle' to '~s'.",
+						   [ self(), NewStateName ] ),
 
 	{ next_state, NewStateName, _NewData=FinalLEState,
 	  _Action={ reply, From, Reply } };
@@ -918,7 +984,7 @@ valid( _EventType={ call, _ServerRef=From },
 
 	Csr = letsencrypt_tls:get_cert_request( BinDomain, BinCertDirPath, SANs ),
 
-	{ FinOrderDirMap, _BinUri, FinNonce } = letsencrypt_api:finalize_order(
+	{ FinOrderDirMap, _BinLocUri, FinNonce } = letsencrypt_api:finalize_order(
 		OrderDirMap, Csr, PrivKey, Jws#jws{ nonce=Nonce }, OptionMap ),
 
 	BinStatus = case maps:get( <<"status">>, FinOrderDirMap,
@@ -938,9 +1004,14 @@ valid( _EventType={ call, _ServerRef=From },
 		finalize ->
 			finalize;
 
+		% Certainly happens:
+		valid ->
+			finalize;
+			%valid;
+
 		OtherStateName ->
-			trace_utils:warning_fmt( "New state after finalizing order is not "
-				"'finalize' but '~s'.", [ OtherStateName ] ),
+			trace_utils:warning_fmt( "New state after finalizing order is "
+									 "'~s'.", [ OtherStateName ] ),
 			OtherStateName
 
 	end,
@@ -972,7 +1043,7 @@ valid( EventType, EventContentMsg, _LEState ) ->
 %
 % When order is being finalized, and certificate generation is ongoing.
 %
-% Wait for certificate generation being complete (order status == 'valid').
+% Waits for certificate generation being complete (order status == 'valid').
 %
 % Returns the order status.
 %
@@ -998,9 +1069,9 @@ finalize( _EventType=processing, _EventContentMsg=_Domain,
 
 % Downloads certificate and saves it into file.
 %
-% Returns #{key, cert} where;
-%		- Key is certificate private key filename
-%		- Cert is certificate PEM filename
+% Returns #{key, cert} where:
+%  - Key is certificate private key filename
+%  - Cert is certificate PEM filename
 %
 % Transitions to state 'idle': fsm complete, going back to initial state.
 %
@@ -1009,6 +1080,8 @@ finalize( _EventType=valid, _EventContentMsg=_Domain,
 			cert_key_file_path=KeyFilePath, cert_dir_path=BinCertDirPath,
 			private_key=PrivKey, jws=Jws, nonce=Nonce,
 			option_map=OptionMap } ) ->
+
+	trace_utils:trace_fmt( "[~w] Finalizing now...", [ self() ] ),
 
 	BinKeyFilePath = text_utils:string_to_binary( KeyFilePath ),
 
@@ -1244,6 +1317,10 @@ wait_challenges_valid( FsmPid, Count, MaxCount ) ->
 -spec wait_finalized( fsm_pid(), status(), count() ) ->
 		  { 'ok', map() } | { 'error', 'timeout' | any() }.
 wait_finalized( FsmPid, Status, C ) ->
+
+	trace_utils:debug_fmt( "[~w] Waiting for status '~s'...",
+						   [ FsmPid, Status ] ),
+
 	wait_finalized( FsmPid, Status, C, C ).
 
 
@@ -1265,13 +1342,13 @@ wait_finalized( FsmPid, Status, Count, Max ) ->
 			wait_finalized( FsmPid, S, Count-1, Max );
 
 		P={ _, Error } ->
-			trace_utils:error_fmt( "wait_finalized received ~p for ~w.",
+			trace_utils:error_fmt( "wait_finalized received '~p' for ~w.",
 								   [ P, FsmPid ] ),
 			{ error, Error };
 
 		Any ->
-			trace_utils:warning_fmt( "wait_finalized received ~p for ~w.",
-									 [ any, FsmPid ] ),
+			trace_utils:warning_fmt( "wait_finalized received '~p' for ~w.",
+									 [ Any, FsmPid ] ),
 			Any
 
 	end.
@@ -1279,31 +1356,44 @@ wait_finalized( FsmPid, Status, Count, Max ) ->
 
 
 % Performs ACME authorization based on selected challenge initialization.
--spec perform_auth( challenge_type(), [ bin_uri() ], le_state() ) ->
+-spec perform_authorization( challenge_type(), [ bin_uri() ], le_state() ) ->
 						  { uri_challenge_map(), nonce() }.
-perform_auth( ChallengeType, AuthUris, LEState=#le_state{ mode=Mode } ) ->
+perform_authorization( ChallengeType, AuthUris,
+					   LEState=#le_state{ mode=Mode } ) ->
 
 	trace_utils:trace_fmt( "[~w] Starting authorization procedure with "
 		"challenge type '~s' (mode: ~s).", [ self(), ChallengeType, Mode ] ),
 
 	BinChallengeType = text_utils:atom_to_binary( ChallengeType ),
 
-	{ UriChallengeMap, Nonce } = perform_auth_step1( AuthUris, BinChallengeType,
-											 LEState, _UriChallengeMap=#{} ),
+	{ UriChallengeMap, Nonce } = perform_authorization_step1( AuthUris,
+				BinChallengeType, LEState, _UriChallengeMap=#{} ),
 
-	trace_utils:debug_fmt( "[~w] URI challenge map after step 1:~n ~p.",
+	trace_utils:debug_fmt( "[~w] URI challenge map after step 1:~n  ~p.",
 						   [ self(), UriChallengeMap ] ),
+
+	% UriChallengeMap is like:
+	%
+	%  #{<<"https://acme-staging-v02.api.letsencrypt.org/acme/authz-v3/142509381">> =>
+	%   #{<<"status">> => <<"pending">>,
+	%     <<"token">> => <<"qVTq6gQWZO4Dt4gUmnaTQdwTRkpaSnMiRx8L7Grzhl8">>,
+	%     <<"type">> => <<"http-01">>,
+	%     <<"url">> =>
+	%         <<"https://acme-staging-v02.api.letsencrypt.org/acme/chall-v3/142509381/-Axkdw">>}}.
 
 	init_for_challenge_type( ChallengeType, Mode, LEState, UriChallengeMap ),
 
-	NewNonce = perform_auth_step2( maps:to_list( UriChallengeMap ),
-								   LEState#le_state{ nonce=Nonce } ),
+	NewNonce = perform_authorization_step2( maps:to_list( UriChallengeMap ),
+								 LEState#le_state{ nonce=Nonce } ),
 
 	{ UriChallengeMap, NewNonce }.
 
 
 
-% Requests authorizations based on specified challenge type and URIs.
+% Requests authorizations based on specified challenge type and URIs: for each
+% challenge type (ex: http-01, dns-01, etc.), a challenge is proposed.
+%
+% At least in some cases, a single authorization URI is actually listed.
 %
 % Returns:
 %   {ok, Challenges, Nonce}
@@ -1311,24 +1401,24 @@ perform_auth( ChallengeType, AuthUris, LEState=#le_state{ mode=Mode } ) ->
 %		ChallengeType type
 %		- Nonce is a new valid replay-nonce
 %
--spec perform_auth_step1( [ bin_uri() ], bin_challenge_type(), le_state(),
-		  uri_challenge_map() ) -> { uri_challenge_map(), nonce() }.
-perform_auth_step1( _AuthUris=[], _BinChallengeType, #le_state{ nonce=Nonce },
-					UriChallengeMap ) ->
+-spec perform_authorization_step1( [ bin_uri() ], bin_challenge_type(),
+		le_state(), uri_challenge_map() ) -> { uri_challenge_map(), nonce() }.
+perform_authorization_step1( _AuthUris=[], _BinChallengeType,
+							 #le_state{ nonce=Nonce }, UriChallengeMap ) ->
 	{ UriChallengeMap, Nonce };
 
-perform_auth_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
+perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 			LEState=#le_state{ nonce=Nonce, private_key=PrivKey,
 							   jws=Jws, option_map=OptionMap },
 			UriChallengeMap ) ->
 
 	% Ex: AuthUri =
-	%  https://acme-staging-v02.api.letsencrypt.org/acme/authz-v3/133572032
+	%  "https://acme-staging-v02.api.letsencrypt.org/acme/authz-v3/133572032"
 
 	{ AuthMap, _LocUri, NewNonce } = letsencrypt_api:request_authorization(
 		AuthUri, PrivKey, Jws#jws{ nonce=Nonce }, OptionMap ),
 
-	trace_utils:debug_fmt( "[~w] Step 1: authmap returned for URI '~s':~n ~p.",
+	trace_utils:debug_fmt( "[~w] Step 1: authmap returned for URI '~s':~n  ~p.",
 						   [ self(), AuthUri, AuthMap ] ),
 
 	% Ex: AuthMap =
@@ -1359,13 +1449,15 @@ perform_auth_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 	[ Challenge ] = lists:filter(
 
 		fun( ChlgMap ) ->
-			maps:get( <<"type">>, ChlgMap, _Default=error ) =:= BinChallengeType
+			maps:get( <<"type">>, ChlgMap,
+					  _Default=never_match ) =:= BinChallengeType
 		end,
 
 		_List=maps:get( <<"challenges">>, AuthMap ) ),
 
-	perform_auth_step1( T, BinChallengeType, LEState#le_state{ nonce=NewNonce },
-						UriChallengeMap#{ AuthUri => Challenge } ).
+	perform_authorization_step1( T, BinChallengeType,
+		LEState#le_state{ nonce=NewNonce },
+		UriChallengeMap#{ AuthUri => Challenge } ).
 
 
 
@@ -1375,12 +1467,12 @@ perform_auth_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 % Notifies the ACME server the challenges are good to proceed, returns an
 % updated nonce.
 %
--spec perform_auth_step2( [ { bin_uri(), challenge() } ], le_state()) ->
+-spec perform_authorization_step2( [ { bin_uri(), challenge() } ], le_state()) ->
 								nonce().
-perform_auth_step2( _Pairs=[], #le_state{ nonce=Nonce } ) ->
+perform_authorization_step2( _Pairs=[], #le_state{ nonce=Nonce } ) ->
 	Nonce;
 
-perform_auth_step2( _Pairs=[ { _Uri, Challenge } | T ],
+perform_authorization_step2( _Pairs=[ { _Uri, Challenge } | T ],
 					LEState=#le_state{ nonce=Nonce, private_key=PrivKey,
 									   jws=Jws, option_map=OptionMap } ) ->
 
@@ -1388,7 +1480,7 @@ perform_auth_step2( _Pairs=[ { _Uri, Challenge } | T ],
 		letsencrypt_api:notify_ready_for_challenge( Challenge, PrivKey,
 										Jws#jws{ nonce=Nonce }, OptionMap ),
 
-	perform_auth_step2( T, LEState#le_state{ nonce=NewNonce } ).
+	perform_authorization_step2( T, LEState#le_state{ nonce=NewNonce } ).
 
 
 

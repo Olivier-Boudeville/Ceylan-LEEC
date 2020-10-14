@@ -15,8 +15,8 @@
 -module(letsencrypt_api).
 -author("Guillaume Bour <guillaume@bour.cc>").
 
--export([ get_directory_map/2, get_nonce/2, get_account/4,
-		  request_order/5, get_order/4, request_authorization/4,
+-export([ get_directory_map/2, get_nonce/2, create_acme_account/4,
+		  request_new_certificate/5, get_order/4, request_authorization/4,
 		  notify_ready_for_challenge/4, finalize_order/5, get_certificate/4,
 		  binary_to_status/1 ]).
 
@@ -135,8 +135,8 @@ get_tcp_connection( Proto, Host, Port ) ->
 
 		% Not found:
 		[] ->
-			trace_utils:debug_fmt( "Opening connection to ~s:~B, with the "
-				"'~s' scheme.", [ Host, Port, Proto ] ),
+			trace_utils:debug_fmt( "[~w] Opening a connection to ~s:~B, "
+				"with the '~s' scheme.", [ self(), Host, Port, Proto ] ),
 
 			Conn = case shotgun:open( Host, Port, Proto ) of
 
@@ -152,6 +152,9 @@ get_tcp_connection( Proto, Host, Port ) ->
 			Conn;
 
 		[ { _ConnectTriplet, Conn } ] ->
+			trace_utils:debug_fmt( "[~w] Reusing connection to ~s:~B, "
+				"with the '~s' scheme: ~p.",
+				[ self(), Host, Port, Proto, Conn ] ),
 			Conn
 
 	end.
@@ -165,12 +168,13 @@ get_tcp_connection( Proto, Host, Port ) ->
 -spec decode( OptionMap :: option_map(), Response :: map() ) ->
 					json_http_body().
 decode( _OptionMap=#{ json := true }, Response=#{ body := Body } ) ->
-	trace_utils:debug_fmt( "Decoding from JSON following body:~n~p",
-						   [ Body ] ),
+
+	%trace_utils:debug_fmt( "Decoding from JSON following body:~n~p",
+	%					   [ Body ] ),
+
 	Payload = json_utils:from_json( Body ),
 
-	trace_utils:debug_fmt( "Corresponding payload from JSON:~n~p",
-						   [ Payload ] ),
+	trace_utils:debug_fmt( "Payload decoded from JSON:~n  ~p", [ Payload ] ),
 
 	Response#{ json => Payload };
 
@@ -185,7 +189,7 @@ decode( _OptionMap, Response ) ->
 %
 % Returns:
 %	{ok, #{status_coe, body, headers}}: query succeed
-%	{error, invalid_method}           : Method MUST be either 'get' or 'post'
+%	{error, invalid_method}           : method must be either 'get' or 'post'
 %   {error, term()}                   : query failed
 %
 % TODO: is 'application/jose+json' content type always required?
@@ -252,6 +256,20 @@ request( Method, Uri, Headers, MaybeBinContent,
 	trace_utils:debug_fmt( "[~w] The '~s' request to ~s resulted in:~n~p",
 						   [ self(), Method, UriStr, ReqRes ] ),
 
+	% Typically success results in ReqRes like:
+
+	% {ok,#{headers =>
+	%           [{<<"server">>,<<"nginx">>},
+	%            {<<"date">>,<<"Mon, 12 Oct 2020 20:24:37 GMT">>},
+	%            {<<"cache-control">>,<<"public, max-age=0, no-cache">>},
+	%            {<<"link">>,
+	%             <<"<https://acme-staging-v02.api.letsencrypt.org/directory>;rel=\"index\"">>},
+	%            {<<"replay-nonce">>,
+	%             <<"0004Rvtq_vk_FFeGDLHnbeb6ySKpkePx_frQeodOZ1byAPg">>},
+	%            {<<"x-frame-options">>,<<"DENY">>},
+	%            {<<"strict-transport-security">>,<<"max-age=604800">>}],
+	%       status_code => 204}}
+
 	case ReqRes of
 
 		{ ok, Response=#{ headers := RHeaders } } ->
@@ -265,7 +283,7 @@ request( Method, Uri, Headers, MaybeBinContent,
 			decode( OptionMap, Resp );
 
 		_ ->
-			throw( { unexpected_answer, Method, UriStr, ReqRes } )
+			throw( { unexpected_request_answer, Method, UriStr, ReqRes } )
 
 	end.
 
@@ -312,30 +330,34 @@ get_directory_map( Env, OptionMap ) ->
 -spec get_nonce( directory_map(), option_map() ) -> nonce().
 get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap ) ->
 
-	trace_utils:debug_fmt( "[~w] Getting new nonce at ~s.", [ self(), Uri ] ),
+	trace_utils:debug_fmt( "[~w] Getting new nonce from ~s.", [ self(), Uri ] ),
 
 	% Status code: 204 (No content):
 	#{ nonce := Nonce } = request( _Method=get, Uri, _Headers=#{},
-									_MaybeBinContent=undefined, OptionMap ),
+								   _MaybeBinContent=undefined, OptionMap ),
+
+	trace_utils:debug_fmt( "[~w] New nonce is: ~p.", [ self(), Nonce ] ),
+
 	Nonce.
 
 
 
-% Requests a new account, see
+% Requests a new account obtained (indirecetly) for specified privat key, see
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.3.1.
 %
 % Returns {Response, Location, Nonce}, where:
-%		- Response is json (decoded as map)
-%		- Location is create account url
-%		- Nonce is a new valid replay-nonce
+% - Response is json (decoded as map)
+% - Location is the URL corresponding to the created ACME account
+% - Nonce is a new valid replay-nonce
 %
 % TODO: checks 201 Created response
 %
--spec get_account( directory_map(), tls_private_key(), jws(), option_map() ) ->
-		  { json_map_decoded(), bin_uri(), nonce() }.
-get_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws, OptionMap ) ->
+-spec create_acme_account( directory_map(), tls_private_key(), jws(),
+			   option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
+create_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
+					 OptionMap ) ->
 
-	trace_utils:debug_fmt( "[~w] Requesting a new account at ~s.",
+	trace_utils:debug_fmt( "[~w] Requesting a new account from ~s.",
 						   [ self(), Uri ] ),
 
 	% Terms of service should not be automatically agreed:
@@ -348,39 +370,58 @@ get_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws, OptionMap ) ->
 		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=ReqB64,
 				 OptionMap#{ json => true } ),
 
+	trace_utils:debug_fmt( "[~w] Account location URI is '~s', "
+		"JSON response iq :~n  ~p", [ self(), LocationUri, Resp ] ),
+
 	{ Resp, LocationUri, NewNonce }.
 
 
 
-% Requests a new order, see
+% Requests (orders from ACME) a new (DNS) certificate, see
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.
 %
 % Returns {Response, Location, Nonce}, where:
-%		- Response is json (decoded as map)
-%		- Location is create account URI
-%		- Nonce is a new valid replay-nonce
+% - Response is json (decoded as map)
+% - Location is the URL corresponding to the created ACME account
+% - Nonce is a new valid replay-nonce
 %
 % TODO: support multiple domains
 %		checks 201 created
 %
--spec request_order( directory_map(), [ bin_domain() ], tls_private_key(),
-		 jws(), option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
-request_order( _DirMap=#{ <<"newOrder">> := Uri }, BinDomains, PrivKey, Jws,
-			   OptionMap ) ->
+-spec request_new_certificate( directory_map(), [ bin_domain() ],
+		tls_private_key(), jws(), option_map() ) ->
+								 { json_map_decoded(), bin_uri(), nonce() }.
+request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
+						 PrivKey, AccountJws, OptionMap ) ->
 
-	trace_utils:debug_fmt( "[~w] Requesting a new order at ~s.",
-						   [ self(), Uri ] ),
+	trace_utils:debug_fmt( "[~w] Requesting a new certificate from ~s for ~p.",
+						   [ self(), OrderUri, BinDomains ] ),
 
 	Idns = [ #{ type => dns, value => BinDomain } || BinDomain <- BinDomains ],
 
-	Payload = #{ identifiers => Idns },
+	IdPayload = #{ identifiers => Idns },
 
-	Req = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri },
-								  _Content=Payload ),
+	Req = letsencrypt_jws:encode( PrivKey, AccountJws#jws{ url=OrderUri },
+								  _Content=IdPayload ),
 
 	#{ json := OrderJsonMap, location := LocationUri, nonce := Nonce } =
-		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
+		request( _Method=post, OrderUri, _Headers=#{}, _MaybeBinContent=Req,
 				 OptionMap#{ json => true } ),
+
+	trace_utils:debug_fmt( "[~w] Obtained from order URI '~s' the "
+		"location '~s' and following JSON:~n  ~p",
+		[ self(), OrderUri, LocationUri, OrderJsonMap ] ),
+
+	% OrderJsonMap like:
+	%
+	% #{<<"authorizations">> =>
+	%     [<<"https://acme-staging-v02.api.letsencrypt.org/acme/authz-v3/132509381">>],
+	%	<<"expires">> => <<"2020-10-21T10:08:04.97820359Z">>,
+	%   <<"finalize">> =>
+	%	  <<"https://acme-staging-v02.api.letsencrypt.org/acme/finalize/16110969/166839186">>,
+	%   <<"identifiers">> =>
+	%		[#{<<"type">> => <<"dns">>,<<"value">> => <<"foo.bar.org">>}],
+	%   <<"status">> => <<"pending">>}
 
 	{ OrderJsonMap, LocationUri, Nonce }.
 
@@ -417,7 +458,7 @@ get_order( Uri, Key, Jws, OptionMap ) ->
 			 option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
 request_authorization( AuthUri, PrivKey, Jws, OptionMap ) ->
 
-	trace_utils:debug_fmt( "[~w] Requesting authorization at ~s.",
+	trace_utils:debug_fmt( "[~w] Requesting authorization from ~s.",
 						   [ self(), AuthUri ] ),
 
 	% POST-as-GET implies no payload:

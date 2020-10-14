@@ -47,8 +47,10 @@
 
   alg = 'RS256' :: letsencrypt:jws_algorithm(),
 
+  % Ex: "https://acme-staging-v02.api.letsencrypt.org/acme/new-order"
   url :: letsencrypt:bin_uri(),
 
+  % Ex: "https://acme-staging-v02.api.letsencrypt.org/acme/acct/16082748"
   kid :: letsencrypt:bin_uri(),
 
   jwk :: letsencrypt:key(),

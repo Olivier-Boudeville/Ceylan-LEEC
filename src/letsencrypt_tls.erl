@@ -17,8 +17,7 @@
 
 -export([ create_private_key/2,
 		  get_cert_request/3,
-		  get_domain_certificate/3, generate_certificate/5,
-		  write_certificate/3,
+		  generate_certificate/5, write_certificate/3,
 		  key_to_map/1, map_to_key/1 ]).
 
 
@@ -30,11 +29,8 @@
 
 % Shorthands:
 
--type directory_path() :: file_utils:directory_path().
 -type bin_directory_path() :: file_utils:bin_directory_path().
 -type file_path() :: file_utils:file_path().
-
--type bin_domain() :: net_utils:bin_domain().
 
 -type key_file_info() :: letsencrypt:key_file_info().
 -type san() :: letsencrypt:san().
@@ -76,6 +72,9 @@ create_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 			ok
 
 	end,
+
+	trace_utils:debug_fmt( "[~w] A private key will be created in '~s'.",
+						   [ self(), UniqPath ] ),
 
 	% Could have been more elegant:
 	UniqFilename = file_utils:get_last_path_element( UniqPath ),
@@ -133,6 +132,9 @@ create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 
 	end,
 
+	trace_utils:debug_fmt( "[~w] Creation of private key in '~s' succeeded.",
+						   [ self(), KeyFilePath ] ),
+
 	% Now load it (next clause), and return it as a tls_private_key():
 	create_private_key( KeyFilePath, BinCertDirPath );
 
@@ -147,11 +149,16 @@ create_private_key( _KeyFileInfo=KeyFilePath, _BinCertDirPath ) ->
 	#'RSAPrivateKey'{ modulus=N, publicExponent=E, privateExponent=D } =
 		public_key:pem_entry_decode( KeyEntry ),
 
-	#tls_private_key{
+	PrivKey = #tls_private_key{
 	   raw=[ E, N, D ],
 	   b64_pair={ letsencrypt_utils:b64encode( binary:encode_unsigned( N ) ),
 				  letsencrypt_utils:b64encode( binary:encode_unsigned( E ) ) },
-	   file_path=KeyFilePath }.
+	   file_path=KeyFilePath },
+
+	%trace_utils:debug_fmt( "[~w] Returning following private key:~n  ~p",
+	%					   [ self(), PrivKey ] ),
+
+	PrivKey.
 
 
 
@@ -178,21 +185,6 @@ get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 	%trace_utils:debug_fmt( "Decoded CSR: ~p", [ Csr ] ),
 
 	letsencrypt_utils:b64encode( Csr ).
-
-
-
-% Generates a domain certificate.
--spec get_domain_certificate( bin_domain(), bin_certificate(),
-							  bin_directory_path() ) -> file_path().
-get_domain_certificate( BinDomain, BinDomainCert, BinCertDirPath ) ->
-
-	Domain = text_utils:binary_to_string( BinDomain ),
-
-	CertFilePath = file_utils:join( BinCertDirPath, Domain ++ ".crt" ),
-
-	file_utils:write_whole( CertFilePath, BinDomainCert ),
-
-	CertFilePath.
 
 
 
@@ -278,13 +270,13 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 % Domain certificate only.
 %
 -spec write_certificate( net_utils:string_fqdn(), bin_certificate(),
-						 directory_path() ) -> file_path().
-write_certificate( Domain, BinDomainCert, CertDirPath ) ->
+						 bin_directory_path() ) -> file_path().
+write_certificate( Domain, BinDomainCert, BinCertDirPath ) ->
 
-	CertFilePath = file_utils:join( CertDirPath, Domain ++ ".crt" ),
+	CertFilePath = file_utils:join( BinCertDirPath, Domain ++ ".crt" ),
 
-	%trace_utils:debug_fmt( "Domain certificate for '~s' (in '~s'): ~p.",
-	%                     [ Domain, CertFilePath, BinDomainCert ] ),
+	trace_utils:debug_fmt( "Writing domain certificate for domain '~s' "
+		"(in '~s'): ~p.", [ Domain, CertFilePath, BinDomainCert ] ),
 
 	file_utils:write_whole( CertFilePath, BinDomainCert ),
 
@@ -306,7 +298,8 @@ key_to_map( #key{ kty=Kty, n=N, e=E } ) ->
 -spec map_to_key( map() ) -> key().
 map_to_key( Map ) ->
 
-	{ [ Kty, N, E ], #{} } = map_hashtable:extract_entries(
+	% Ensures all keys are extracted:
+	{ [ Kty, N, E ], _RemainingTable=#{} } = map_hashtable:extract_entries(
 							   [ <<"kty">>, <<"n">>, <<"e">> ], Map ),
 
 	#key{ kty=Kty, n=N, e=E }.
