@@ -723,6 +723,7 @@ idle( _EventType={ call, From },
 	{ AccountDecodedJsonMap, AccountLocationUri, AccountNonce } =
 		letsencrypt_api:create_acme_account( DirMap, PrivKey,
 									 Jws#jws{ nonce=Nonce }, OptionMap ),
+
 	% Payload decoded from JSON in AccountDecodedJsonMap will be like:
 	%
 	% #{<<"contact">> => [],
@@ -736,6 +737,17 @@ idle( _EventType={ call, From },
 
 	% AccountLocationUri will be like:
 	% "https://acme-staging-v02.api.letsencrypt.org/acme/acct/16210968"
+
+	case maps:get( <<"status">>, AccountDecodedJsonMap ) of
+
+		<<"valid">> ->
+			ok;
+
+		AccountUnexpectedStatus ->
+			throw( { unexpected_status, AccountUnexpectedStatus,
+					 account_creation } )
+
+	end,
 
 	AccountKeyAsMap = maps:get( <<"key">>, AccountDecodedJsonMap ),
 
@@ -754,10 +766,20 @@ idle( _EventType={ call, From },
 
 	BinDomains = [ BinDomain | BinSans ],
 
-	% TODO: checks order is ok; a status is returned:
 	{ OrderDecodedJsonMap, OrderLocationUri, OrderNonce } =
 		letsencrypt_api:request_new_certificate( DirMap, BinDomains, PrivKey,
 												 AccountJws, OptionMap ),
+
+	case maps:get( <<"status">>, AccountDecodedJsonMap ) of
+
+		<<"pending">> ->
+			ok;
+
+		CertUnexpectedStatus ->
+			throw( { unexpected_status, CertUnexpectedStatus,
+					 certificate_ordering } )
+
+	end,
 
 	% We need to keep trace of order location:
 	LocOrder = OrderDecodedJsonMap#{ <<"location">> => OrderLocationUri },
@@ -789,6 +811,7 @@ idle( _EventType={ call, From },
 
 	{ next_state, NewStateName, _NewData=FinalLEState,
 	  _Action={ reply, From, Reply } };
+
 
 idle( _EventType={ call, From },
 	  _EventContentMsg=_Request=get_ongoing_challenges, _Data=_LEState ) ->
@@ -865,7 +888,7 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 			BinStatus = maps:get( <<"status">>, AuthJsonMap ),
 
 			trace_utils:debug_fmt( "[~w] For auth URI ~s, received "
-				"status '~w'.", [ self(), AuthUri, BinStatus ] ),
+				"status '~s'.", [ self(), AuthUri, BinStatus ] ),
 
 			NewStateName = case { AccStateName, BinStatus } of
 
@@ -914,7 +937,6 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 					throw( { unexpected_auth_status, UnexpectedBinStatus,
 							 self(), AnyOtherState, AuthUri } )
 
-
 			end,
 
 			{ NewStateName, NewNonce }
@@ -925,6 +947,17 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 
 	trace_utils:debug_fmt( "[~w] Check resulted in switching from 'pending' "
 						   "to '~s' state.", [ self(), NextStateName ] ),
+
+	% Be nice to ACME server:
+	case NextStateName of
+
+		pending ->
+			timer:sleep( 1000 );
+
+		_ ->
+			ok
+
+	end,
 
 	{ next_state, NextStateName,
 	  _NewData=LEState#le_state{ nonce=ResultingNonce },
@@ -960,7 +993,7 @@ pending( EventType, EventContentMsg, _LEState ) ->
 
 % Management of the 'valid' state.
 %
-% When challenges have been successfully completed, finalizes ACME order and
+% When challenges have been successfully completed, finalizes the ACME order and
 % generates TLS certificate.
 %
 % Returns Status, the order status.
@@ -973,6 +1006,9 @@ valid( _EventType={ call, _ServerRef=From },
 			cert_dir_path=BinCertDirPath, order=OrderDirMap,
 			private_key=PrivKey, jws=Jws, nonce=Nonce,
 			option_map=OptionMap } ) ->
+
+	trace_utils:trace_fmt( "[~w] Trying to switch to finalize while being "
+						   "in the 'valid' state.", [ self() ] ),
 
 	challenge_destroy( Mode, LEState ),
 
@@ -1055,6 +1091,9 @@ finalize( _EventType=processing, _EventContentMsg=_Domain,
 		  _Data=LEState=#le_state{ order=OrderMap, private_key=PrivKey,
 							jws=Jws, nonce=Nonce, option_map=OptionMap } ) ->
 
+	trace_utils:trace_fmt( "[~w] Finalizing (event type: processing).",
+						   [ self() ] ),
+
 	Loc = maps:get( <<"location">>, OrderMap, nil ),
 
 	{ NewOrderMap, _Loc, NewNonce } = letsencrypt_api:get_order( Loc, PrivKey,
@@ -1081,7 +1120,8 @@ finalize( _EventType=valid, _EventContentMsg=_Domain,
 			private_key=PrivKey, jws=Jws, nonce=Nonce,
 			option_map=OptionMap } ) ->
 
-	trace_utils:trace_fmt( "[~w] Finalizing now...", [ self() ] ),
+	trace_utils:trace_fmt( "[~w] Finalizing now (event type: valid)...",
+						   [ self() ] ),
 
 	BinKeyFilePath = text_utils:string_to_binary( KeyFilePath ),
 
@@ -1131,7 +1171,12 @@ finalize( UnexpectedEventType, EventContentMsg, _LEState ) ->
 								  le_state() ) -> state_callback_result().
 handle_call_for_all_states( ServerRef, _Request=get_status, StateName,
 							_LEState ) ->
+
+	trace_utils:debug_fmt( "[~w] Returning current status: '~s'.",
+						   [ ServerRef, StateName ] ),
+
 	Res = StateName,
+
 	{ keep_state_and_data, _Actions={ reply, _From=ServerRef, Res } };
 
 
@@ -1443,6 +1488,18 @@ perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 	%	   #{<<"type">> => <<"dns">>,<<"value">> => <<"www.foobar.org">>},
 	%   <<"status">> => <<"pending">>}.
 
+	case maps:get( <<"status">>, AuthMap ) of
+
+		<<"pending">> ->
+			ok;
+
+		AuthUnexpectedStatus ->
+			throw( { unexpected_status, AuthUnexpectedStatus,
+					 authorization_step1 } )
+
+	end,
+
+
 	% Retains only the specified challenge type (cannot be a list
 	% comprehension):
 	%
@@ -1467,18 +1524,29 @@ perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 % Notifies the ACME server the challenges are good to proceed, returns an
 % updated nonce.
 %
--spec perform_authorization_step2( [ { bin_uri(), challenge() } ], le_state()) ->
-								nonce().
+-spec perform_authorization_step2( [ { bin_uri(), challenge() } ],
+								   le_state()) -> nonce().
 perform_authorization_step2( _Pairs=[], #le_state{ nonce=Nonce } ) ->
 	Nonce;
 
-perform_authorization_step2( _Pairs=[ { _Uri, Challenge } | T ],
+perform_authorization_step2( _Pairs=[ { Uri, Challenge } | T ],
 					LEState=#le_state{ nonce=Nonce, private_key=PrivKey,
 									   jws=Jws, option_map=OptionMap } ) ->
 
-	{ _Resp, _Location, NewNonce } =
+	{ Resp, _Location, NewNonce } =
 		letsencrypt_api:notify_ready_for_challenge( Challenge, PrivKey,
 										Jws#jws{ nonce=Nonce }, OptionMap ),
+
+	case maps:get( <<"status">>, Resp ) of
+
+		<<"pending">> ->
+			ok;
+
+		AuthUnexpectedStatus ->
+			throw( { unexpected_status, AuthUnexpectedStatus,
+					 authorization_step2, Uri } )
+
+	end,
 
 	perform_authorization_step2( T, LEState#le_state{ nonce=NewNonce } ).
 
@@ -1564,8 +1632,8 @@ init_for_challenge_type( ChallengeType, _Mode=standalone,
 % - 'slave' mode: nothing to do
 %
 -spec challenge_destroy( le_mode(), le_state() ) -> void().
-challenge_destroy( _Mode=webroot,
-		#le_state{ webroot_path=BinWPath, challenges=UriChallengeMap } ) ->
+challenge_destroy( _Mode=webroot, #le_state{ webroot_path=BinWPath,
+											 challenges=UriChallengeMap } ) ->
 
 	[ begin
 

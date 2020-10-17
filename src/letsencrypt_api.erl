@@ -314,8 +314,19 @@ get_directory_map( Env, OptionMap ) ->
 	trace_utils:debug_fmt( "[~w] Getting directory map at ~s.",
 						   [ self(), DirUri ] ),
 
-	#{ json := DirectoryMap } = request( _Method=get, DirUri,
-		_Headers=#{}, _MaybeBinContent=undefined, OptionMap#{ json => true } ),
+	#{ json := DirectoryMap, status_code := StatusCode } = request( _Method=get,
+		DirUri, _Headers=#{}, _MaybeBinContent=undefined,
+		OptionMap#{ json => true } ),
+
+	case StatusCode of
+
+		200 ->
+			ok;
+
+		_ ->
+			throw( { unexpected_status_code, StatusCode } )
+
+	end,
 
 	trace_utils:debug_fmt( "[~w] Obtained directory map:~n~p",
 						   [ self(), DirectoryMap ] ),
@@ -333,8 +344,18 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap ) ->
 	trace_utils:debug_fmt( "[~w] Getting new nonce from ~s.", [ self(), Uri ] ),
 
 	% Status code: 204 (No content):
-	#{ nonce := Nonce } = request( _Method=get, Uri, _Headers=#{},
-								   _MaybeBinContent=undefined, OptionMap ),
+	#{ nonce := Nonce, status_code := StatusCode } = request( _Method=get, Uri,
+				_Headers=#{}, _MaybeBinContent=undefined, OptionMap ),
+
+	case StatusCode of
+
+		204 ->
+			ok;
+
+		_ ->
+			throw( { unexpected_status_code, StatusCode } )
+
+	end,
 
 	trace_utils:debug_fmt( "[~w] New nonce is: ~p.", [ self(), Nonce ] ),
 
@@ -366,12 +387,22 @@ create_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 
 	ReqB64 = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri }, Payload ),
 
-	#{ json := Resp, location := LocationUri, nonce := NewNonce } =
-		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=ReqB64,
-				 OptionMap#{ json => true } ),
+	#{ json := Resp, location := LocationUri, nonce := NewNonce,
+	   status_code := StatusCode } = request( _Method=post, Uri, _Headers=#{},
+			_MaybeBinContent=ReqB64, OptionMap#{ json => true } ),
+
+	case StatusCode of
+
+		201 ->
+			ok;
+
+		_ ->
+			throw( { unexpected_status_code, StatusCode } )
+
+	end,
 
 	trace_utils:debug_fmt( "[~w] Account location URI is '~s', "
-		"JSON response iq :~n  ~p", [ self(), LocationUri, Resp ] ),
+		"JSON response is :~n  ~p", [ self(), LocationUri, Resp ] ),
 
 	{ Resp, LocationUri, NewNonce }.
 
@@ -404,9 +435,19 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 	Req = letsencrypt_jws:encode( PrivKey, AccountJws#jws{ url=OrderUri },
 								  _Content=IdPayload ),
 
-	#{ json := OrderJsonMap, location := LocationUri, nonce := Nonce } =
-		request( _Method=post, OrderUri, _Headers=#{}, _MaybeBinContent=Req,
-				 OptionMap#{ json => true } ),
+	#{ json := OrderJsonMap, location := LocationUri, nonce := Nonce,
+	   status_code := StatusCode } = request( _Method=post, OrderUri,
+		_Headers=#{}, _MaybeBinContent=Req, OptionMap#{ json => true } ),
+
+	case StatusCode of
+
+		201 ->
+			ok;
+
+		_ ->
+			throw( { unexpected_status_code, StatusCode } )
+
+	end,
 
 	trace_utils:debug_fmt( "[~w] Obtained from order URI '~s' the "
 		"location '~s' and following JSON:~n  ~p",
@@ -465,9 +506,19 @@ request_authorization( AuthUri, PrivKey, Jws, OptionMap ) ->
 	B64AuthReq = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=AuthUri },
 										 _Content=undefined ),
 
-	#{ json := Resp, location := LocationUri, nonce := Nonce } =
-		request( _Method=post, AuthUri, _Headers=#{},
-				 _MaybeBinContent=B64AuthReq, OptionMap#{ json=> true } ),
+	#{ json := Resp, location := LocationUri, nonce := Nonce,
+	   status_code := StatusCode } = request( _Method=post, AuthUri,
+		_Headers=#{}, _MaybeBinContent=B64AuthReq, OptionMap#{ json=> true } ),
+
+	case StatusCode of
+
+		200 ->
+			ok;
+
+		_ ->
+			throw( { unexpected_status_code, StatusCode } )
+
+	end,
 
 	{ Resp, LocationUri, Nonce }.
 
@@ -486,15 +537,25 @@ request_authorization( AuthUri, PrivKey, Jws, OptionMap ) ->
 notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
 							OptionMap ) ->
 
-	trace_utils:debug_fmt( "[~w] Notifying ACME server that ready for "
-						   "challenge validation at ~s.", [ self(), Uri ] ),
+	trace_utils:debug_fmt( "[~w] Notifying the ACME server that our agent is "
+		"ready for challenge validation at ~s.", [ self(), Uri ] ),
 
 	% POST-as-GET implies no payload:
 	Req = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri }, _Content=#{} ),
 
-	#{ json := Resp, location := Location, nonce := Nonce } =
-		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
-				 OptionMap#{ json => true } ),
+	#{ json := Resp, location := Location, nonce := Nonce,
+	   status_code := StatusCode } = request( _Method=post, Uri, _Headers=#{},
+			_MaybeBinContent=Req, OptionMap#{ json => true } ),
+
+	case StatusCode of
+
+		200 ->
+			ok;
+
+		_ ->
+			throw( { unexpected_status_code, StatusCode } )
+
+	end,
 
 	{ Resp, Location, Nonce }.
 
@@ -514,9 +575,19 @@ finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 
 	JWSBody = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=FinUri }, Payload ),
 
-	#{ json := FinOrderDirMap, location := BinLocUri, nonce := Nonce } =
-		request( _Method=post, FinUri, _Headers=#{}, _MaybeBinContent=JWSBody,
-				 OptionMap#{ json => true } ),
+	#{ json := FinOrderDirMap, location := BinLocUri, nonce := Nonce,
+	   status_code := StatusCode } = request( _Method=post, FinUri,
+		  _Headers=#{}, _MaybeBinContent=JWSBody, OptionMap#{ json => true } ),
+
+	case StatusCode of
+
+		200 ->
+			ok;
+
+		_ ->
+			throw( { unexpected_status_code, StatusCode } )
+
+	end,
 
 	{ FinOrderDirMap, BinLocUri, Nonce }.
 

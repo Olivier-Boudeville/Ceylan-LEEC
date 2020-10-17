@@ -167,6 +167,9 @@ create_private_key( _KeyFileInfo=KeyFilePath, _BinCertDirPath ) ->
 						[ san() ] ) -> letsencrypt:tls_csr().
 get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 
+	trace_utils:debug_fmt( "[~w] Generating certificate request for '~s.'",
+						   [ self(), BinDomain ] ),
+
 	Domain = text_utils:binary_to_string( BinDomain ),
 
 	KeyFilePath = file_utils:join( BinCertDirPath, Domain ++ ".key" ),
@@ -275,8 +278,8 @@ write_certificate( Domain, BinDomainCert, BinCertDirPath ) ->
 
 	CertFilePath = file_utils:join( BinCertDirPath, Domain ++ ".crt" ),
 
-	trace_utils:debug_fmt( "Writing domain certificate for domain '~s' "
-		"(in '~s'): ~p.", [ Domain, CertFilePath, BinDomainCert ] ),
+	trace_utils:debug_fmt( "Writing certificate for domain '~s' "
+		"in '~s': ~p.", [ Domain, CertFilePath, BinDomainCert ] ),
 
 	file_utils:write_whole( CertFilePath, BinDomainCert ),
 
