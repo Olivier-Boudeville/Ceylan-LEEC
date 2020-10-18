@@ -279,7 +279,7 @@ write_certificate( Domain, BinDomainCert, BinCertDirPath ) ->
 	CertFilePath = file_utils:join( BinCertDirPath, Domain ++ ".crt" ),
 
 	trace_utils:debug_fmt( "Writing certificate for domain '~s' "
-		"in '~s': ~p.", [ Domain, CertFilePath, BinDomainCert ] ),
+		"in '~s':~n  ~p.", [ Domain, CertFilePath, BinDomainCert ] ),
 
 	file_utils:write_whole( CertFilePath, BinDomainCert ),
 

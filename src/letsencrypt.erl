@@ -535,7 +535,10 @@ init( UserOptions ) ->
 % One callback function per state, akin to gen_fsm:
 -spec callback_mode() -> gen_statem:callback_mode().
 callback_mode() ->
-	state_functions.
+	% state_enter useful to trigger code once, when entering the 'finalize'
+	% state for the first time:
+	%
+	[ state_functions, state_enter ].
 
 
 
@@ -551,33 +554,38 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 	Timeout = ?base_timeout,
 
 	% Expected to be in the 'idle' state, hence to trigger idle({create,
-	% BinDomain, Opts }, _, LEState):
+	% BinDomain, Opts}, _, LEState):
 	%
 	CreationRes = case gen_statem:call( _ServerRef=FsmPid,
 				_Request={ create, BinDomain, OptionMap }, Timeout ) of
 
 		% State of FSM shall thus be 'idle' now:
 		ErrorTerm={ creation_failed, Error } ->
-			trace_utils:error_fmt( "Creation error reported: ~p.", [ Error ] ),
+			trace_utils:error_fmt( "Creation error reported by FSM ~w: ~p.",
+								   [ FsmPid, Error ] ),
 			{ error, ErrorTerm };
 
 		% State of FSM shall thus be 'pending' now; should then transition after
 		% some delay to 'valid'; we wait for it:
 		%
 		creation_pending ->
+
+			trace_utils:debug_fmt( "FSM ~w reported that creation is pending, "
+				"waiting for the validation of challenge(s).", [ FsmPid ] ),
+
 			case wait_challenges_valid( FsmPid ) of
 
 				ok ->
 					% So here the FSM is expected to have switched from
 					% 'pending' to 'valid'. Then:
 
-					% Most probably 'finalize':
-					Status = gen_statem:call( _ServerRef=FsmPid,
-											  _Req=switchTofinalize, Timeout ),
+					% Most probably 'valid':
+					_LastReadStatus = gen_statem:call( _ServerRef=FsmPid,
+											   _Req=switchTofinalize, Timeout ),
 
-					case wait_finalized( FsmPid, Status, _Count=20 ) of
+					case wait_creation_completed( FsmPid, _Count=20 ) of
 
-						ok ->
+						certificate_ready ->
 							trace_utils:debug_fmt( "Domain '~s' finalized "
 								"for ~w.", [ Domain, FsmPid ] ),
 							ok;
@@ -699,6 +707,10 @@ get_ongoing_challenges( FsmPid ) ->
 %  - 'idle' if process failed
 %  - 'pending' waiting for challenges to be complete
 %
+idle( _EventType=enter, _PreviousState, _Data ) ->
+	trace_utils:trace_fmt( "[~w] Entering the 'idle' state.", [ self() ] ),
+	keep_state_and_data;
+
 idle( _EventType={ call, From },
 	  _EventContentMsg=_Request={ create, BinDomain, OptionMap },
 	  _Data=LEState=#le_state{ directory_map=DirMap, private_key=PrivKey,
@@ -770,7 +782,7 @@ idle( _EventType={ call, From },
 		letsencrypt_api:request_new_certificate( DirMap, BinDomains, PrivKey,
 												 AccountJws, OptionMap ),
 
-	case maps:get( <<"status">>, AccountDecodedJsonMap ) of
+	case maps:get( <<"status">>, OrderDecodedJsonMap ) of
 
 		<<"pending">> ->
 			ok;
@@ -841,6 +853,10 @@ idle( EventType, EventContentMsg, _LEState ) ->
 % Returns a list of the challenges currently on-the-go with pre-computed
 % thumbprints, i.e. a thumbprint_map().
 %
+pending( _EventType=enter, _PreviousState, _Data ) ->
+	trace_utils:trace_fmt( "[~w] Entering the 'pending' state.", [ self() ] ),
+	keep_state_and_data;
+
 pending( _EventType={ call, From }, _EventContentMsg=get_ongoing_challenges,
 		 _Data=LEState=#le_state{ account_key=AccountKey,
 								  challenges=TypeChallengeMap } ) ->
@@ -945,16 +961,18 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 		_Acc0={ _InitialNextStateName=valid, InitialNonce },
 		_List=AuthorizationsUris ),
 
-	trace_utils:debug_fmt( "[~w] Check resulted in switching from 'pending' "
-						   "to '~s' state.", [ self(), NextStateName ] ),
 
 	% Be nice to ACME server:
 	case NextStateName of
 
 		pending ->
+			trace_utils:debug_fmt( "[~w] Remaining in 'pending' state.",
+									[ self() ] ),
 			timer:sleep( 1000 );
 
 		_ ->
+			trace_utils:debug_fmt( "[~w] Check resulted in switching from "
+				"'pending' to '~s' state.", [ self(), NextStateName ] ),
 			ok
 
 	end,
@@ -964,7 +982,6 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 	  _Action={ reply, From, _RetValue=NextStateName } };
 
 
-% Possibly switchTofinalize:
 pending( _EventType={ call, From }, _EventContentMsg=_Request=switchTofinalize,
 		 _Data=_LEState ) ->
 
@@ -1000,6 +1017,10 @@ pending( EventType, EventContentMsg, _LEState ) ->
 %
 % Transitions to 'finalize' state.
 %
+valid( _EventType=enter, _PreviousState, _Data ) ->
+	trace_utils:trace_fmt( "[~w] Entering the 'valid' state.", [ self() ] ),
+	keep_state_and_data;
+
 valid( _EventType={ call, _ServerRef=From },
 	   _EventContentMsg=_Request=switchTofinalize,
 	   _Data=LEState=#le_state{ mode=Mode, domain=BinDomain, sans=SANs,
@@ -1023,34 +1044,10 @@ valid( _EventType={ call, _ServerRef=From },
 	{ FinOrderDirMap, _BinLocUri, FinNonce } = letsencrypt_api:finalize_order(
 		OrderDirMap, Csr, PrivKey, Jws#jws{ nonce=Nonce }, OptionMap ),
 
-	BinStatus = case maps:get( <<"status">>, FinOrderDirMap,
-							   undefined_status ) of
+	BinStatus = maps:get( <<"status">>, FinOrderDirMap ),
 
-		undefined_status ->
-			throw( { lacking_status, FinOrderDirMap } );
-
-		S ->
-			S
-
-	end,
-
-	% Expected to be 'finalize':
-	NewStateName = case letsencrypt_api:binary_to_status( BinStatus ) of
-
-		finalize ->
-			finalize;
-
-		% Certainly happens:
-		valid ->
-			finalize;
-			%valid;
-
-		OtherStateName ->
-			trace_utils:warning_fmt( "New state after finalizing order is "
-									 "'~s'.", [ OtherStateName ] ),
-			OtherStateName
-
-	end,
+	% Expected to be 'finalize' sooner or later:
+	ReadStateName = letsencrypt_api:binary_to_status( BinStatus ),
 
 	% Update location in finalized order:
 	LocOrderDirMap = FinOrderDirMap#{
@@ -1060,8 +1057,11 @@ valid( _EventType={ call, _ServerRef=From },
 		cert_key_file_path=CreatedTLSPrivKey#tls_private_key.file_path,
 		nonce=FinNonce },
 
-	{ next_state, NewStateName, _NewData=FinalLEState,
-	  _Action={ reply, From, _Reply=NewStateName } };
+	trace_utils:trace_fmt( "[~w][state] Switching from 'valid' to 'finalize' "
+		"(after having read '~s').", [ self(), ReadStateName ] ),
+
+	{ next_state, _NewStateName=finalize, _NewData=FinalLEState,
+	  _Action={ reply, From, _Reply=ReadStateName } };
 
 
 valid( _EventType={ call, ServerRef }, _EventContentMsg=Request,
@@ -1087,57 +1087,78 @@ valid( EventType, EventContentMsg, _LEState ) ->
 %   state 'processing' : still ongoing
 %   state 'valid'      : certificate is ready
 %
-finalize( _EventType=processing, _EventContentMsg=_Domain,
-		  _Data=LEState=#le_state{ order=OrderMap, private_key=PrivKey,
-							jws=Jws, nonce=Nonce, option_map=OptionMap } ) ->
+finalize( _EventType=enter, _PreviousState, _Data ) ->
+	trace_utils:trace_fmt( "[~w] Entering the 'finalize' state.", [ self() ] ),
+	keep_state_and_data;
 
-	trace_utils:trace_fmt( "[~w] Finalizing (event type: processing).",
-						   [ self() ] ),
-
-	Loc = maps:get( <<"location">>, OrderMap, nil ),
-
-	{ NewOrderMap, _Loc, NewNonce } = letsencrypt_api:get_order( Loc, PrivKey,
-										 Jws#{ nonce => Nonce }, OptionMap ),
-
-	BinStatus = maps:get( <<"status">>, NewOrderMap, nil ),
-
-	Status = letsencrypt_api:binary_to_status( BinStatus ),
-
-	{ reply, Status, finalize,
-	  LEState#le_state{ order=NewOrderMap, nonce=NewNonce } };
-
-% Downloads certificate and saves it into file.
-%
-% Returns #{key, cert} where:
-%  - Key is certificate private key filename
-%  - Cert is certificate PEM filename
-%
-% Transitions to state 'idle': fsm complete, going back to initial state.
-%
-finalize( _EventType=valid, _EventContentMsg=_Domain,
+finalize( _EventType={ call, _ServerRef=From },
+		  _EventContentMsg=_Request=manageCreation,
 		  _Data=LEState=#le_state{ order=OrderMap, domain=BinDomain,
-			cert_key_file_path=KeyFilePath, cert_dir_path=BinCertDirPath,
-			private_key=PrivKey, jws=Jws, nonce=Nonce,
-			option_map=OptionMap } ) ->
+			  %cert_key_file_path=KeyFilePath,
+			  cert_dir_path=BinCertDirPath,
+			  private_key=PrivKey, jws=Jws, nonce=Nonce,
+			  option_map=OptionMap } ) ->
 
-	trace_utils:trace_fmt( "[~w] Finalizing now (event type: valid)...",
-						   [ self() ] ),
+	trace_utils:trace_fmt( "[~w] Getting progress of creation procedure "
+		"based on order map ~p.", [ self(), OrderMap ] ),
 
-	BinKeyFilePath = text_utils:string_to_binary( KeyFilePath ),
+	Loc = maps:get( <<"location">>, OrderMap ),
 
-	% Downloads certificate:
-	BinCert = letsencrypt_api:get_certificate( OrderMap, PrivKey,
-							Jws#{ nonce => Nonce }, OptionMap ),
+	{ NewOrderMap, _NullLoc, OrderNonce } = letsencrypt_api:get_order( Loc,
+					PrivKey, Jws#jws{ nonce=Nonce }, OptionMap ),
 
-	Domain = text_utils:binary_to_string( BinDomain ),
+	BinStatus = maps:get( <<"status">>, NewOrderMap ),
 
-	CertFilePath = letsencrypt_tls:write_certificate( Domain, BinCert,
-													  BinCertDirPath ),
+	ReadStatus = letsencrypt_api:binary_to_status( BinStatus ),
 
-	BinCertFilePath = text_utils:string_to_binary( CertFilePath ),
+	{ Reply, NewStateName, NewNonce } = case ReadStatus of
 
-	{ reply, { ok, #{ key => BinKeyFilePath, cert => BinCertFilePath } }, idle,
-	  LEState#le_state{ nonce=undefined } };
+		processing ->
+			trace_utils:trace_fmt( "[~w] Certificate creation still in "
+				"progress on server.", [ self() ] ),
+			{ creation_in_progress, finalize, OrderNonce };
+
+		% Downloads certificate and saves it into file.
+		%
+		% Transitions to state 'idle': fsm complete, going back to initial
+		% state.
+		%
+		valid ->
+			trace_utils:trace_fmt( "[~w] Finalizing certificate creation now.",
+								   [ self() ] ),
+
+			%BinKeyFilePath = text_utils:string_to_binary( KeyFilePath ),
+
+			% Downloads certificate:
+			BinCert = letsencrypt_api:get_certificate( OrderMap, PrivKey,
+							Jws#jws{ nonce=OrderNonce }, OptionMap ),
+
+			Domain = text_utils:binary_to_string( BinDomain ),
+
+			%BinCertFilePath = text_utils:string_to_binary( CertFilePath ),
+
+			_CertFilePath = letsencrypt_tls:write_certificate( Domain, BinCert,
+															  BinCertDirPath ),
+
+			trace_utils:trace_fmt( "[~w] Certificate generated, switching from "
+				   "'finalize' to the 'idle' state.", [ self() ] ),
+
+			{ certificate_ready, idle, undefined };
+
+
+		% Like for 'processing', yet with a different trace:
+		OtherStatus ->
+			trace_utils:warning_fmt( "[~w] Unexpected read status while "
+				"finalizing: '~s' (ignored).", [ self(), OtherStatus ] ),
+			{ creation_in_progress, finalize, OrderNonce }
+
+	end,
+
+	NewLEState = LEState#le_state{ order=NewOrderMap, nonce=NewNonce },
+
+	{ next_state, NewStateName, _NewData=NewLEState,
+	  _Action={ reply, From, Reply } };
+
 
 finalize( _EventType={ call, ServerRef }, _EventContentMsg=Request,
 		  _Data=LEState ) ->
@@ -1335,9 +1356,13 @@ wait_challenges_valid( FsmPid, Count, MaxCount ) ->
 				_Request=check_challenges_completed, _Timeout=15000 ) of
 
 		valid ->
+			trace_utils:debug_fmt( "FSM ~w reported that challenges are "
+								   "completed.", [ FsmPid ] ),
 			ok;
 
 		pending ->
+			trace_utils:debug_fmt( "FSM ~w reported that challenges are "
+								   "still pending.", [ FsmPid ] ),
 			timer:sleep( 500 * ( MaxCount - Count + 1 ) ),
 			wait_challenges_valid( FsmPid, Count - 1, MaxCount );
 
@@ -1351,50 +1376,54 @@ wait_challenges_valid( FsmPid, Count, MaxCount ) ->
 
 
 
-% Loops X times on order being finalized (waits incrementing time between each
-% trial).
+% Waits until the certification creation is reported as completed.
 %
 % Returns:
 %   - {error, timeout} if failed after X loops
 %   - {error, Err} if another error
 %   - {'ok', Response} if succeed
 %
--spec wait_finalized( fsm_pid(), status(), count() ) ->
+-spec wait_creation_completed( fsm_pid(), count() ) ->
 		  { 'ok', map() } | { 'error', 'timeout' | any() }.
-wait_finalized( FsmPid, Status, C ) ->
+wait_creation_completed( FsmPid, C ) ->
 
-	trace_utils:debug_fmt( "[~w] Waiting for status '~s'...",
-						   [ FsmPid, Status ] ),
+	trace_utils:debug_fmt( "[~w] Waiting for the completion of the certificate "
+		"creation...", [ FsmPid ] ),
 
-	wait_finalized( FsmPid, Status, C, C ).
+	wait_creation_completed( FsmPid, C, C ).
 
 
+
+% Waits until specified status is read.
+%
 % (helper)
--spec wait_finalized( fsm_pid(), status(), count(), count() ) ->
+%
+-spec wait_creation_completed( fsm_pid(), count(), count() ) ->
 		  { 'ok', map() } | { 'error', 'timeout' | any() }.
-wait_finalized( _FsmPid, _Status, _Count=0, _Max ) ->
+wait_creation_completed( _FsmPid, _Count=0, _Max ) ->
 	{ error, timeout };
 
-wait_finalized( FsmPid, Status, Count, Max ) ->
+wait_creation_completed( FsmPid, Count, Max ) ->
 
-	case gen_statem:call( FsmPid, _Req=get_status, ?base_timeout ) of
+	case gen_statem:call( _ServerRef=FsmPid, _Req=manageCreation,
+						  ?base_timeout ) of
 
-		Status ->
+		certificate_ready ->
+			trace_utils:debug_fmt( "End of waiting for creation: read target "
+				"status 'finalize' for ~w.", [ FsmPid ] ),
 			ok;
 
-		S when S =:= valid orelse S =:= processing ->
+		creation_in_progress ->
+			trace_utils:debug_fmt( "Still waiting for creation from ~w.",
+								   [ FsmPid ] ),
 			timer:sleep( 500 * ( Max - Count + 1 ) ),
-			wait_finalized( FsmPid, S, Count-1, Max );
+			wait_creation_completed( FsmPid, Count-1, Max );
 
-		P={ _, Error } ->
-			trace_utils:error_fmt( "wait_finalized received '~p' for ~w.",
-								   [ P, FsmPid ] ),
-			{ error, Error };
-
+		% Not expected to ever happen:
 		Any ->
-			trace_utils:warning_fmt( "wait_finalized received '~p' for ~w.",
-									 [ Any, FsmPid ] ),
-			Any
+			trace_utils:warning_fmt( "Received unexpected '~p' for ~w while "
+				"waiting for creation (ignored).", [ Any, FsmPid ] ),
+			wait_creation_completed( FsmPid, Count-1, Max )
 
 	end.
 
