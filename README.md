@@ -1,21 +1,19 @@
-**NOTE: still in-development, not usable at all yet!**
+# LEEC: Let's Encrypt Erlang with Ceylan
 
-# LEEC: letsencrypt-erlang-ceylan
+This library is yet another fork of the Let's Encrypt client library for Erlang
 
-This is yet another fork of the Let's Encrypt client library for Erlang, a
-Ceylan fork of the original and much appreciated
-[letsencrypt-erlang](https://github.com/gbour/letsencrypt-erlang) library whose
-author is Guillaume Bour.
+It is indeed a Ceylan fork of the original and much appreciated [letsencrypt-erlang](https://github.com/gbour/letsencrypt-erlang) library whose author is Guillaume Bour.
 
 The main differences introduced by LEEC are:
-- more comments, more spell-checking
+- more comments, more spell-checking, much clarification
 - more typing, more runtime checking
 - dependency onto [Ceylan-Myriad](https://github.com/Olivier-Boudeville/Ceylan-Myriad) added, to benefit from its facilities
-- JSON parser can be JSX (the default), or Jiffy
-- port from [gen_fsm](https://erlang.org/documentation/doc-6.1/lib/stdlib-2.1/doc/html/gen_fsm.html) (soon to be deprecated) to newer [gen_statem](https://erlang.org/doc/man/gen_statem.html)
-- fixed the compilation with Erlang version 23.1 and higher (ex: w.r.t. to http_uri/uri_string, to dependencies such as Jiffy, and newer Cowboy for the examples)
-- allow for concurrent certificate requests (ex: if having multiple virtual hosts all requesting new certificates at webserver start-up); so generating non-overlapping certificates and not using a *registered* gen_fsm anymore
-- connect_timeout deprecated in favor of http_timeout
+- JSON parser can be JSX (the default), or Jiffy (refer to the `JSON parsers` section)
+- porting done from [gen_fsm](https://erlang.org/documentation/doc-6.1/lib/stdlib-2.1/doc/html/gen_fsm.html) (soon to be deprecated) to the newer [gen_statem](https://erlang.org/doc/man/gen_statem.html)
+- minor API changes, for a clearer mode of operation
+- fixed the compilation with Erlang version 23.0 and higher (ex: w.r.t. to http_uri/uri_string, to updated dependencies such as Jiffy, and newer Cowboy for the examples)
+- allow for *concurrent* certificate requests (ex: if managing multiple virtual hosts, all requesting new certificates at webserver start-up); so LEEC generates certificates in parallel and does not rely on a *registered* FSM anymore
+- `connect_timeout` deprecated in favor of `http_timeout`
 
 
 ## Overview
@@ -26,16 +24,16 @@ Features:
 - [ ] registering client (with email)
 - [x] issuing RSA certificate
 - [ ] revoking certificate
-- [x] SAN certificate (Subject Alternative Names)
+- [?] SAN certificate (_Subject Alternative Names_; added yet not tested yet)
 - [ ] allow EC keys
 - [ ] choose RSA key length
-- [x] unittests
-- [x] hex package
+- [?] unittests (inherited from upstream, possibly still functional)
+- [?] hex package (inherited from upstream, possibly still functional)
 
 Modes
-- [x] webroot
-- [x] slave
-- [x] standalone (with http server)
+- [?] webroot (inherited from upstream, probably still functional)
+- [x] slave (main use case of interest with LEEC)
+- [?] based on a standalone http server (inherited from upstream, possibly still functional)
 
 Validation challenges
 - [x] http-01 (http)
@@ -44,7 +42,7 @@ Validation challenges
 
 ## Prerequisites
 - openssl >= 1.1.1 (required to generate RSA key and certificate request)
-- erlang OTP (tested with 23.1 versions and upwards)
+- Erlang OTP (tested with 23.1 versions and upwards)
 
 
 ## Building
@@ -54,13 +52,14 @@ Validation challenges
  $> ./rebar3 compile
 ```
 
-## Quickstart
+## Quickstart (as webroot)
 
 You must execute this example on the server targeted by _mydomain.tld_.
 
-Port 80 (http) must be opened and a webserver listening on it (line 1) and serving `/path/to/webroot/` content.
+TCP port 80 (`http`) must be opened, and a webserver listening on it (line 1) and serving `/path/to/webroot/` content shall be available.
 
-Both `/path/to/webroot` and `/path/to/certs` must be writable by the Erlang process (at least to create respectively any `/path/to/webroot/.well-known/acme-challenge/ANY_FILE` and `/path/to/certs/ANY_FILE`). One may use groups to isolate users and minimise assigned permissions (use `chgrp`/`chmod` for that, and `touch` to test).
+Both `/path/to/webroot` and `/path/to/certs` must be writable by the LEEC Erlang process (at least to create respectively any `/path/to/webroot/.well-known/acme-challenge/ANY_FILE` and `/path/to/certs/ANY_FILE`).
+One may use UNIX groups to isolate users and minimise assigned permissions (use `chgrp`/`chmod` for that, and `touch` to test).
 
 
 ```erlang
@@ -68,7 +67,8 @@ Both `/path/to/webroot` and `/path/to/certs` must be writable by the Erlang proc
  $> $(cd /path/to/webroot && python -m SimpleHTTPServer 80)&
  $> ./rebar3 shell
  $erl> application:ensure_all_started(letsencrypt).
- $erl> {ok, FsmPid } = letsencrypt:start([{mode,webroot},{webroot_dir_path,"/path/to/webroot"},{cert_dir_path,"/path/to/certs"}]).
+ $erl> {ok, FsmPid} = letsencrypt:start([{mode,webroot},{webroot_dir_path,"/path/to/webroot"},
+ {cert_dir_path,"/path/to/certs"}]).
  $erl> letsencrypt:obtain_certificate_for( <<"mydomain.tld">>, FsmPid, #{async => false}).
 {ok, #{cert => <<"/path/to/certs/mydomain.tld.crt">>, key => <<"/path/to/certs/mydomain.tld.key">>}}
  $erl> ^C
@@ -85,14 +85,19 @@ Both `/path/to/webroot` and `/path/to/certs` must be writable by the Erlang proc
 
   The overall process is [explained here](https://ietf-wg-acme.github.io/acme/draft-ietf-acme-acme.html#rfc.section.4).
 
-  During the certification process, the letsencrypt server returns challenge(s) and then tries to query a corresponding challenge file from the domain name asked to be certified.
-  So LEEC generates and writes such a challenge file under `/path/to/webroot` directory.
+  The LEEC agent gets in touch with the Let's Encrypt ACME server, authenticates itself (through a RSA key that it generated, nonces, etc.) and, based on the obtained URI directory, triggers the relevant operations on the ACME server, relying on a simple FSM (*Finite State Machine*) for that.
+
+  During the certification process, the ACME server returns challenge(s) and then tries to query a corresponding challenge answer through a file that it is to obtain from the domain name for which a certificate is requested (typically the ACME server attempts to download such a file from a webserver running on the domain of interest).
+
+  So LEEC (for `http-01` challenges), generates and writes such a challenge file under `/path/to/webroot` directory.
+
   Finally, keys and certificates are written in the `/path/to/certs` directory.
 
 ## Escript
 
-**bin/eletsencrypt** escript allows certificates management without any lines of Erlang.
-Configuration is defined in etc/eletsencrypt.yml. To be run only from the root of the repository (i.e. as bin/eletsencrypt).
+The `bin/eletsencrypt` Escript allows the management of certificates directly from the UNIX command-line.
+
+Its configuration is defined in `etc/eletsencrypt.yml`. It shall be run only from the root of the repository (i.e. as `bin/eletsencrypt`).
 
 Options:
  * **-h|--help**: show help
@@ -102,66 +107,57 @@ Options:
  * **-f|--force**: along with *-r*, force certificates renewal even if not expired
  * **-c|--config CONFIG-FILE**: use *CONFIG-FILE* configuration instead of default one
 
-Optionally, you can provide the domain you want to apply options as parameter
+Optionally, you can provide as parameter the domain you want to apply options.
 
 
 ## API
 NOTE: if _optional_ is not written, parameter is required
 
-* `letsencrypt:start(Params) :: starts letsencrypt client process`:
-Params is a list of parameters, choose from the followings:
-  * `staging` (optional): use staging API (generating fake certificates - default behavior is to use real API)
-  * `{mode, Mode}`: choose running mode, where `Mode` is one of `webroot`, `slave` or
-	`standalone`
-  * `{cert_dir_path, Path}`: pinpoint path to store generated certificates.
-	Must be writable by erlang process
-  * `{http_timeout, Timeout}` (integer, optional, default to 30000): http queries timeout
-	(in milliseconds)
+* `letsencrypt:start(Params)` :: starts the LEEC client process, creating a corresponding FSM (as a separate process):
+Params is a list of parameters, chosen from the following ones:
+  * `staging` (optional): use staging API (generating fake certificates - the default behavior is to use real API)
+  * `{mode, Mode}`: choose the mode of operation, where `Mode` is one of: `webroot`, `slave` and `standalone`
+  * `{cert_dir_path, Path}`: pinpoint the path where to store the generated certificates. Must be writable by the LEEC process
+  * `{http_timeout, Timeout}` (integer, optional, default to 30000 ms, i.e. 30 seconds): http queries timeout (in milliseconds)
 
 
   Mode-specific parameters:
-  * _webroot_ mode:
-	* `{webroot_dir_path, Path}`: pinpoint path to store challenge thumbprints.
-	  Must be writable by erlang process, and available through your webserver as root path
+  * _webroot_ mode: `{webroot_dir_path, Path}`: pinpoints the directory path where to store challenge thumbprints. Must be writable by the LEEC process, and available through the root path of your webserver
 
-  * _standalone_ mode:
-	* `{port, Port}` (optional, default to *80*): tcp port to listen for http query for
-	  challenge validation
+  * _standalone_ mode: `{port, Port}` (optional, default to `80`): TCP port to listen for http queries in the course of challenge validation
 
-  returns:
-	* `{ok, Pid}` with Pid the server process pid
+  Returns: `{ok, Pid}` with Pid is the PID of the LEEC client process
 
-* `letsencrypt:obtain_certificate_for(Domain, Opts) :: generate a new certificate for the considered domain name`:
-  * `Domain`: domain name (string or binary)
-  * `Opts`: options map
-	* `async` = true|false (optional, _true_ by default):
-	* `callback` (optional, used only when _async=true_): function called once certificate has been
-	  generated.
-	* `san` (list(binary), optional): supplementary domain names added to the certificate.
-	  `san is not available currently, will be reimplemented soon`.
-	* `challenge` (optional): 'http-01' (default)
+* `letsencrypt:obtain_certificate_for(Domain, Opts) :: generates a new certificate for the considered domain name`:
+  * `Domain`: domain name (type: string or binary)
+  * `Opts`: is a map of options, whose keys may be:
+	* `async` :: `boolean()` (optional, _true_ by default):
+	* `callback` (optional, used only when _async=true_): function called once the certificate has been generated
+	* `san` :: ``[binary()]`` (optional): supplementary domain names to be added to the certificate
+	* `challenge` (optional): 'http-01' (default, only supported type for the time being)
 
-  returns:
-	* in asynchronous mode, function returns `async`
+  Returns:
+	* in asynchronous mode, function returns `async` (certification operations are running in the background then)
 	* in synchronous mode, or as asynchronous callback function parameter:
 	  * `{ok, #{cert => <<"/path/to/cert">>, key => <<"/path/to/key">>}}` on success
 	  * `{error, Message}` on error
 
-  examples:
-	* sync mode (shell is locked several seconds waiting result)
+  Examples:
+	* sync mode (shell blocks for several seconds, waiting the corresponding result):
   ```erlang
+	> % Success:
 	> letsencrypt:obtain_certificate_for(<<"mydomain.tld">>, #{async => false}).
 	{ok, #{cert => <<"/path/to/cert">>, key => <<"/path/to/key">>}}
 
-	> % domain tld is incorrect
+	> % Domain tld is incorrect:
 	> letsencrypt:obtain_certificate_for(<<"invalid.tld">>, #{async => false}).
 	{error, <<"Error creating new authz :: Name does not end in a public suffix">>}
 
-	> % domain web server does not return challenge file (ie 404 error)
+	> % Domain webserver does not return a challenge file (i.e. 404 error):
 	> letsencrypt:obtain_certificate_for(<<"example.com">>, #{async => false}).
 	{error, <<"Invalid response from http://example.com/.well-known/acme-challenge/Bt"...>>}
 
-	> % returned challenge is wrong
+	> % Returned challenge is invalid:
 	> letsencrypt:obtain_certificate_for(<<"example.com">>, #{async => false}).
 	{error,<<"Error parsing key authorization file: Invalid key authorization: 1 parts">>}
 	or
@@ -169,7 +165,8 @@ Params is a list of parameters, choose from the followings:
 	or
 	{error,<<"The key authorization file from the server did not match this challenge"...>>>}
   ```
-	* async mode ('async' is written immediately)
+
+	* async mode ('async' is written immediately):
   ```erlang
 	> F = fun({Status, Result}) -> io:format("completed: ~p (result= ~p)~n") end.
 	> letsencrypt:obtain_certificate_for(<<"example.com">>, #{async => true, callback => F}).
@@ -179,24 +176,24 @@ Params is a list of parameters, choose from the followings:
 	completed: ok (result= #{cert => <<"/path/to/cert">>, key => <<"/path/to/key">>})
   ```
 
-	* SAN (`not available currently`)
+	* SAN:
   ```erlang
 	> letsencrypt:obtain_certificate_for(<<"example.com">>, #{async => false, san => [<<"www.example.com">>]}).
 	{ok, #{cert => <<"/path/to/cert">>, key => <<"/path/to/key">>}}
   ```
 
-	* explicit `'http-01'` challenge
+	* explicit `'http-01'` challenge:
   ```erlang
 	> letsencrypt:obtain_certificate_for(<<"example.com">>, #{async => false, challenge => 'http-01'}).
 	{ok, #{cert => <<"/path/to/cert">>, key => <<"/path/to/key">>}}
   ```
 
 
-## Action modes
+## Operation modes
 
-### webroot
+### As webroot
 
-*When you're running a webserver (ie apache or nginx) listening on public http port*.
+To be used when already running a webserver (e.g. _Apache_ or _Nginx_), listening on public http port #80:
 
 ```erlang
 on_complete({State, Data}) ->
@@ -216,9 +213,9 @@ main() ->
 	ok.
 ```
 
-### slave
+### As slave
 
-*When your erlang application is already running an erlang http server, listening on public http port (ie cowboy)*.
+To be used when already running an Erlang application as an http server, listening on public http port (e.g. _Cowboy_):
 
 ```erlang
 
@@ -241,7 +238,7 @@ main() ->
 	ok.
 ```
 
-my_letsencrypt_cowboy_handler.erl contains the code to returns letsencrypt thumbprint matching received token
+Here `my_letsencrypt_cowboy_handler.erl` contains the code to return the Let's Encrypt thumbprint(s) matching the received token(s):
 
 ```erlang
 -module(my_letsencrypt_cowboy_handler).
@@ -252,12 +249,12 @@ my_letsencrypt_cowboy_handler.erl contains the code to returns letsencrypt thumb
 init(_, Req, []) ->
 	{Host,_} = cowboy_req:host(Req),
 
-	% NOTES
-	%   - cowboy_req:binding() returns undefined is token not set in URI
-	%   - letsencrypt:get_challenge() returns 'error' if token+thumbprint are not available
+	% Notes:
+	%  - cowboy_req:binding() returns undefined is token not set in URI
+	%  - letsencrypt:get_challenge() returns 'error' if token+thumbprint are not available
 	%
 	Thumbprints = letsencrypt:get_challenge(),
-	{Token,_}   = cowboy_req:binding(token, Req),
+	{Token,_} = cowboy_req:binding(token, Req),
 
 	{ok, Req2} = case maps:get(Token, Thumprints, undefined) of
 		Thumbprint ->
@@ -276,12 +273,11 @@ terminate(Reason, Req, State) ->
 	ok.
 ```
 
-### standalone
+### As standalone
 
-*When you have no live http server running on your server*.
+To be used when you have no live http server running on your server.
 
-letsencrypt-erlang will start its own webserver just enough time to validate the challenge, then will
-stop it immediately after that.
+LEEC will then start its own webserver just during the time necessary in order to validate the challenge, then will stop it immediately after that.
 
 ```erlang
 
@@ -298,24 +294,23 @@ main() ->
 
 ## JSON parsers
 
-If wanting to switch from jsx to jiffy, following files shall be updated:
-- rebar.config
-- src/letsencrypt.app.src
+If wanting to switch from the default JSX to Jiffy, following files shall be updated:
+- [rebar.config](https://github.com/Olivier-Boudeville/letsencrypt-erlang/blob/master/rebar.config)
+- [src/letsencrypt.app.src](https://github.com/Olivier-Boudeville/letsencrypt-erlang/blob/master/src/letsencrypt.app.src)
 (none in Myriad)
 
 
-## About this fork
+## About this LEEC fork
 
-This is mostly a reckless fork, with so many differences (in terms of conventions, Myriad integration, whitespace cleanup) that a pull request is hardly conceivable.
+This is mostly a reckless fork, with so many differences (in terms of conventions, Myriad integration, whitespace cleanup) that a pull request can difficultly be considered.
 
-By some ways, the fork is safer and more robust than the original, by others not (ex: test coverage, continuous integration). A goal was to make it easier to understand and maintain.
+By some ways, this fork is safer and more robust than the original, by others not (ex: test coverage, continuous integration). A key goal was to make it easier to understand and maintain.
 
-Despite the apparences, it remained nevertheless very close to the original (just differences of form, mainly).
+In spite of the appearances, it remained nevertheless very close to the original (just differences of form, mainly).
 
 Most of the elements of [this pull request](https://github.com/gbour/letsencrypt-erlang/pull/16/) from Marc Worrell have also been integrated.
 
 
-
 ## License
 
-LEEC is distributed under APACHE 2.0 license, as the original work it derives from.
+LEEC is distributed under APACHE 2.0 license, like the original work it derives from.
