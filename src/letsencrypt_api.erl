@@ -69,7 +69,7 @@
 -endif.
 
 -ifdef(LEEC_DEBUG).
-	-define( debug( Fmt, Args ), trace_utils:debug_fmt( Fmt, Args ) ).
+	-define( debug( Fmt, Args ), trace_bridge:debug_fmt( Fmt, Args ) ).
 -else.
 	-define( debug( Fmt, Args ), ok ).
 -endif.
@@ -97,7 +97,7 @@ binary_to_status( <<"revoked">> ) ->
 	revoked;
 
 binary_to_status( InvalidBinStatus ) ->
-	trace_utils:error_fmt( "Invalid status: '~p'.", [ InvalidBinStatus ] ),
+	trace_bridge:error_fmt( "Invalid status: '~p'.", [ InvalidBinStatus ] ),
 	throw( { invalid_status, InvalidBinStatus } ).
 
 
@@ -135,7 +135,7 @@ get_tcp_connection( Proto, Host, Port ) ->
 
 		% Not found:
 		[] ->
-			trace_utils:debug_fmt( "[~w] Opening a connection to ~s:~B, "
+			trace_bridge:debug_fmt( "[~w] Opening a connection to ~s:~B, "
 				"with the '~s' scheme.", [ self(), Host, Port, Proto ] ),
 
 			Conn = case shotgun:open( Host, Port, Proto ) of
@@ -152,7 +152,7 @@ get_tcp_connection( Proto, Host, Port ) ->
 			Conn;
 
 		[ { _ConnectTriplet, Conn } ] ->
-			trace_utils:debug_fmt( "[~w] Reusing connection to ~s:~B, "
+			trace_bridge:debug_fmt( "[~w] Reusing connection to ~s:~B, "
 				"with the '~s' scheme: ~p.",
 				[ self(), Host, Port, Proto, Conn ] ),
 			Conn
@@ -169,18 +169,18 @@ get_tcp_connection( Proto, Host, Port ) ->
 					json_http_body().
 decode( _OptionMap=#{ json := true }, Response=#{ body := Body } ) ->
 
-	%trace_utils:debug_fmt( "Decoding from JSON following body:~n~p",
-	%					   [ Body ] ),
+	%trace_bridge:debug_fmt( "Decoding from JSON following body:~n~p",
+	%						[ Body ] ),
 
 	Payload = json_utils:from_json( Body ),
 
-	trace_utils:debug_fmt( "Payload decoded from JSON:~n  ~p", [ Payload ] ),
+	trace_bridge:debug_fmt( "Payload decoded from JSON:~n  ~p", [ Payload ] ),
 
 	Response#{ json => Payload };
 
 decode( _OptionMap, Response ) ->
-	trace_utils:debug_fmt( "Not requested to decode from JSON following "
-						   "response:~n~p", [ Response ] ),
+	trace_bridge:debug_fmt( "Not requested to decode from JSON following "
+							"response:~n~p", [ Response ] ),
 	Response.
 
 
@@ -253,8 +253,8 @@ request( Method, Uri, Headers, MaybeBinContent,
 
 	end,
 
-	trace_utils:debug_fmt( "[~w] The '~s' request to ~s resulted in:~n~p",
-						   [ self(), Method, UriStr, ReqRes ] ),
+	trace_bridge:debug_fmt( "[~w] The '~s' request to ~s resulted in:~n~p",
+							[ self(), Method, UriStr, ReqRes ] ),
 
 	% Typically success results in ReqRes like:
 
@@ -311,8 +311,8 @@ get_directory_map( Env, OptionMap ) ->
 
 	end,
 
-	trace_utils:debug_fmt( "[~w] Getting directory map at ~s.",
-						   [ self(), DirUri ] ),
+	trace_bridge:debug_fmt( "[~w] Getting directory map at ~s.",
+							[ self(), DirUri ] ),
 
 	#{ json := DirectoryMap, status_code := StatusCode } = request( _Method=get,
 		DirUri, _Headers=#{}, _MaybeBinContent=undefined,
@@ -328,8 +328,8 @@ get_directory_map( Env, OptionMap ) ->
 
 	end,
 
-	trace_utils:debug_fmt( "[~w] Obtained directory map:~n~p",
-						   [ self(), DirectoryMap ] ),
+	trace_bridge:debug_fmt( "[~w] Obtained directory map:~n~p",
+							[ self(), DirectoryMap ] ),
 
 	DirectoryMap.
 
@@ -341,7 +341,7 @@ get_directory_map( Env, OptionMap ) ->
 -spec get_nonce( directory_map(), option_map() ) -> nonce().
 get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap ) ->
 
-	trace_utils:debug_fmt( "[~w] Getting new nonce from ~s.", [ self(), Uri ] ),
+	trace_bridge:debug_fmt( "[~w] Getting new nonce from ~s.", [ self(), Uri ] ),
 
 	% Status code: 204 (No content):
 	#{ nonce := Nonce, status_code := StatusCode } = request( _Method=get, Uri,
@@ -357,7 +357,7 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap ) ->
 
 	end,
 
-	trace_utils:debug_fmt( "[~w] New nonce is: ~p.", [ self(), Nonce ] ),
+	trace_bridge:debug_fmt( "[~w] New nonce is: ~p.", [ self(), Nonce ] ),
 
 	Nonce.
 
@@ -378,8 +378,8 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap ) ->
 create_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 					 OptionMap ) ->
 
-	trace_utils:debug_fmt( "[~w] Requesting a new account from ~s.",
-						   [ self(), Uri ] ),
+	trace_bridge:debug_fmt( "[~w] Requesting a new account from ~s.",
+							[ self(), Uri ] ),
 
 	% Terms of service should not be automatically agreed:
 	Payload = #{ termsOfServiceAgreed => true,
@@ -401,7 +401,7 @@ create_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 
 	end,
 
-	trace_utils:debug_fmt( "[~w] Account location URI is '~s', "
+	trace_bridge:debug_fmt( "[~w] Account location URI is '~s', "
 		"JSON response is :~n  ~p", [ self(), LocationUri, Resp ] ),
 
 	{ Resp, LocationUri, NewNonce }.
@@ -425,8 +425,8 @@ create_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 						 PrivKey, AccountJws, OptionMap ) ->
 
-	trace_utils:debug_fmt( "[~w] Requesting a new certificate from ~s for ~p.",
-						   [ self(), OrderUri, BinDomains ] ),
+	trace_bridge:debug_fmt( "[~w] Requesting a new certificate from ~s for ~p.",
+							[ self(), OrderUri, BinDomains ] ),
 
 	Idns = [ #{ type => dns, value => BinDomain } || BinDomain <- BinDomains ],
 
@@ -449,7 +449,7 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 
 	end,
 
-	trace_utils:debug_fmt( "[~w] Obtained from order URI '~s' the "
+	trace_bridge:debug_fmt( "[~w] Obtained from order URI '~s' the "
 		"location '~s' and following JSON:~n  ~p",
 		[ self(), OrderUri, LocationUri, OrderJsonMap ] ),
 
@@ -473,7 +473,7 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 		  { json_map_decoded(), bin_uri(), nonce() }.
 get_order( Uri, Key, Jws, OptionMap ) ->
 
-	trace_utils:debug_fmt( "[~w] Getting order at ~s.", [ self(), Uri ] ),
+	trace_bridge:debug_fmt( "[~w] Getting order at ~s.", [ self(), Uri ] ),
 
 	% POST-as-GET implies no payload:
 
@@ -499,8 +499,8 @@ get_order( Uri, Key, Jws, OptionMap ) ->
 			 option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
 request_authorization( AuthUri, PrivKey, Jws, OptionMap ) ->
 
-	trace_utils:debug_fmt( "[~w] Requesting authorization from ~s.",
-						   [ self(), AuthUri ] ),
+	trace_bridge:debug_fmt( "[~w] Requesting authorization from ~s.",
+							[ self(), AuthUri ] ),
 
 	% POST-as-GET implies no payload:
 	B64AuthReq = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=AuthUri },
@@ -537,7 +537,7 @@ request_authorization( AuthUri, PrivKey, Jws, OptionMap ) ->
 notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
 							OptionMap ) ->
 
-	trace_utils:debug_fmt( "[~w] Notifying the ACME server that our agent is "
+	trace_bridge:debug_fmt( "[~w] Notifying the ACME server that our agent is "
 		"ready for challenge validation at ~s.", [ self(), Uri ] ),
 
 	% POST-as-GET implies no payload:
@@ -569,7 +569,7 @@ notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
 finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 				OptionMap ) ->
 
-	trace_utils:debug_fmt( "[~w] Finalizing order at ~s.", [ self(), FinUri ] ),
+	trace_bridge:debug_fmt( "[~w] Finalizing order at ~s.", [ self(), FinUri ] ),
 
 	Payload = #{ csr => Csr },
 
@@ -600,8 +600,8 @@ finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 		  bin_certificate().
 get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, OptionMap ) ->
 
-	trace_utils:debug_fmt( "[~w] Downloading certificate at ~s.",
-						   [ self(), Uri ] ),
+	trace_bridge:debug_fmt( "[~w] Downloading certificate at ~s.",
+							[ self(), Uri ] ),
 
 	% POST-as-GET implies no payload:
 	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined ),

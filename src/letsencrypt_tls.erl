@@ -73,8 +73,8 @@ create_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 
 	end,
 
-	trace_utils:debug_fmt( "[~w] A private key will be created in '~s'.",
-						   [ self(), UniqPath ] ),
+	trace_bridge:debug_fmt( "[~w] A private key will be created in '~s'.",
+							[ self(), UniqPath ] ),
 
 	% Could have been more elegant:
 	UniqFilename = file_utils:get_last_path_element( UniqPath ),
@@ -89,7 +89,7 @@ create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 	case file_utils:is_existing_file( KeyFilePath ) of
 
 		true ->
-			trace_utils:warning_fmt( "A '~s' key file was already existing, "
+			trace_bridge:warning_fmt( "A '~s' key file was already existing, "
 				"it will be overwritten.", [ KeyFilePath ] );
 
 		false ->
@@ -109,12 +109,12 @@ create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 		% RSA private key, 2048 bit long modulus (2 primes) [...]".
 		%
 		{ _ReturnCode=0, _CommandOutput } ->
-			%trace_utils:info_fmt( "Private key creation successful; "
+			%trace_bridge:info_fmt( "Private key creation successful; "
 			%  "following output was made: ~s.", [ CommandOutput ] );
 			ok;
 
 		{ ErrorCode, CommandOutput } ->
-			trace_utils:error_fmt(
+			trace_bridge:error_fmt(
 			  "Command for creating private key failed (error code: ~B): ~s.",
 			  [ ErrorCode, CommandOutput ] ),
 			throw( { private_key_generation_failed, ErrorCode, CommandOutput,
@@ -132,8 +132,8 @@ create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 
 	end,
 
-	trace_utils:debug_fmt( "[~w] Creation of private key in '~s' succeeded.",
-						   [ self(), KeyFilePath ] ),
+	trace_bridge:debug_fmt( "[~w] Creation of private key in '~s' succeeded.",
+							[ self(), KeyFilePath ] ),
 
 	% Now load it (next clause), and return it as a tls_private_key():
 	create_private_key( KeyFilePath, BinCertDirPath );
@@ -155,8 +155,8 @@ create_private_key( _KeyFileInfo=KeyFilePath, _BinCertDirPath ) ->
 				  letsencrypt_utils:b64encode( binary:encode_unsigned( E ) ) },
 	   file_path=KeyFilePath },
 
-	%trace_utils:debug_fmt( "[~w] Returning following private key:~n  ~p",
-	%					   [ self(), PrivKey ] ),
+	%trace_bridge:debug_fmt( "[~w] Returning following private key:~n  ~p",
+	%						[ self(), PrivKey ] ),
 
 	PrivKey.
 
@@ -167,8 +167,8 @@ create_private_key( _KeyFileInfo=KeyFilePath, _BinCertDirPath ) ->
 						[ san() ] ) -> letsencrypt:tls_csr().
 get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 
-	trace_utils:debug_fmt( "[~w] Generating certificate request for '~s.'",
-						   [ self(), BinDomain ] ),
+	trace_bridge:debug_fmt( "[~w] Generating certificate request for '~s.'",
+							[ self(), BinDomain ] ),
 
 	Domain = text_utils:binary_to_string( BinDomain ),
 
@@ -176,7 +176,7 @@ get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 
 	CertFilePath = file_utils:join( BinCertDirPath, Domain ++ ".csr" ),
 
-	%trace_utils:debug_fmt( "CSR file path: ~s.", [ CertFilePath ] ),
+	%trace_bridge:debug_fmt( "CSR file path: ~s.", [ CertFilePath ] ),
 
 	generate_certificate( request, BinDomain, CertFilePath, KeyFilePath, SANs ),
 
@@ -185,7 +185,7 @@ get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 	[ { 'CertificationRequest', Csr, not_encrypted } ] =
 		public_key:pem_decode( RawCsr ),
 
-	%trace_utils:debug_fmt( "Decoded CSR: ~p", [ Csr ] ),
+	%trace_bridge:debug_fmt( "Decoded CSR: ~p", [ Csr ] ),
 
 	letsencrypt_utils:b64encode( Csr ).
 
@@ -251,12 +251,12 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 			ok;
 
 		{ _ReturnCode=0, CommandOutput } ->
-			trace_utils:warning_fmt(
+			trace_bridge:warning_fmt(
 			  "Command output when generating certificate: ~s",
 			  [ CommandOutput ] );
 
 		{ ErrorCode, CommandOutput } ->
-			trace_utils:error_fmt(
+			trace_bridge:error_fmt(
 			  "Command for generating certificate failed (error code: ~B): ~s",
 			  [ ErrorCode, CommandOutput ] ),
 			throw( { certificate_generation_failed, ErrorCode, CommandOutput } )
@@ -278,7 +278,7 @@ write_certificate( Domain, BinDomainCert, BinCertDirPath ) ->
 
 	CertFilePath = file_utils:join( BinCertDirPath, Domain ++ ".crt" ),
 
-	trace_utils:debug_fmt( "Writing certificate for domain '~s' "
+	trace_bridge:debug_fmt( "Writing certificate for domain '~s' "
 		"in '~s':~n  ~p.", [ Domain, CertFilePath, BinDomainCert ] ),
 
 	file_utils:write_whole( CertFilePath, BinDomainCert ),

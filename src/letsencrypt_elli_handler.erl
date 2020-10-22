@@ -23,7 +23,7 @@
 
 % Handles specified requests, returns a reply with an http code.
 handle( Req, Args ) ->
-	%trace_utils:debug_fmt( "Elli: ~p~n~p", [ Req, Args ] ),
+	%trace_bridge:debug_fmt( "Elli: ~p~n~p", [ Req, Args ] ),
 	handle( elli_request:method( Req ), elli_request:path( Req ), Req, Args ).
 
 
@@ -39,21 +39,20 @@ handle( 'GET', [ <<".well-known">>, <<"acme-challenge">>, Token ], Req,
 
 	[ Host | _Port ] = binary:split( Header, <<":">> ),
 
-	%trace_utils:debug_fmt( "ELLI: host=~p.", [ Host ] ),
+	%trace_bridge:debug_fmt( "ELLI: host=~p.", [ Host ] ),
 
 	case maps:get( Host, Thumbprints, _Def=undefined ) of
 
 		#{ Token := Thumbprint } ->
 
-			%trace_utils:debug_fmt( "Token match: ~p -> ~p.",
+			%trace_bridge:debug_fmt( "Token match: ~p -> ~p.",
 			%                       [ Token, Thumbprint ] ),
 
 			{ 200, [ { <<"Content-Type">>, <<"text/plain">> } ], Thumbprint };
 
 		Other ->
-
-			trace_utils:debug_fmt( "No token match: ~p -> ~p.",
-								   [ Token, Other ] ),
+			trace_bridge:debug_fmt( "No token match: ~p -> ~p.",
+									[ Token, Other ] ),
 
 			{ 404, [], <<"Not Found">> }
 

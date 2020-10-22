@@ -422,8 +422,8 @@ obtain_certificate_for( Domain, FsmPid ) ->
 obtain_certificate_for( Domain, FsmPid, OptionMap=#{ async := false } ) ->
 
 	% Still in user process:
-	trace_utils:debug_fmt( "Requesting FSM ~w to generate sync certificate "
-						   "for domain '~s'.", [ FsmPid, Domain ] ),
+	trace_bridge:debug_fmt( "Requesting FSM ~w to generate sync certificate "
+							"for domain '~s'.", [ FsmPid, Domain ] ),
 
 	% Direct synchronous return:
 	obtain_cert_helper( Domain, FsmPid, OptionMap );
@@ -432,8 +432,8 @@ obtain_certificate_for( Domain, FsmPid, OptionMap=#{ async := false } ) ->
 % Default to async=true:
 obtain_certificate_for( Domain, FsmPid, OptionMap ) ->
 
-	trace_utils:debug_fmt( "Requesting FSM ~w to generate async certificate "
-						   "for domain '~s'.", [ FsmPid, Domain ] ),
+	trace_bridge:debug_fmt( "Requesting FSM ~w to generate async certificate "
+							"for domain '~s'.", [ FsmPid, Domain ] ),
 
 	% Asynchronous (either already true, or set to true if not):
 	_Pid = erlang:spawn_link( ?MODULE, obtain_cert_helper,
@@ -447,7 +447,7 @@ obtain_certificate_for( Domain, FsmPid, OptionMap ) ->
 -spec stop( fsm_pid() ) -> void().
 stop( FsmPid ) ->
 
-	trace_utils:trace_fmt( "Requesting ~w to stop.", [ FsmPid ] ),
+	trace_bridge:trace_fmt( "Requesting ~w to stop.", [ FsmPid ] ),
 
 	% No more gen_fsm:sync_send_all_state_event/2 available, so
 	% handle_call_for_all_states/4 will have to be called from all states
@@ -460,7 +460,7 @@ stop( FsmPid ) ->
 	% Not stopped here, as stopping is only going back to the 'idle' state:
 	%json_utils:stop_parser().
 
-	trace_utils:trace_fmt( "FSM ~w stopped (result: ~p).", [ FsmPid, Res ] ).
+	trace_bridge:trace_fmt( "FSM ~w stopped (result: ~p).", [ FsmPid, Res ] ).
 
 
 
@@ -482,7 +482,7 @@ init( UserOptions ) ->
 
 	LEState = setup_mode( get_options( UserOptions, _Blank=#le_state{} ) ),
 
-	trace_utils:debug_fmt( "[~w] Initial state:~n  ~p", [ self(), LEState ] ),
+	trace_bridge:debug_fmt( "[~w] Initial state:~n  ~p", [ self(), LEState ] ),
 
 	% Creates private key (a tls_private_key()) and initialises its JWS:
 	PrivateKey = letsencrypt_tls:create_private_key(
@@ -518,8 +518,8 @@ init( UserOptions ) ->
 
 	FirstNonce = letsencrypt_api:get_nonce( URLDirectoryMap, OptionMap ),
 
-	trace_utils:trace_fmt( "[~w][state] Switching initially to 'idle'.",
-						   [ self() ] ),
+	trace_bridge:trace_fmt( "[~w][state] Switching initially to 'idle'.",
+							[ self() ] ),
 
 	% Next transition typically triggered by user code calling
 	% obtain_certificate_for/{2,3}:
@@ -561,8 +561,8 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 
 		% State of FSM shall thus be 'idle' now:
 		ErrorTerm={ creation_failed, Error } ->
-			trace_utils:error_fmt( "Creation error reported by FSM ~w: ~p.",
-								   [ FsmPid, Error ] ),
+			trace_bridge:error_fmt( "Creation error reported by FSM ~w: ~p.",
+									[ FsmPid, Error ] ),
 			{ error, ErrorTerm };
 
 		% State of FSM shall thus be 'pending' now; should then transition after
@@ -570,7 +570,7 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 		%
 		creation_pending ->
 
-			trace_utils:debug_fmt( "FSM ~w reported that creation is pending, "
+			trace_bridge:debug_fmt( "FSM ~w reported that creation is pending, "
 				"waiting for the validation of challenge(s).", [ FsmPid ] ),
 
 			case wait_challenges_valid( FsmPid ) of
@@ -586,12 +586,12 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 					case wait_creation_completed( FsmPid, _Count=20 ) of
 
 						certificate_ready ->
-							trace_utils:debug_fmt( "Domain '~s' finalized "
+							trace_bridge:debug_fmt( "Domain '~s' finalized "
 								"for ~w.", [ Domain, FsmPid ] ),
 							ok;
 
 						Error ->
-							trace_utils:error_fmt( "Error for FSM ~w when "
+							trace_bridge:error_fmt( "Error for FSM ~w when "
 								"finalizing domain '~s': ~p.",
 								[ FsmPid, Domain, Error ] ),
 							Error
@@ -600,7 +600,7 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 
 				% Typically {error, timeout}:
 				OtherError ->
-					trace_utils:debug_fmt( "Reset of FSM ~w for '~s' "
+					trace_bridge:debug_fmt( "Reset of FSM ~w for '~s' "
 						"after error ~p.", [ FsmPid, Domain, OtherError ] ),
 					_ = gen_statem:call( _ServerRef=FsmPid, reset ),
 					OtherError
@@ -608,8 +608,8 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 			end;
 
 		Other ->
-			trace_utils:error_fmt( "Unexpected return after create for ~w: ~p",
-								   [ FsmPid, Other ] ),
+			trace_bridge:error_fmt( "Unexpected return after create for ~w: ~p",
+									[ FsmPid, Other ] ),
 			throw( { unexpected_create, Other, FsmPid } )
 
 	end,
@@ -619,7 +619,7 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 		true ->
 			Callback = maps:get( callback, OptionMap,
 				_DefaultCallback=fun( Ret ) ->
-					trace_utils:warning_fmt( "Default async callback called "
+					trace_bridge:warning_fmt( "Default async callback called "
 						"for ~w regarding result ~p.", [ FsmPid, Ret ] )
 								 end ),
 
@@ -630,8 +630,8 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 
 	end,
 
-	%trace_utils:debug_fmt( "Return for domain '~s' creation (FSM: ~w): ~p",
-	%                      [ Domain, FsmPid, CreationRes ] ),
+	%trace_bridge:debug_fmt( "Return for domain '~s' creation (FSM: ~w): ~p",
+	%                       [ Domain, FsmPid, CreationRes ] ),
 
 	CreationRes.
 
@@ -651,8 +651,8 @@ get_ongoing_challenges( FsmPid ) ->
 
 		% Process not started, wrong state, etc.:
 		{ 'EXIT', ExitReason } ->
-			trace_utils:error_fmt( "Challenge not obtained: ~p.",
-								   [ ExitReason ] ),
+			trace_bridge:error_fmt( "Challenge not obtained: ~p.",
+									[ ExitReason ] ),
 			error;
 
 		% Could be also 'no_challenge' if in 'idle' state.
@@ -708,7 +708,7 @@ get_ongoing_challenges( FsmPid ) ->
 %  - 'pending' waiting for challenges to be complete
 %
 idle( _EventType=enter, _PreviousState, _Data ) ->
-	trace_utils:trace_fmt( "[~w] Entering the 'idle' state.", [ self() ] ),
+	trace_bridge:trace_fmt( "[~w] Entering the 'idle' state.", [ self() ] ),
 	keep_state_and_data;
 
 idle( _EventType={ call, From },
@@ -716,7 +716,7 @@ idle( _EventType={ call, From },
 	  _Data=LEState=#le_state{ directory_map=DirMap, private_key=PrivKey,
 							   jws=Jws, nonce=Nonce } ) ->
 
-	trace_utils:trace_fmt( "[~w] While idle: received a certificate creation "
+	trace_bridge:trace_fmt( "[~w] While idle: received a certificate creation "
 		"request for domain '~s'.", [ self(), BinDomain ] ),
 
 	% Ex: 'http-01', 'tls-sni-01', etc.:
@@ -765,8 +765,8 @@ idle( _EventType={ call, From },
 
 	AccountKey = letsencrypt_tls:map_to_key( AccountKeyAsMap ),
 
-	trace_utils:trace_fmt( "[~w] The obtained ACME account key is:~n  ~p",
-						   [ self(), AccountKey ] ),
+	trace_bridge:trace_fmt( "[~w] The obtained ACME account key is:~n  ~p",
+							[ self(), AccountKey ] ),
 
 	AccountJws = #jws{ alg=Jws#jws.alg, kid=AccountLocationUri,
 					   nonce=AccountNonce },
@@ -818,8 +818,8 @@ idle( _EventType={ call, From },
 	FinalLEState = AuthLEState#le_state{ nonce=FinalNonce, order=LocOrder,
 										 challenges=NewUriChallengeMap },
 
-	trace_utils:trace_fmt( "[~w][state] Switching from 'idle' to '~s'.",
-						   [ self(), NewStateName ] ),
+	trace_bridge:trace_fmt( "[~w][state] Switching from 'idle' to '~s'.",
+							[ self(), NewStateName ] ),
 
 	{ next_state, NewStateName, _NewData=FinalLEState,
 	  _Action={ reply, From, Reply } };
@@ -828,7 +828,7 @@ idle( _EventType={ call, From },
 idle( _EventType={ call, From },
 	  _EventContentMsg=_Request=get_ongoing_challenges, _Data=_LEState ) ->
 
-	trace_utils:warning_fmt( "Received a get_ongoing_challenges request event "
+	trace_bridge:warning_fmt( "Received a get_ongoing_challenges request event "
 		"from ~w while being idle.", [ From ] ),
 
 	% Clearer than {next_state, idle, LEState, {reply, From,
@@ -854,20 +854,20 @@ idle( EventType, EventContentMsg, _LEState ) ->
 % thumbprints, i.e. a thumbprint_map().
 %
 pending( _EventType=enter, _PreviousState, _Data ) ->
-	trace_utils:trace_fmt( "[~w] Entering the 'pending' state.", [ self() ] ),
+	trace_bridge:trace_fmt( "[~w] Entering the 'pending' state.", [ self() ] ),
 	keep_state_and_data;
 
 pending( _EventType={ call, From }, _EventContentMsg=get_ongoing_challenges,
 		 _Data=LEState=#le_state{ account_key=AccountKey,
 								  challenges=TypeChallengeMap } ) ->
 
-	trace_utils:trace_fmt( "[~w] Getting ongoing challenges.", [ self() ] ),
+	trace_bridge:trace_fmt( "[~w] Getting ongoing challenges.", [ self() ] ),
 
 	ThumbprintMap = maps:from_list( [ { Token,
 		_Thumbprint=letsencrypt_jws:get_key_authorization( AccountKey, Token ) }
 		  || #{ <<"token">> := Token } <- maps:values( TypeChallengeMap ) ] ),
 
-	trace_utils:trace_fmt( "[~w] Returning from pending state challenge "
+	trace_bridge:trace_fmt( "[~w] Returning from pending state challenge "
 		"thumbprint map ~p.", [ self(), ThumbprintMap ] ),
 
 	{ next_state, _SameState=pending, _Data=LEState,
@@ -889,8 +889,8 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 						  nonce=InitialNonce, private_key=PrivKey, jws=Jws,
 						  option_map=OptionMap } ) ->
 
-	trace_utils:trace_fmt( "[~w] Checking whether challenges are completed.",
-						   [ self() ] ),
+	trace_bridge:trace_fmt( "[~w] Checking whether challenges are completed.",
+							[ self() ] ),
 
 	% Checking the status for each authorization URI:
 	{ NextStateName, ResultingNonce } = lists:foldl(
@@ -903,7 +903,7 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 
 			BinStatus = maps:get( <<"status">>, AuthJsonMap ),
 
-			trace_utils:debug_fmt( "[~w] For auth URI ~s, received "
+			trace_bridge:debug_fmt( "[~w] For auth URI ~s, received "
 				"status '~s'.", [ self(), AuthUri, BinStatus ] ),
 
 			NewStateName = case { AccStateName, BinStatus } of
@@ -920,32 +920,32 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 
 				% Expecting AnyState to be generally 'valid':
 				{ AnyState, <<"deactivated">> } ->
-					trace_utils:warning_fmt( "[~w] For auth URI ~s, switching "
+					trace_bridge:warning_fmt( "[~w] For auth URI ~s, switching "
 						"from '~s' to unsupported 'deactivated' state.",
 						[ self(), AnyState, AuthUri ] ),
 					deactivated;
 
 				{ AnyState, <<"expired">> } ->
-					trace_utils:warning_fmt( "[~w] For auth URI ~s, switching "
+					trace_bridge:warning_fmt( "[~w] For auth URI ~s, switching "
 						"from '~s' to unsupported 'expired' state.",
 						[ self(), AnyState, AuthUri ] ),
 					expired;
 
 				{ AnyState, <<"revoked">> } ->
-					trace_utils:warning_fmt( "[~w] For auth URI ~s, switching "
+					trace_bridge:warning_fmt( "[~w] For auth URI ~s, switching "
 						"from '~s' to unsupported 'revoked' state.",
 						[ self(), AnyState, AuthUri ] ),
 					revoked;
 
 				% By default remains in the current state (including 'pending'):
 				{ AccStateName, AnyBinStatus } ->
-					trace_utils:trace_fmt( "[~w] For auth URI ~s, staying "
+					trace_bridge:trace_fmt( "[~w] For auth URI ~s, staying "
 						"in '~s' despite having received status '~p'.",
 						[ self(), AuthUri, AccStateName, AnyBinStatus ] ),
 					AccStateName;
 
 				{ AnyOtherState, UnexpectedBinStatus } ->
-					trace_utils:error_fmt( "[~w] For auth URI ~s, "
+					trace_bridge:error_fmt( "[~w] For auth URI ~s, "
 						"while in '~s' state, received unexpected status '~p'.",
 						[ self(), AuthUri, AnyOtherState,
 						  UnexpectedBinStatus ] ),
@@ -966,12 +966,12 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 	case NextStateName of
 
 		pending ->
-			trace_utils:debug_fmt( "[~w] Remaining in 'pending' state.",
+			trace_bridge:debug_fmt( "[~w] Remaining in 'pending' state.",
 									[ self() ] ),
 			timer:sleep( 1000 );
 
 		_ ->
-			trace_utils:debug_fmt( "[~w] Check resulted in switching from "
+			trace_bridge:debug_fmt( "[~w] Check resulted in switching from "
 				"'pending' to '~s' state.", [ self(), NextStateName ] ),
 			ok
 
@@ -985,7 +985,7 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 pending( _EventType={ call, From }, _EventContentMsg=_Request=switchTofinalize,
 		 _Data=_LEState ) ->
 
-	trace_utils:trace_fmt( "[~w] Received, while in 'pending' state, "
+	trace_bridge:trace_fmt( "[~w] Received, while in 'pending' state, "
 		"request '~s' from ~w, currently ignored.", [ self(), From ] ),
 
 	% { next_state, finalize, ...}?
@@ -999,7 +999,7 @@ pending( _EventType={ call, ServerRef }, _EventContentMsg=Request,
 
 pending( EventType, EventContentMsg, _LEState ) ->
 
-	trace_utils:warning_fmt( "[~w] Received, while in 'pending' state, "
+	trace_bridge:warning_fmt( "[~w] Received, while in 'pending' state, "
 		"event type '~p' and content message '~p'.",
 		[ self(), EventType, EventContentMsg ] ),
 
@@ -1018,7 +1018,7 @@ pending( EventType, EventContentMsg, _LEState ) ->
 % Transitions to 'finalize' state.
 %
 valid( _EventType=enter, _PreviousState, _Data ) ->
-	trace_utils:trace_fmt( "[~w] Entering the 'valid' state.", [ self() ] ),
+	trace_bridge:trace_fmt( "[~w] Entering the 'valid' state.", [ self() ] ),
 	keep_state_and_data;
 
 valid( _EventType={ call, _ServerRef=From },
@@ -1028,8 +1028,8 @@ valid( _EventType={ call, _ServerRef=From },
 			private_key=PrivKey, jws=Jws, nonce=Nonce,
 			option_map=OptionMap } ) ->
 
-	trace_utils:trace_fmt( "[~w] Trying to switch to finalize while being "
-						   "in the 'valid' state.", [ self() ] ),
+	trace_bridge:trace_fmt( "[~w] Trying to switch to finalize while being "
+							"in the 'valid' state.", [ self() ] ),
 
 	challenge_destroy( Mode, LEState ),
 
@@ -1057,7 +1057,7 @@ valid( _EventType={ call, _ServerRef=From },
 		cert_key_file_path=CreatedTLSPrivKey#tls_private_key.file_path,
 		nonce=FinNonce },
 
-	trace_utils:trace_fmt( "[~w][state] Switching from 'valid' to 'finalize' "
+	trace_bridge:trace_fmt( "[~w][state] Switching from 'valid' to 'finalize' "
 		"(after having read '~s').", [ self(), ReadStateName ] ),
 
 	{ next_state, _NewStateName=finalize, _NewData=FinalLEState,
@@ -1088,7 +1088,7 @@ valid( EventType, EventContentMsg, _LEState ) ->
 %   state 'valid'      : certificate is ready
 %
 finalize( _EventType=enter, _PreviousState, _Data ) ->
-	trace_utils:trace_fmt( "[~w] Entering the 'finalize' state.", [ self() ] ),
+	trace_bridge:trace_fmt( "[~w] Entering the 'finalize' state.", [ self() ] ),
 	keep_state_and_data;
 
 finalize( _EventType={ call, _ServerRef=From },
@@ -1099,7 +1099,7 @@ finalize( _EventType={ call, _ServerRef=From },
 			  private_key=PrivKey, jws=Jws, nonce=Nonce,
 			  option_map=OptionMap } ) ->
 
-	trace_utils:trace_fmt( "[~w] Getting progress of creation procedure "
+	trace_bridge:trace_fmt( "[~w] Getting progress of creation procedure "
 		"based on order map ~p.", [ self(), OrderMap ] ),
 
 	Loc = maps:get( <<"location">>, OrderMap ),
@@ -1114,7 +1114,7 @@ finalize( _EventType={ call, _ServerRef=From },
 	{ Reply, NewStateName, NewNonce } = case ReadStatus of
 
 		processing ->
-			trace_utils:trace_fmt( "[~w] Certificate creation still in "
+			trace_bridge:trace_fmt( "[~w] Certificate creation still in "
 				"progress on server.", [ self() ] ),
 			{ creation_in_progress, finalize, OrderNonce };
 
@@ -1124,8 +1124,8 @@ finalize( _EventType={ call, _ServerRef=From },
 		% state.
 		%
 		valid ->
-			trace_utils:trace_fmt( "[~w] Finalizing certificate creation now.",
-								   [ self() ] ),
+			trace_bridge:trace_fmt( "[~w] Finalizing certificate creation now.",
+									[ self() ] ),
 
 			%BinKeyFilePath = text_utils:string_to_binary( KeyFilePath ),
 
@@ -1140,7 +1140,7 @@ finalize( _EventType={ call, _ServerRef=From },
 			_CertFilePath = letsencrypt_tls:write_certificate( Domain, BinCert,
 															  BinCertDirPath ),
 
-			trace_utils:trace_fmt( "[~w] Certificate generated, switching from "
+			trace_bridge:trace_fmt( "[~w] Certificate generated, switching from "
 				   "'finalize' to the 'idle' state.", [ self() ] ),
 
 			{ certificate_ready, idle, undefined };
@@ -1148,7 +1148,7 @@ finalize( _EventType={ call, _ServerRef=From },
 
 		% Like for 'processing', yet with a different trace:
 		OtherStatus ->
-			trace_utils:warning_fmt( "[~w] Unexpected read status while "
+			trace_bridge:warning_fmt( "[~w] Unexpected read status while "
 				"finalizing: '~s' (ignored).", [ self(), OtherStatus ] ),
 			{ creation_in_progress, finalize, OrderNonce }
 
@@ -1168,8 +1168,8 @@ finalize( _EventType={ call, ServerRef }, _EventContentMsg=Request,
 
 finalize( UnexpectedEventType, EventContentMsg, _LEState ) ->
 
-	trace_utils:error_fmt( "Unknown event ~p (content: ~p) in finalize status.",
-						  [ UnexpectedEventType, EventContentMsg ] ),
+	trace_bridge:error_fmt( "Unknown event ~p (content: ~p) in finalize status.",
+							[ UnexpectedEventType, EventContentMsg ] ),
 
 	%{ reply, { error, UnexpectedEventType }, finalize, LEState }.
 
@@ -1193,8 +1193,8 @@ finalize( UnexpectedEventType, EventContentMsg, _LEState ) ->
 handle_call_for_all_states( ServerRef, _Request=get_status, StateName,
 							_LEState ) ->
 
-	trace_utils:debug_fmt( "[~w] Returning current status: '~s'.",
-						   [ ServerRef, StateName ] ),
+	trace_bridge:debug_fmt( "[~w] Returning current status: '~s'.",
+							[ ServerRef, StateName ] ),
 
 	Res = StateName,
 
@@ -1204,8 +1204,8 @@ handle_call_for_all_states( ServerRef, _Request=get_status, StateName,
 handle_call_for_all_states( ServerRef, _Request=stop, StateName,
 							LEState=#le_state{ mode=Mode } ) ->
 
-	trace_utils:debug_fmt( "[~w] Received a stop request from ~s state.",
-						   [ ServerRef, StateName ] ),
+	trace_bridge:debug_fmt( "[~w] Received a stop request from ~s state.",
+							[ ServerRef, StateName ] ),
 
 	challenge_destroy( Mode, LEState ),
 
@@ -1219,7 +1219,7 @@ handle_call_for_all_states( ServerRef, _Request=stop, StateName,
 
 handle_call_for_all_states( ServerRef, Request, StateName, _LEState ) ->
 
-	trace_utils:error_fmt( "[~w] Received an unexpected request, ~p, "
+	trace_bridge:error_fmt( "[~w] Received an unexpected request, ~p, "
 		"while in state ~p.", [ ServerRef, Request, StateName ] ),
 
 	throw( { unexpected_request, Request, ServerRef, StateName } ).
@@ -1290,7 +1290,7 @@ get_options( _Opts=[ { http_timeout, Timeout } | T ], LEState ) ->
 				  option_map=#{ netopts => #{ timeout => Timeout } } } );
 
 get_options( _Opts=[ Unexpected | _T ], _LEState ) ->
-	trace_utils:error_fmt( "Invalid option: ~p.", [ Unexpected ] ),
+	trace_bridge:error_fmt( "Invalid option: ~p.", [ Unexpected ] ),
 	throw( { invalid_option, Unexpected } ).
 
 
@@ -1298,7 +1298,7 @@ get_options( _Opts=[ Unexpected | _T ], _LEState ) ->
 % Setups the context of chosen mode.
 -spec setup_mode( le_state() ) -> le_state().
 setup_mode( #le_state{ mode=webroot, webroot_path=undefined } ) ->
-	trace_utils:error( "Missing 'webroot_path' parameter." ),
+	trace_bridge:error( "Missing 'webroot_path' parameter." ),
 	throw( webroot_path_missing );
 
 setup_mode( LEState=#le_state{ mode=webroot, webroot_path=BinWebrootPath } ) ->
@@ -1322,7 +1322,7 @@ setup_mode( LEState=#le_state{ mode=slave } ) ->
 
 % Every other mode value is invalid:
 setup_mode( #le_state{ mode=Mode } ) ->
-	trace_utils:error_fmt( "Invalid '~p' mode.", [ Mode ] ),
+	trace_bridge:error_fmt( "Invalid '~p' mode.", [ Mode ] ),
 	throw( { invalid_mode, Mode } ).
 
 
@@ -1356,13 +1356,13 @@ wait_challenges_valid( FsmPid, Count, MaxCount ) ->
 				_Request=check_challenges_completed, _Timeout=15000 ) of
 
 		valid ->
-			trace_utils:debug_fmt( "FSM ~w reported that challenges are "
-								   "completed.", [ FsmPid ] ),
+			trace_bridge:debug_fmt( "FSM ~w reported that challenges are "
+									"completed.", [ FsmPid ] ),
 			ok;
 
 		pending ->
-			trace_utils:debug_fmt( "FSM ~w reported that challenges are "
-								   "still pending.", [ FsmPid ] ),
+			trace_bridge:debug_fmt( "FSM ~w reported that challenges are "
+									"still pending.", [ FsmPid ] ),
 			timer:sleep( 500 * ( MaxCount - Count + 1 ) ),
 			wait_challenges_valid( FsmPid, Count - 1, MaxCount );
 
@@ -1387,7 +1387,7 @@ wait_challenges_valid( FsmPid, Count, MaxCount ) ->
 		  { 'ok', map() } | { 'error', 'timeout' | any() }.
 wait_creation_completed( FsmPid, C ) ->
 
-	trace_utils:debug_fmt( "[~w] Waiting for the completion of the certificate "
+	trace_bridge:debug_fmt( "[~w] Waiting for the completion of the certificate "
 		"creation...", [ FsmPid ] ),
 
 	wait_creation_completed( FsmPid, C, C ).
@@ -1409,19 +1409,19 @@ wait_creation_completed( FsmPid, Count, Max ) ->
 						  ?base_timeout ) of
 
 		certificate_ready ->
-			trace_utils:debug_fmt( "End of waiting for creation: read target "
+			trace_bridge:debug_fmt( "End of waiting for creation: read target "
 				"status 'finalize' for ~w.", [ FsmPid ] ),
 			ok;
 
 		creation_in_progress ->
-			trace_utils:debug_fmt( "Still waiting for creation from ~w.",
-								   [ FsmPid ] ),
+			trace_bridge:debug_fmt( "Still waiting for creation from ~w.",
+									[ FsmPid ] ),
 			timer:sleep( 500 * ( Max - Count + 1 ) ),
 			wait_creation_completed( FsmPid, Count-1, Max );
 
 		% Not expected to ever happen:
 		Any ->
-			trace_utils:warning_fmt( "Received unexpected '~p' for ~w while "
+			trace_bridge:warning_fmt( "Received unexpected '~p' for ~w while "
 				"waiting for creation (ignored).", [ Any, FsmPid ] ),
 			wait_creation_completed( FsmPid, Count-1, Max )
 
@@ -1435,7 +1435,7 @@ wait_creation_completed( FsmPid, Count, Max ) ->
 perform_authorization( ChallengeType, AuthUris,
 					   LEState=#le_state{ mode=Mode } ) ->
 
-	trace_utils:trace_fmt( "[~w] Starting authorization procedure with "
+	trace_bridge:trace_fmt( "[~w] Starting authorization procedure with "
 		"challenge type '~s' (mode: ~s).", [ self(), ChallengeType, Mode ] ),
 
 	BinChallengeType = text_utils:atom_to_binary( ChallengeType ),
@@ -1443,8 +1443,8 @@ perform_authorization( ChallengeType, AuthUris,
 	{ UriChallengeMap, Nonce } = perform_authorization_step1( AuthUris,
 				BinChallengeType, LEState, _UriChallengeMap=#{} ),
 
-	trace_utils:debug_fmt( "[~w] URI challenge map after step 1:~n  ~p.",
-						   [ self(), UriChallengeMap ] ),
+	trace_bridge:debug_fmt( "[~w] URI challenge map after step 1:~n  ~p.",
+							[ self(), UriChallengeMap ] ),
 
 	% UriChallengeMap is like:
 	%
@@ -1492,8 +1492,8 @@ perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 	{ AuthMap, _LocUri, NewNonce } = letsencrypt_api:request_authorization(
 		AuthUri, PrivKey, Jws#jws{ nonce=Nonce }, OptionMap ),
 
-	trace_utils:debug_fmt( "[~w] Step 1: authmap returned for URI '~s':~n  ~p.",
-						   [ self(), AuthUri, AuthMap ] ),
+	trace_bridge:debug_fmt( "[~w] Step 1: authmap returned for URI '~s':~n  ~p.",
+							[ self(), AuthUri, AuthMap ] ),
 
 	% Ex: AuthMap =
 	% #{<<"challenges">> =>
@@ -1615,8 +1615,8 @@ init_for_challenge_type( ChallengeType, _Mode=standalone,
 			#le_state{ port=Port, domain=Domain, account_key=AccntKey },
 			UriChallengeMap ) ->
 
-	%trace_utils:debug_fmt( "Init standalone challenge for ~p.",
-	%                       [ ChallengeType ] ),
+	%trace_bridge:debug_fmt( "Init standalone challenge for ~p.",
+	%                        [ ChallengeType ] ),
 
 	case ChallengeType of
 
@@ -1645,8 +1645,8 @@ init_for_challenge_type( ChallengeType, _Mode=standalone,
 		%   TODO
 
 		_ ->
-			trace_utils:error_fmt( "Standalone mode: unsupported ~p challenge "
-								   "type.", [ ChallengeType ] ),
+			trace_bridge:error_fmt( "Standalone mode: unsupported ~p challenge "
+									"type.", [ ChallengeType ] ),
 
 			throw( { unsupported_challenge_type, ChallengeType, standalone } )
 

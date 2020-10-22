@@ -70,8 +70,8 @@ init( #tls_private_key{ b64_pair={ N, E } } ) ->
 -spec encode( tls_private_key(), jws(), content() ) -> letsencrypt:binary_b64().
 encode( PrivateKey, Jws, Content ) ->
 
-	trace_utils:debug_fmt( "Encoding to JSON following JWS:~n  ~p~n"
-						   "with content: ~p", [ Jws, Content ] ),
+	trace_bridge:debug_fmt( "Encoding to JSON following JWS:~n  ~p~n"
+							"with content: ~p", [ Jws, Content ] ),
 
 	Protected = letsencrypt_utils:jsonb64encode( jws_to_map( Jws ) ),
 
