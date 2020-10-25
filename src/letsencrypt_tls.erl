@@ -268,7 +268,7 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 
 
 
-% Writes specified certificate.
+% Writes specified certificate, overwriting any prior one.
 %
 % Domain certificate only.
 %
@@ -280,6 +280,9 @@ write_certificate( Domain, BinDomainCert, BinCertDirPath ) ->
 
 	trace_bridge:debug_fmt( "Writing certificate for domain '~s' "
 		"in '~s':~n  ~p.", [ Domain, CertFilePath, BinDomainCert ] ),
+
+	% For example in case of renewal:
+	file_utils:remove_file_if_existing( CertFilePath ),
 
 	file_utils:write_whole( CertFilePath, BinDomainCert ),
 

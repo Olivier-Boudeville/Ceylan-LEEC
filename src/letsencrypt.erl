@@ -21,10 +21,10 @@
 -module(letsencrypt).
 
 % Original work:
--author("Guillaume Bour <guillaume@bour.cc>").
+-author("Guillaume Bour (guillaume at bour dot cc)").
 
 % This fork:
--author("Olivier Boudeville <olivier.boudeville@esperide.com>").
+-author("Olivier Boudeville (olivier dot boudeville at esperide dot com").
 
 
 % Replaces the deprecated gen_fsm; we use here the 'state_functions' callback
@@ -78,8 +78,12 @@
 -type domain() :: net_utils:string_fqdn() | bin_domain().
 
 
-% Three ways of interfacing with user code:
+% Three ways of interfacing LEEC with user code:
 -type le_mode() :: 'webroot' | 'slave' | 'standalone'.
+
+
+% The PID of a LEEC FSM:
+-type fsm_pid() :: pid().
 
 
 % Note: only the 'http-01' challenge is supported currently.
@@ -128,7 +132,13 @@
 
 
 % A user-specified option:
--type user_option() :: atom() | { atom(), any() }.
+-type user_option() :: 'staging'
+					 | { 'mode', le_mode() }
+					 | { 'key_file_path', any_file_path() }
+					 | { 'cert_dir_path', any_directory_path() }
+					 | { 'webroot_dir_path', any_directory_path() }
+					 | { 'port', tcp_port() }
+					 | { 'http_timeout', unit_utils:milliseconds() }.
 
 
 % User options.
@@ -179,7 +189,8 @@
 -type json_map_decoded() :: map().
 
 
--type key_file_info() :: { 'new', file_name() } | file_path().
+% Information regarding the private key of the LEEC agent:
+-type agent_key_file_info() :: { 'new', file_path() } | file_path().
 
 
 % A certificate, as a binary:
@@ -215,14 +226,14 @@
 -type certificate() :: #certificate{}.
 
 
--export_type([ bin_domain/0, domain/0, le_mode/0,
+-export_type([ bin_domain/0, domain/0, le_mode/0, fsm_pid/0,
 			   challenge_type/0, bin_challenge_type/0,
 			   token/0, thumbprint/0, thumbprint_map/0,
 			   string_uri/0, bin_uri/0, uri/0,
 			   challenge/0, uri_challenge_map/0, type_challenge_map/0,
 			   user_option/0, option_id/0, option_map/0,
 			   acme_operation/0, directory_map/0, nonce/0,
-			   san/0, bin_san/0, json_map_decoded/0, key_file_info/0,
+			   san/0, bin_san/0, json_map_decoded/0, agent_key_file_info/0,
 			   bin_certificate/0, bin_key/0, bin_csr_key/0,
 			   jws_algorithm/0, binary_b64/0, key_auth/0,
 			   tls_private_key/0, key/0, jws/0, certificate/0 ]).
@@ -230,6 +241,10 @@
 
 % Where Let's Encrypt will attempt to find answers to its http-01 challenges:
 -define( webroot_challenge_path, <<".well-known/acme-challenge">> ).
+
+
+% Default overall http time-out, in milliseconds:
+-define( default_timeout, 30000 ).
 
 % Base time-out, in milliseconds:
 -define( base_timeout, 15000 ).
@@ -247,8 +262,6 @@
 	%
 	directory_map = undefined :: maybe( directory_map() ),
 
-	key_file_info = undefined :: maybe( key_file_info() ),
-
 	% Directory where certificates are to be stored:
 	cert_dir_path = <<"/tmp">> :: bin_directory_path(),
 
@@ -256,10 +269,10 @@
 	mode = undefined :: maybe( le_mode() ),
 
 	% If mode is 'webroot':
-	webroot_path = undefined :: maybe( bin_directory_path() ),
+	webroot_dir_path = undefined :: maybe( bin_directory_path() ),
 
 	% If mode is 'standalone':
-	port = 80 :: net_utils:tcp_port(),
+	port = 80 :: tcp_port(),
 
 	intermediate_cert = undefined :: maybe( bin_certificate() ),
 
@@ -274,8 +287,11 @@
 	% The Subject Alternative Names of interest:
 	sans = [] :: [ san() ],
 
+	% Information regarding the key of the LEEC agent:
+	agent_key_file_info = undefined :: maybe( agent_key_file_info() ),
+
 	% The TLS private key that the LEEC agent generated at startup:
-	private_key = undefined :: maybe( tls_private_key() ),
+	agent_private_key = undefined :: maybe( tls_private_key() ),
 
 	% JSON Web Signature of the private key of the LEEC agent:
 	jws = undefined :: maybe( jws() ),
@@ -288,8 +304,8 @@
 	% Known challenges, per URI:
 	challenges = #{} :: uri_challenge_map(),
 
-	% Path to certificate/csr key file:
-	cert_key_file_path = undefined :: maybe( file_path() ),
+	% Path to the private key file of the LEEC agent:
+	agent_key_file_path = undefined :: maybe( file_path() ),
 
 	% API options:
 	option_map = get_default_options() :: option_map() }).
@@ -297,8 +313,6 @@
 
 -type le_state() :: #le_state{}.
 
-
--type fsm_pid() :: pid().
 
 % Typically fsm_pid():
 -type server_ref() :: gen_statem:server_ref().
@@ -326,17 +340,22 @@
 
 -type count() :: basic_utils:count().
 -type error_term() :: basic_utils:error_term().
+-type base_status() :: basic_utils:base_status().
 
 -type ustring() :: text_utils:ustring().
 -type bin_string() :: text_utils:bin_string().
 
--type file_name() :: file_utils:file_name().
+%-type file_name() :: file_utils:file_name().
 -type file_path() :: file_utils:file_path().
+-type any_file_path() :: file_utils:any_file_path().
 
 %-type directory_path() :: file_utils:directory_path().
 -type bin_directory_path() :: file_utils:bin_directory_path().
+-type any_directory_path() :: file_utils:any_directory_path().
 
--type base_status() :: basic_utils:base_status().
+%-type milliseconds() :: unit_utils:milliseconds().
+
+-type tcp_port() :: net_utils:tcp_port().
 
 -type json() :: json_utils:json().
 
@@ -372,7 +391,7 @@ get_default_options() ->
 %
 -spec get_default_options( boolean() ) -> option_map().
 get_default_options( Async ) when is_boolean( Async ) ->
-	#{ async => Async, netopts => #{ timeout => 30000 } }.
+	#{ async => Async, netopts => #{ timeout => ?default_timeout } }.
 
 
 
@@ -447,7 +466,7 @@ obtain_certificate_for( Domain, FsmPid, OptionMap ) ->
 -spec stop( fsm_pid() ) -> void().
 stop( FsmPid ) ->
 
-	trace_bridge:trace_fmt( "Requesting ~w to stop.", [ FsmPid ] ),
+	trace_bridge:trace_fmt( "Requesting FSM ~w to stop.", [ FsmPid ] ),
 
 	% No more gen_fsm:sync_send_all_state_event/2 available, so
 	% handle_call_for_all_states/4 will have to be called from all states
@@ -484,11 +503,13 @@ init( UserOptions ) ->
 
 	trace_bridge:debug_fmt( "[~w] Initial state:~n  ~p", [ self(), LEState ] ),
 
-	% Creates private key (a tls_private_key()) and initialises its JWS:
-	PrivateKey = letsencrypt_tls:create_private_key(
-		LEState#le_state.key_file_info, LEState#le_state.cert_dir_path ),
+	% Creates the private key (a tls_private_key()) of this LEEC agent, and
+	% initialises its JWS:
+	%
+	AgentPrivateKey = letsencrypt_tls:create_private_key(
+		LEState#le_state.agent_key_file_info, LEState#le_state.cert_dir_path ),
 
-	KeyJws = letsencrypt_jws:init( PrivateKey ),
+	KeyJws = letsencrypt_jws:init( AgentPrivateKey ),
 
 	OptionMap = LEState#le_state.option_map,
 
@@ -526,7 +547,7 @@ init( UserOptions ) ->
 	%
 	{ ok, _NewStateName=idle,
 	  LEState#le_state{ directory_map=URLDirectoryMap,
-						private_key=PrivateKey,
+						agent_private_key=AgentPrivateKey,
 						jws=KeyJws,
 						nonce=FirstNonce } }.
 
@@ -547,11 +568,10 @@ callback_mode() ->
 %
 -spec obtain_cert_helper( Domain :: domain(), fsm_pid(), option_map() ) ->
 		  { 'ok', certificate() } | error_term().
-obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
+obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async,
+												 timeout := Timeout } ) ->
 
 	BinDomain = text_utils:ensure_binary( Domain ),
-
-	Timeout = ?base_timeout,
 
 	% Expected to be in the 'idle' state, hence to trigger idle({create,
 	% BinDomain, Opts}, _, LEState):
@@ -713,7 +733,7 @@ idle( _EventType=enter, _PreviousState, _Data ) ->
 
 idle( _EventType={ call, From },
 	  _EventContentMsg=_Request={ create, BinDomain, OptionMap },
-	  _Data=LEState=#le_state{ directory_map=DirMap, private_key=PrivKey,
+	  _Data=LEState=#le_state{ directory_map=DirMap, agent_private_key=PrivKey,
 							   jws=Jws, nonce=Nonce } ) ->
 
 	trace_bridge:trace_fmt( "[~w] While idle: received a certificate creation "
@@ -886,7 +906,7 @@ pending( _EventType={ call, From }, _EventContentMsg=get_ongoing_challenges,
 pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 		 _Data=LEState=#le_state{
 						  order=#{ <<"authorizations">> := AuthorizationsUris },
-						  nonce=InitialNonce, private_key=PrivKey, jws=Jws,
+						  nonce=InitialNonce, agent_private_key=PrivKey, jws=Jws,
 						  option_map=OptionMap } ) ->
 
 	trace_bridge:trace_fmt( "[~w] Checking whether challenges are completed.",
@@ -1025,7 +1045,7 @@ valid( _EventType={ call, _ServerRef=From },
 	   _EventContentMsg=_Request=switchTofinalize,
 	   _Data=LEState=#le_state{ mode=Mode, domain=BinDomain, sans=SANs,
 			cert_dir_path=BinCertDirPath, order=OrderDirMap,
-			private_key=PrivKey, jws=Jws, nonce=Nonce,
+			agent_private_key=PrivKey, jws=Jws, nonce=Nonce,
 			option_map=OptionMap } ) ->
 
 	trace_bridge:trace_fmt( "[~w] Trying to switch to finalize while being "
@@ -1054,7 +1074,7 @@ valid( _EventType={ call, _ServerRef=From },
 				   <<"location">> => maps:get( <<"location">>, OrderDirMap ) },
 
 	FinalLEState = LEState#le_state{ order=LocOrderDirMap,
-		cert_key_file_path=CreatedTLSPrivKey#tls_private_key.file_path,
+		agent_key_file_path=CreatedTLSPrivKey#tls_private_key.file_path,
 		nonce=FinNonce },
 
 	trace_bridge:trace_fmt( "[~w][state] Switching from 'valid' to 'finalize' "
@@ -1094,9 +1114,9 @@ finalize( _EventType=enter, _PreviousState, _Data ) ->
 finalize( _EventType={ call, _ServerRef=From },
 		  _EventContentMsg=_Request=manageCreation,
 		  _Data=LEState=#le_state{ order=OrderMap, domain=BinDomain,
-			  %cert_key_file_path=KeyFilePath,
+			  %agent_key_file_path=KeyFilePath,
 			  cert_dir_path=BinCertDirPath,
-			  private_key=PrivKey, jws=Jws, nonce=Nonce,
+			  agent_private_key=PrivKey, jws=Jws, nonce=Nonce,
 			  option_map=OptionMap } ) ->
 
 	trace_bridge:trace_fmt( "[~w] Getting progress of creation procedure "
@@ -1244,13 +1264,19 @@ code_change( _, StateName, LEState, _ ) ->
 % Parses the start/1 options.
 %
 % Available options are:
-%   - staging: runs in staging environment (otherwise running in production)
-%   - key_file_path: reuse an existing TLS key
-%   - cert_dir_path: path to read/save TLS certificates, keys and csr requests
-%   - http_timeout: timeout for ACME API requests (in seconds)
+%  - staging: runs in staging environment (otherwise running in production one)
+%  - mode: webroot, slave or standalone
+%  - agent_key_file_path: to reuse an existing agent TLS key
+%  - cert_dir_path: path to read/save TLS certificates, keys and CSR requests
+%  - webroot_dir_path: the webroot directory, in a conventional subdirectory of
+%  which challenge answers shall be written so that the ACME server can download
+%  them
+%  - port: the TCP port at which the corresponding webserver shall be available,
+%  in standalone mode
+%  - http_timeout: timeout for ACME API requests (in seconds)
 %
-% Returns LEState (type record 'le_state') filled with corresponding options
-% values.
+% Returns LEState (type record 'le_state') filled with corresponding, checked
+% option values.
 %
 -spec get_options( [ user_option() ], le_state() ) -> le_state().
 get_options( _Opts=[], LEState ) ->
@@ -1266,42 +1292,89 @@ get_options( _Opts=[ { mode, Mode } | T ], LEState ) ->
 			ok;
 
 		false ->
-			throw( { invalid_mode, Mode } )
+			throw( { invalid_leec_mode, Mode } )
 
 	end,
 	get_options( T, LEState#le_state{ mode=Mode } );
 
-get_options( _Opts=[ { key_file_path, KeyFilePath } | T ], LEState ) ->
-	get_options( T, LEState#le_state{ key_file_info=KeyFilePath } );
+get_options( _Opts=[ { agent_key_file_path, KeyFilePath } | T ], LEState ) ->
+	AgentKeyFilePath = text_utils:ensure_string( KeyFilePath ),
+	case file_utils:is_existing_file_or_link( AgentKeyFilePath ) of
+
+		true ->
+			get_options( T, LEState#le_state{
+							  agent_key_file_info=AgentKeyFilePath } );
+
+		false ->
+			throw( { non_existing_agent_key_file, AgentKeyFilePath } )
+
+	end;
+
+
+get_options( _Opts=[ { cert_dir_path, BinCertDirPath } | T ], LEState )
+  when is_binary( BinCertDirPath ) ->
+	case file_utils:is_existing_directory_or_link( BinCertDirPath ) of
+
+		true ->
+			get_options( T, LEState#le_state{ cert_dir_path=BinCertDirPath } );
+
+		false ->
+			throw( { non_existing_certificate_directory,
+					 text_utils:binary_to_string( BinCertDirPath ) } )
+
+	end;
 
 get_options( _Opts=[ { cert_dir_path, CertDirPath } | T ], LEState ) ->
-	get_options( T, LEState#le_state{
-				  cert_dir_path=text_utils:string_to_binary( CertDirPath ) } );
+	BinCertDirPath = text_utils:string_to_binary( CertDirPath ),
+	get_options( [ { cert_dir_path, BinCertDirPath } | T ], LEState );
+
+
+get_options( _Opts=[ { webroot_dir_path, BinWebDirPath } | T ], LEState )
+  when is_binary( BinWebDirPath ) ->
+	case file_utils:is_existing_directory_or_link( BinWebDirPath ) of
+
+		true ->
+			get_options( T,
+						 LEState#le_state{ webroot_dir_path=BinWebDirPath } );
+
+		false ->
+			throw( { non_existing_webroot_directory,
+					 text_utils:binary_to_string( BinWebDirPath ) } )
+
+	end;
 
 get_options( _Opts=[ { webroot_dir_path, WebDirPath } | T ], LEState ) ->
-	get_options( T, LEState#le_state{
-				  webroot_path=text_utils:string_to_binary( WebDirPath ) } );
+	BinWebDirPath = text_utils:string_to_binary( WebDirPath ),
+	get_options( [ { webroot_dir_path=BinWebDirPath } | T ], LEState );
+
 
 get_options( _Opts=[ { port, Port } | T ], LEState ) when is_integer( Port ) ->
 	get_options( T, LEState#le_state{ port=Port } );
 
-get_options( _Opts=[ { http_timeout, Timeout } | T ], LEState ) ->
+get_options( _Opts=[ { port, Port } | _T ], _LEState ) ->
+	throw( { invalid_standalone_tcp_port, Port } );
+
+get_options( _Opts=[ { http_timeout, Timeout } | T ], LEState )
+  when is_integer( Timeout ) ->
 	get_options( T, LEState#le_state{
 				  option_map=#{ netopts => #{ timeout => Timeout } } } );
 
+get_options( _Opts=[ { http_timeout, Timeout } | _T ], _LEState ) ->
+	throw( { invalid_http_timeout, Timeout } );
+
 get_options( _Opts=[ Unexpected | _T ], _LEState ) ->
-	trace_bridge:error_fmt( "Invalid option: ~p.", [ Unexpected ] ),
-	throw( { invalid_option, Unexpected } ).
+	trace_bridge:error_fmt( "Invalid LEEC option specified: ~p.", [ Unexpected ] ),
+	throw( { invalid_leec_option, Unexpected } ).
 
 
 
 % Setups the context of chosen mode.
 -spec setup_mode( le_state() ) -> le_state().
-setup_mode( #le_state{ mode=webroot, webroot_path=undefined } ) ->
-	trace_bridge:error( "Missing 'webroot_path' parameter." ),
-	throw( webroot_path_missing );
+setup_mode( #le_state{ mode=webroot, webroot_dir_path=undefined } ) ->
+	trace_bridge:error( "Missing 'webroot_dir_path' parameter." ),
+	throw( webroot_dir_path_missing );
 
-setup_mode( LEState=#le_state{ mode=webroot, webroot_path=BinWebrootPath } ) ->
+setup_mode( LEState=#le_state{ mode=webroot, webroot_dir_path=BinWebrootPath } ) ->
 
 	ChallengeDirPath =
 		file_utils:join( BinWebrootPath, ?webroot_challenge_path ),
@@ -1312,6 +1385,7 @@ setup_mode( LEState=#le_state{ mode=webroot, webroot_path=BinWebrootPath } ) ->
 
 	LEState;
 
+% Already checked:
 setup_mode( LEState=#le_state{ mode=standalone, port=Port } )
   when is_integer( Port ) ->
 	% TODO: check port is unused?
@@ -1353,7 +1427,7 @@ wait_challenges_valid( FsmPid, Count, MaxCount ) ->
 	% (possibly new) current state being then returned:
 	%
 	case gen_statem:call( _ServerRef=FsmPid,
-				_Request=check_challenges_completed, _Timeout=15000 ) of
+				_Request=check_challenges_completed, ?base_timeout ) of
 
 		valid ->
 			trace_bridge:debug_fmt( "FSM ~w reported that challenges are "
@@ -1482,7 +1556,7 @@ perform_authorization_step1( _AuthUris=[], _BinChallengeType,
 	{ UriChallengeMap, Nonce };
 
 perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
-			LEState=#le_state{ nonce=Nonce, private_key=PrivKey,
+			LEState=#le_state{ nonce=Nonce, agent_private_key=PrivKey,
 							   jws=Jws, option_map=OptionMap },
 			UriChallengeMap ) ->
 
@@ -1559,11 +1633,11 @@ perform_authorization_step2( _Pairs=[], #le_state{ nonce=Nonce } ) ->
 	Nonce;
 
 perform_authorization_step2( _Pairs=[ { Uri, Challenge } | T ],
-					LEState=#le_state{ nonce=Nonce, private_key=PrivKey,
-									   jws=Jws, option_map=OptionMap } ) ->
+			LEState=#le_state{ nonce=Nonce, agent_private_key=AgentPrivKey,
+							   jws=Jws, option_map=OptionMap } ) ->
 
 	{ Resp, _Location, NewNonce } =
-		letsencrypt_api:notify_ready_for_challenge( Challenge, PrivKey,
+		letsencrypt_api:notify_ready_for_challenge( Challenge, AgentPrivKey,
 										Jws#jws{ nonce=Nonce }, OptionMap ),
 
 	case maps:get( <<"status">>, Resp ) of
@@ -1588,7 +1662,7 @@ perform_authorization_step2( _Pairs=[ { Uri, Challenge } | T ],
 -spec init_for_challenge_type( challenge_type(), le_mode(), le_state(),
 							   uri_challenge_map() ) -> void().
 init_for_challenge_type( _ChallengeType='http-01', _Mode=webroot,
-		#le_state{ webroot_path=BinWebrootPath, account_key=AccountKey },
+		#le_state{ webroot_dir_path=BinWebrootPath, account_key=AccountKey },
 		UriChallengeMap ) ->
 
 	[ begin
@@ -1639,6 +1713,7 @@ init_for_challenge_type( ChallengeType, _Mode=standalone,
 				{ name, { local, letsencrypt_elli_listener } },
 				{ callback, letsencrypt_elli_handler },
 				{ callback_args, [ #{ Domain => Thumbprints } ] },
+				% If is not 80, a priori should not work as ACME to look for it:
 				{ port, Port } ] );
 
 		%'tls-sni-01' ->
@@ -1661,7 +1736,7 @@ init_for_challenge_type( ChallengeType, _Mode=standalone,
 % - 'slave' mode: nothing to do
 %
 -spec challenge_destroy( le_mode(), le_state() ) -> void().
-challenge_destroy( _Mode=webroot, #le_state{ webroot_path=BinWPath,
+challenge_destroy( _Mode=webroot, #le_state{ webroot_dir_path=BinWPath,
 											 challenges=UriChallengeMap } ) ->
 
 	[ begin
