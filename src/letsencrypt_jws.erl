@@ -57,7 +57,7 @@
 -spec init( tls_private_key() ) -> jws().
 init( #tls_private_key{ b64_pair={ N, E } } ) ->
 	#jws{ alg='RS256',
-		  jwk=#key{ kty='RSA', n=N, e=E },
+		  jwk=#tls_public_key{ kty='RSA', n=N, e=E },
 		  nonce=undefined }.
 
 
@@ -103,7 +103,7 @@ encode( PrivateKey, Jws, Content ) ->
 %
 -spec get_key_authorization( letsencrypt:key(), letsencrypt:token() ) ->
 								   letsencrypt:key_auth().
-get_key_authorization( #key{ kty=Kty, n=N, e=E }, Token ) ->
+get_key_authorization( #tls_public_key{ kty=Kty, n=N, e=E }, Token ) ->
 
 	Thumbprint = json_utils:to_json( #{ <<"kty">> => Kty, <<"n">> => N,
 										<<"e">> => E } ),

@@ -7,7 +7,7 @@
  {<<"jsx">>,{pkg,<<"jsx">>,<<"3.0.0">>},0},
  {<<"myriad">>,
   {git,"git://github.com/Olivier-Boudeville/Ceylan-Myriad",
-       {ref,"0795da6f4916ab7ae3498084dfa0697c111b01f3"}},
+       {ref,"ad3abc8337089fb90f67d9194b856be9575f2474"}},
   0},
  {<<"shotgun">>,{pkg,<<"shotgun">>,<<"0.4.0">>},0},
  {<<"yamerl">>,{pkg,<<"yamerl">>,<<"0.7.0">>},0}]}.

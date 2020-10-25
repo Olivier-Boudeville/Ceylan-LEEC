@@ -18,7 +18,8 @@
 -export([ get_directory_map/2, get_nonce/2, create_acme_account/4,
 		  request_new_certificate/5, get_order/4, request_authorization/4,
 		  notify_ready_for_challenge/4, finalize_order/5, get_certificate/4,
-		  binary_to_status/1 ]).
+		  binary_to_status/1,
+		  get_tcp_connection/3, close_tcp_connections/0 ]).
 
 
 -type json_http_body() :: map().
@@ -107,12 +108,16 @@ binary_to_status( InvalidBinStatus ) ->
 
 % Returns a suitable TCP connection.
 %
-% If a connection to the given Host:Port is already opened, returns it, either
-% opens a new connection.
+% If a connection to the given Host:Port is already opened, returns it,
+% otherwise opens a new connection.
 %
 % Opened connections are stored in the ?connection_table ETS table.
 %
 % TODO: checks connection is still alive (ping?)
+%
+% Note: for long-living processes (ex: up to 90 days can elapse between two
+% certification generations for a given domain), it is certainly safer to reset
+% that connection cache.
 %
 -spec get_tcp_connection( net_utils:protocol_type(),
 		net_utils:string_host_name(), net_utils:tcp_port() ) ->
@@ -144,18 +149,43 @@ get_tcp_connection( Proto, Host, Port ) ->
 				   Connection;
 
 				{ error, gun_open_failed } ->
-				   throw( { gun_open_failed, Host, Port, Proto } )
+				   throw( { gun_open_failed, Host, Port, Proto } );
+
+				{ error, Error } ->
+				   throw( { gun_open_failed, Error, Host, Port, Proto } )
 
 		   end,
 
 			ets:insert( ?connection_table, { ConnectTriplet, Conn } ),
+			trace_bridge:trace_fmt( "Connection ~p cached.", [ Conn ] ),
 			Conn;
 
 		[ { _ConnectTriplet, Conn } ] ->
 			trace_bridge:debug_fmt( "[~w] Reusing connection to ~s:~B, "
-				"with the '~s' scheme: ~p.",
+				"with the '~s' scheme: ~w.",
 				[ self(), Host, Port, Proto, Conn ] ),
 			Conn
+
+	end.
+
+
+
+% Closes all pending (cached) TCP connections.
+-spec close_tcp_connections() -> basic_utils:void().
+close_tcp_connections() ->
+
+	Table = ?connection_table,
+
+	case ets:info( Table ) of
+
+		undefined ->
+			ok;
+
+		_ ->
+			% Not testing any returned close error, needing to resist them:
+			[ shotgun:close( pair:second( Conn ) )
+			  || Conn <- ets:tab2list( Table ) ],
+			ets:delete( Table )
 
 	end.
 
@@ -174,13 +204,13 @@ decode( _OptionMap=#{ json := true }, Response=#{ body := Body } ) ->
 
 	Payload = json_utils:from_json( Body ),
 
-	trace_bridge:debug_fmt( "Payload decoded from JSON:~n  ~p", [ Payload ] ),
+	%trace_bridge:debug_fmt( "Payload decoded from JSON:~n  ~p", [ Payload ] ),
 
 	Response#{ json => Payload };
 
 decode( _OptionMap, Response ) ->
-	trace_bridge:debug_fmt( "Not requested to decode from JSON following "
-							"response:~n~p", [ Response ] ),
+	%trace_bridge:debug_fmt( "Not requested to decode from JSON following "
+	%						"response:~n~p", [ Response ] ),
 	Response.
 
 
@@ -253,8 +283,9 @@ request( Method, Uri, Headers, MaybeBinContent,
 
 	end,
 
-	trace_bridge:debug_fmt( "[~w] The '~s' request to ~s resulted in:~n~p",
-							[ self(), Method, UriStr, ReqRes ] ),
+	% Very useful yet quite verbose:
+	%trace_bridge:debug_fmt( "[~w] The '~s' request to ~s resulted in:~n~p",
+	%						[ self(), Method, UriStr, ReqRes ] ),
 
 	% Typically success results in ReqRes like:
 
@@ -324,7 +355,7 @@ get_directory_map( Env, OptionMap ) ->
 			ok;
 
 		_ ->
-			throw( { unexpected_status_code, StatusCode } )
+			throw( { unexpected_status_code, StatusCode, get_directory_map } )
 
 	end,
 
@@ -353,7 +384,7 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap ) ->
 			ok;
 
 		_ ->
-			throw( { unexpected_status_code, StatusCode } )
+			throw( { unexpected_status_code, StatusCode, get_nonce } )
 
 	end,
 
@@ -363,15 +394,15 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap ) ->
 
 
 
-% Requests a new account obtained (indirecetly) for specified privat key, see
+% Requests an account obtained (indirectly) for specified private key, see
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.3.1.
+%
+% This is either a new account or one that was already created by this FSM.
 %
 % Returns {Response, Location, Nonce}, where:
 % - Response is json (decoded as map)
 % - Location is the URL corresponding to the created ACME account
 % - Nonce is a new valid replay-nonce
-%
-% TODO: checks 201 Created response
 %
 -spec create_acme_account( directory_map(), tls_private_key(), jws(),
 			   option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
@@ -393,11 +424,16 @@ create_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 
 	case StatusCode of
 
-		201 ->
+		_CreatedCode=201 ->
 			ok;
 
+		% Happens should this account already exist (in using the same LEEC FSM
+		% for more than one certificate operation):
+		%
+		_Success=200 ->
+			ok;
 		_ ->
-			throw( { unexpected_status_code, StatusCode } )
+			throw( { unexpected_status_code, StatusCode, create_acme_account } )
 
 	end,
 
@@ -415,9 +451,6 @@ create_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 % - Response is json (decoded as map)
 % - Location is the URL corresponding to the created ACME account
 % - Nonce is a new valid replay-nonce
-%
-% TODO: support multiple domains
-%		checks 201 created
 %
 -spec request_new_certificate( directory_map(), [ bin_domain() ],
 		tls_private_key(), jws(), option_map() ) ->
@@ -441,11 +474,12 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 
 	case StatusCode of
 
-		201 ->
+		_CreatedCode=201 ->
 			ok;
 
 		_ ->
-			throw( { unexpected_status_code, StatusCode } )
+			throw( { unexpected_status_code, StatusCode,
+					 request_new_certificate } )
 
 	end,
 
@@ -516,7 +550,8 @@ request_authorization( AuthUri, PrivKey, Jws, OptionMap ) ->
 			ok;
 
 		_ ->
-			throw( { unexpected_status_code, StatusCode } )
+			throw( { unexpected_status_code, StatusCode,
+					 request_authorization } )
 
 	end,
 
@@ -553,7 +588,8 @@ notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
 			ok;
 
 		_ ->
-			throw( { unexpected_status_code, StatusCode } )
+			throw( { unexpected_status_code, StatusCode,
+					 notify_ready_for_challenge } )
 
 	end,
 
@@ -585,7 +621,7 @@ finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 			ok;
 
 		_ ->
-			throw( { unexpected_status_code, StatusCode } )
+			throw( { unexpected_status_code, StatusCode, finalize_order } )
 
 	end,
 
@@ -597,7 +633,7 @@ finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.2) and returns it.
 %
 -spec get_certificate( order_map(), tls_private_key(), jws(), option_map() ) ->
-		  bin_certificate().
+		  { bin_certificate(), nonce() }.
 get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, OptionMap ) ->
 
 	trace_bridge:debug_fmt( "[~w] Downloading certificate at ~s.",
@@ -606,7 +642,18 @@ get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, OptionMap ) ->
 	% POST-as-GET implies no payload:
 	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined ),
 
-	#{ body := BinCert } = request( _Method=post, Uri, _Headers=#{},
-									_MaybeBinContent=Req, OptionMap ),
+	#{ body := BinCert, nonce := NewNonce, status_code := StatusCode  } =
+		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
+				 OptionMap ),
 
-	BinCert.
+	case StatusCode of
+
+		200 ->
+			ok;
+
+		_ ->
+			throw( { unexpected_status_code, StatusCode, get_certificate } )
+
+	end,
+
+	{ BinCert, NewNonce }.

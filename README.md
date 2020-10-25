@@ -145,7 +145,7 @@ Returns: `{ok, Pid}` where Pid is the PID of the LEEC agent process.
   Returns:
 	* in asynchronous mode, function returns `async` (certification operations are running in the background then)
 	* in synchronous mode, or as asynchronous callback function parameter:
-	  * `{ok, #{cert => <<"/path/to/cert">>, key => <<"/path/to/key">>}}` on success
+	  * `{certificate_ready, BinCertFilePath}` on success (ex: `BinCertFilePath=<<"/tmp/foobar.org.crt">>`)
 	  * `{error, Message}` on error
 
   Examples:

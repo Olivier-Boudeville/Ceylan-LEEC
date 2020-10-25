@@ -219,7 +219,8 @@
 
 -type tls_private_key() :: #tls_private_key{}.
 
--type key() :: #key{}.
+
+-type tls_public_key() :: #tls_public_key{}.
 
 -type jws() :: #jws{}.
 
@@ -236,7 +237,7 @@
 			   san/0, bin_san/0, json_map_decoded/0, agent_key_file_info/0,
 			   bin_certificate/0, bin_key/0, bin_csr_key/0,
 			   jws_algorithm/0, binary_b64/0, key_auth/0,
-			   tls_private_key/0, key/0, jws/0, certificate/0 ]).
+			   tls_private_key/0, tls_public_key/0, jws/0, certificate/0 ]).
 
 
 % Where Let's Encrypt will attempt to find answers to its http-01 challenges:
@@ -296,8 +297,8 @@
 	% JSON Web Signature of the private key of the LEEC agent:
 	jws = undefined :: maybe( jws() ),
 
-	% The key returned by the ACME server on account creation:
-	account_key :: key(),
+	% The public key returned by the ACME server on account creation:
+	account_key :: tls_public_key(),
 
 	order = undefined :: maybe( directory_map() ),
 
@@ -347,6 +348,7 @@
 
 %-type file_name() :: file_utils:file_name().
 -type file_path() :: file_utils:file_path().
+-type bin_file_path() :: file_utils:bin_file_path().
 -type any_file_path() :: file_utils:any_file_path().
 
 %-type directory_path() :: file_utils:directory_path().
@@ -364,9 +366,12 @@
 % Public API.
 
 
-% Starts an instance of the letsencrypt service FSM.
+% Starts an instance of the LEEC service FSM.
 -spec start( [ user_option() ] ) -> { 'ok', fsm_pid() } | error_term().
 start( UserOptions ) ->
+
+	trace_bridge:trace_fmt( "Starting, with following options:~n  ~p.",
+							[ UserOptions ] ),
 
 	json_utils:start_parser(),
 
@@ -503,7 +508,7 @@ init( UserOptions ) ->
 
 	trace_bridge:debug_fmt( "[~w] Initial state:~n  ~p", [ self(), LEState ] ),
 
-	% Creates the private key (a tls_private_key()) of this LEEC agent, and
+	% Creates the private key (a tls_private_tls_public_key()) of this LEEC agent, and
 	% initialises its JWS:
 	%
 	AgentPrivateKey = letsencrypt_tls:create_private_key(
@@ -567,9 +572,10 @@ callback_mode() ->
 % on being async or not)
 %
 -spec obtain_cert_helper( Domain :: domain(), fsm_pid(), option_map() ) ->
-		  { 'ok', certificate() } | error_term().
-obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async,
-												 timeout := Timeout } ) ->
+		  { 'certificate_ready', bin_file_path() } | error_term().
+obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
+
+	Timeout = maps:get( timeout, OptionMap, ?default_timeout ),
 
 	BinDomain = text_utils:ensure_binary( Domain ),
 
@@ -605,10 +611,11 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async,
 
 					case wait_creation_completed( FsmPid, _Count=20 ) of
 
-						certificate_ready ->
+						Reply={ certificate_ready, BinCertFilePath } ->
 							trace_bridge:debug_fmt( "Domain '~s' finalized "
-								"for ~w.", [ Domain, FsmPid ] ),
-							ok;
+								"for ~w, returning certificate path '~s'.",
+								[ Domain, FsmPid, BinCertFilePath ] ),
+							Reply;
 
 						Error ->
 							trace_bridge:error_fmt( "Error for FSM ~w when "
@@ -719,7 +726,7 @@ get_ongoing_challenges( FsmPid ) ->
 %
 % Starts a new certificate delivery process:
 %  - create new account
-%  - create new order
+%  - send a new order
 %  - require authorization (returns challenges list)
 %  - initiate chosen challenge
 %
@@ -788,6 +795,7 @@ idle( _EventType={ call, From },
 	trace_bridge:trace_fmt( "[~w] The obtained ACME account key is:~n  ~p",
 							[ self(), AccountKey ] ),
 
+	% Apparently a difference JWS then:
 	AccountJws = #jws{ alg=Jws#jws.alg, kid=AccountLocationUri,
 					   nonce=AccountNonce },
 
@@ -805,6 +813,10 @@ idle( _EventType={ call, From },
 	case maps:get( <<"status">>, OrderDecodedJsonMap ) of
 
 		<<"pending">> ->
+			ok;
+
+		% If one was already created recently:
+		<<"ready">> ->
 			ok;
 
 		CertUnexpectedStatus ->
@@ -1120,7 +1132,7 @@ finalize( _EventType={ call, _ServerRef=From },
 			  option_map=OptionMap } ) ->
 
 	trace_bridge:trace_fmt( "[~w] Getting progress of creation procedure "
-		"based on order map ~p.", [ self(), OrderMap ] ),
+		"based on order map:~n   ~p.", [ self(), OrderMap ] ),
 
 	Loc = maps:get( <<"location">>, OrderMap ),
 
@@ -1131,12 +1143,12 @@ finalize( _EventType={ call, _ServerRef=From },
 
 	ReadStatus = letsencrypt_api:binary_to_status( BinStatus ),
 
-	{ Reply, NewStateName, NewNonce } = case ReadStatus of
+	{ Reply, NewStateName, NewNonce, NewJws } = case ReadStatus of
 
 		processing ->
 			trace_bridge:trace_fmt( "[~w] Certificate creation still in "
 				"progress on server.", [ self() ] ),
-			{ creation_in_progress, finalize, OrderNonce };
+			{ creation_in_progress, finalize, OrderNonce, Jws };
 
 		% Downloads certificate and saves it into file.
 		%
@@ -1150,31 +1162,47 @@ finalize( _EventType={ call, _ServerRef=From },
 			%BinKeyFilePath = text_utils:string_to_binary( KeyFilePath ),
 
 			% Downloads certificate:
-			BinCert = letsencrypt_api:get_certificate( OrderMap, PrivKey,
-							Jws#jws{ nonce=OrderNonce }, OptionMap ),
+			{ BinCert, DownloadNonce } = letsencrypt_api:get_certificate(
+				OrderMap, PrivKey, Jws#jws{ nonce=OrderNonce }, OptionMap ),
 
 			Domain = text_utils:binary_to_string( BinDomain ),
 
-			%BinCertFilePath = text_utils:string_to_binary( CertFilePath ),
-
-			_CertFilePath = letsencrypt_tls:write_certificate( Domain, BinCert,
+			CertFilePath = letsencrypt_tls:write_certificate( Domain, BinCert,
 															  BinCertDirPath ),
 
-			trace_bridge:trace_fmt( "[~w] Certificate generated, switching from "
-				   "'finalize' to the 'idle' state.", [ self() ] ),
+			BinCertFilePath = text_utils:string_to_binary( CertFilePath ),
 
-			{ certificate_ready, idle, undefined };
+			trace_bridge:trace_fmt( "[~w] Certificate generated in ~s, "
+				"switching from 'finalize' to the 'idle' state.",
+				[ self(), BinCertFilePath ] ),
+
+			% Shall we continue with the same account for any next operation?
+			% No, and the current JWS would not be suitable for that (ex: not
+			% having the public key of that LEEC agent), and anyway we prefer
+			% creating a new account each time a new operation is performed (as
+			% ~90 days may elapse between two operations). So:
+			%
+			AgentKeyJws = letsencrypt_jws:init( PrivKey ),
+
+			% Safer, not wasting idle connections, bound to fail after some time
+			% anyway:
+			%
+			letsencrypt_api:close_tcp_connections(),
+
+			{ { certificate_ready, BinCertFilePath }, idle,
+			  DownloadNonce, AgentKeyJws };
 
 
 		% Like for 'processing', yet with a different trace:
 		OtherStatus ->
 			trace_bridge:warning_fmt( "[~w] Unexpected read status while "
 				"finalizing: '~s' (ignored).", [ self(), OtherStatus ] ),
-			{ creation_in_progress, finalize, OrderNonce }
+			{ creation_in_progress, finalize, OrderNonce, Jws }
 
 	end,
 
-	NewLEState = LEState#le_state{ order=NewOrderMap, nonce=NewNonce },
+	NewLEState = LEState#le_state{ order=NewOrderMap, jws=NewJws,
+								   nonce=NewNonce },
 
 	{ next_state, NewStateName, _NewData=NewLEState,
 	  _Action={ reply, From, Reply } };
@@ -1345,7 +1373,7 @@ get_options( _Opts=[ { webroot_dir_path, BinWebDirPath } | T ], LEState )
 
 get_options( _Opts=[ { webroot_dir_path, WebDirPath } | T ], LEState ) ->
 	BinWebDirPath = text_utils:string_to_binary( WebDirPath ),
-	get_options( [ { webroot_dir_path=BinWebDirPath } | T ], LEState );
+	get_options( [ { webroot_dir_path, BinWebDirPath } | T ], LEState );
 
 
 get_options( _Opts=[ { port, Port } | T ], LEState ) when is_integer( Port ) ->
@@ -1374,7 +1402,8 @@ setup_mode( #le_state{ mode=webroot, webroot_dir_path=undefined } ) ->
 	trace_bridge:error( "Missing 'webroot_dir_path' parameter." ),
 	throw( webroot_dir_path_missing );
 
-setup_mode( LEState=#le_state{ mode=webroot, webroot_dir_path=BinWebrootPath } ) ->
+setup_mode( LEState=#le_state{ mode=webroot,
+							   webroot_dir_path=BinWebrootPath } ) ->
 
 	ChallengeDirPath =
 		file_utils:join( BinWebrootPath, ?webroot_challenge_path ),
@@ -1473,7 +1502,8 @@ wait_creation_completed( FsmPid, C ) ->
 % (helper)
 %
 -spec wait_creation_completed( fsm_pid(), count(), count() ) ->
-		  { 'ok', map() } | { 'error', 'timeout' | any() }.
+					 { 'certificate_ready', bin_file_path() }
+				   | { 'error', 'timeout' | any() }.
 wait_creation_completed( _FsmPid, _Count=0, _Max ) ->
 	{ error, timeout };
 
@@ -1482,10 +1512,11 @@ wait_creation_completed( FsmPid, Count, Max ) ->
 	case gen_statem:call( _ServerRef=FsmPid, _Req=manageCreation,
 						  ?base_timeout ) of
 
-		certificate_ready ->
-			trace_bridge:debug_fmt( "End of waiting for creation: read target "
-				"status 'finalize' for ~w.", [ FsmPid ] ),
-			ok;
+		Reply={ certificate_ready, BinCertFilePath } ->
+			trace_bridge:debug_fmt( "End of waiting for creation of '~s': "
+				"read target status 'finalize' for ~w.",
+				[ BinCertFilePath, FsmPid ] ),
+			Reply;
 
 		creation_in_progress ->
 			trace_bridge:debug_fmt( "Still waiting for creation from ~w.",
@@ -1596,6 +1627,10 @@ perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 		<<"pending">> ->
 			ok;
 
+		% Should a previous request have already been performed:
+		<<"valid">> ->
+			ok;
+
 		AuthUnexpectedStatus ->
 			throw( { unexpected_status, AuthUnexpectedStatus,
 					 authorization_step1 } )
@@ -1643,6 +1678,10 @@ perform_authorization_step2( _Pairs=[ { Uri, Challenge } | T ],
 	case maps:get( <<"status">>, Resp ) of
 
 		<<"pending">> ->
+			ok;
+
+		% Should a previous request have already been performed:
+		<<"valid">> ->
 			ok;
 
 		AuthUnexpectedStatus ->

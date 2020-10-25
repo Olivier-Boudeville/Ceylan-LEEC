@@ -31,9 +31,10 @@
 
 
 
-% Key (ex: account one):
--record( key, {
+% TLS public key (ex: the account one):
+-record( tls_public_key, {
 
+  % Key type:
   kty :: 'RSA',
 
   n :: text_utils:bin_string(),
@@ -45,16 +46,23 @@
 % RSA JSON Web Signature:
 -record( jws, {
 
+  % The signing algorithm:
   alg = 'RS256' :: letsencrypt:jws_algorithm(),
 
   % Ex: "https://acme-staging-v02.api.letsencrypt.org/acme/new-order"
   url :: letsencrypt:bin_uri(),
 
-  % Ex: "https://acme-staging-v02.api.letsencrypt.org/acme/acct/16082748"
+  % Key identifier; ex:
+  % "https://acme-staging-v02.api.letsencrypt.org/acme/acct/16082748"
+  %
   kid :: letsencrypt:bin_uri(),
 
-  jwk :: letsencrypt:key(),
+  % The public key used to verify the JWS, in order to authenticate future
+  % requests from the account to the ACME server:
+  %
+  jwk :: letsencrypt:tls_public_key(),
 
+  % The nonce that shall be used for next sending:
   nonce = undefined :: maybe( letsencrypt:nonce() ) } ).
 
 

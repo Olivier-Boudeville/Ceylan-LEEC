@@ -36,8 +36,8 @@
 -type san() :: letsencrypt:san().
 -type bin_certificate() :: letsencrypt:bin_certificate().
 
--type key() :: letsencrypt:key().
 -type tls_private_key() :: letsencrypt:tls_private_key().
+-type tls_public_key() :: letsencrypt:tls_public_key().
 
 
 % Not involving Myriad's parse transform here:
@@ -290,22 +290,22 @@ write_certificate( Domain, BinDomainCert, BinCertDirPath ) ->
 
 
 
-% Returns a map-based version of the specified key record, typically for
+% Returns a map-based version of the specified public key record, typically for
 % encoding.
 %
--spec key_to_map( key() ) -> map().
-key_to_map( #key{ kty=Kty, n=N, e=E } ) ->
+-spec key_to_map( tls_public_key() ) -> map().
+key_to_map( #tls_public_key{ kty=Kty, n=N, e=E } ) ->
 	#{ <<"kty">> => Kty, <<"n">> => N, <<"e">> => E }.
 
 
 % Return the key record corresponding to the specified map, typically obtained
 % from a remote server.
 %
--spec map_to_key( map() ) -> key().
+-spec map_to_key( map() ) -> tls_public_key().
 map_to_key( Map ) ->
 
 	% Ensures all keys are extracted:
 	{ [ Kty, N, E ], _RemainingTable=#{} } = map_hashtable:extract_entries(
 							   [ <<"kty">>, <<"n">>, <<"e">> ], Map ),
 
-	#key{ kty=Kty, n=N, e=E }.
+	#tls_public_key{ kty=Kty, n=N, e=E }.
