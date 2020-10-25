@@ -4,6 +4,9 @@ This library is yet another fork of the Let's Encrypt client library for Erlang
 
 It is indeed a Ceylan fork of the original and much appreciated [letsencrypt-erlang](https://github.com/gbour/letsencrypt-erlang) library whose author is Guillaume Bour.
 
+LEEC is notably used in the context of [US-Web](http://us-web.esperide.org/).
+
+
 The main differences introduced by LEEC are:
 - more comments, more spell-checking, much clarification
 - more typing, more runtime checking
@@ -93,6 +96,8 @@ One may use UNIX groups to isolate users and minimise assigned permissions (use 
 
   Finally, keys and certificates are written in the `/path/to/certs` directory.
 
+
+
 ## Escript
 
 The `bin/eletsencrypt` Escript allows the management of certificates directly from the UNIX command-line.
@@ -110,23 +115,24 @@ Options:
 Optionally, you can provide as parameter the domain you want to apply options.
 
 
+
 ## API
-NOTE: if _optional_ is not written, parameter is required
-
-* `letsencrypt:start(Params)` :: starts the LEEC client process, creating a corresponding FSM (as a separate process):
-Params is a list of parameters, chosen from the following ones:
-  * `staging` (optional): use staging API (generating fake certificates - the default behavior is to use real API)
-  * `{mode, Mode}`: choose the mode of operation, where `Mode` is one of: `webroot`, `slave` and `standalone`
-  * `{cert_dir_path, Path}`: pinpoint the path where to store the generated certificates. Must be writable by the LEEC process
-  * `{http_timeout, Timeout}` (integer, optional, default to 30000 ms, i.e. 30 seconds): http queries timeout (in milliseconds)
 
 
-  Mode-specific parameters:
-  * _webroot_ mode: `{webroot_dir_path, Path}`: pinpoints the directory path where to store challenge thumbprints. Must be writable by the LEEC process, and available through the root path of your webserver
+* `letsencrypt:start(Params)`: starts the LEEC client process, creating a corresponding FSM (as a separate process). Params is a list of parameters, chosen from the following ones:
+  * `staging` (optional): uses staging API (generating fake certificates - the default behavior is to use real API)
+  * `{mode, Mode}` (required): chooses the mode of operation, where `Mode` is one of: `webroot`, `slave` and `standalone`
+  * `{cert_dir_path, Path}` (required): pinpoints the path where to the read and/or written certificates are stored; must be writable by the LEEC agent process if a key is to be generated
+  * `{agent_key_file_path, KeyFilePath}` (optional): specifies the file containing any PEM RSA private key to reuse by the LEEC agent (otherwise a `letsencrypt-agent.key-XXX` file will be generated in the certificate directory)
+  * `{http_timeout, Timeout}` (integer, optional, default to 30000 ms - i.e. 30 seconds): http queries timeout (in milliseconds)
 
-  * _standalone_ mode: `{port, Port}` (optional, default to `80`): TCP port to listen for http queries in the course of challenge validation
 
-  Returns: `{ok, Pid}` with Pid is the PID of the LEEC client process
+Mode-specific parameters:
+  * _webroot_ mode: `{webroot_dir_path, Path}` (required): pinpoints the directory path where to store challenge thumbprints. Must be writable by the LEEC process, and available through the root path of your webserver so that the ACME server can download these challenge answers
+
+  * _standalone_ mode: `{port, Port}` (optional, defaults to `80`): TCP port to listen for http queries from the ACME server in the course of challenge validation
+
+Returns: `{ok, Pid}` where Pid is the PID of the LEEC agent process.
 
 * `letsencrypt:obtain_certificate_for(Domain, Opts) :: generates a new certificate for the considered domain name`:
   * `Domain`: domain name (type: string or binary)
