@@ -442,7 +442,7 @@ obtain_certificate_for( Domain, FsmPid ) ->
 % started.
 %
 -spec obtain_certificate_for( Domain :: domain(), fsm_pid(), option_map() ) ->
-		  { 'ok', certificate() } | 'async' | error_term().
+		'async' | { 'certificate_ready', bin_file_path() } | error_term().
 obtain_certificate_for( Domain, FsmPid, OptionMap=#{ async := false } ) ->
 
 	% Still in user process:
