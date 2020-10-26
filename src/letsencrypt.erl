@@ -670,7 +670,8 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 %
 % Defined separately for testing.
 %
--spec get_ongoing_challenges( fsm_pid() ) -> 'error' | thumbprint_map().
+-spec get_ongoing_challenges( fsm_pid() ) ->
+					'error' | 'no_challenge' | thumbprint_map().
 get_ongoing_challenges( FsmPid ) ->
 
 	case catch gen_statem:call( _ServerRef=FsmPid,
@@ -682,9 +683,10 @@ get_ongoing_challenges( FsmPid ) ->
 									[ ExitReason ] ),
 			error;
 
-		% Could be also 'no_challenge' if in 'idle' state.
+		% If in 'idle' state:
+		no_challenge ->
+			no_challenge;
 
-		% Not a list thereof?
 		ThumbprintMap ->
 			ThumbprintMap
 
