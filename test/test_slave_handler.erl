@@ -21,20 +21,21 @@
 
 handle(Req, _Args) ->
 	[<<".well-known">>, <<"acme-challenge">>, Token] = elli_request:path(Req),
-	[Host|_]   = binary:split(elli_request:get_header(<<"Host">>, Req, <<>>), <<":">>),
+	[Host|_] = binary:split(elli_request:get_header(<<"Host">>, Req, <<>>), <<":">>),
 	Thumbprints = letsencrypt:get_challenge(),
 	io:format("SLAVE:handle: req=~p, host= ~p, thumbprints= ~p~n", [Req, Host, Thumbprints]),
 
 	case maps:get(Token, Thumbprints, nil) of
 		Thumbprint ->
 			io:format("200: ~p~n", [Thumbprint]),
-			{200, [{<<"Content-Type">>, <<"text/plain">>}], Thumbprint};
+			{200, [{<<"Content-Type">>, <<"text/plain">>}], Thumbprint}
 
-		_ ->
-			io:format("404~n", []),
-			{404, [], <<"Not Found">>}
+		% Cannot match:
+		%_ ->
+		%	io:format("404~n", []),
+		%	{404, [], <<"Not Found">>}
 	end.
 
 % request events. Unused
 handle_event(_, _, _) ->
-    ok.
+	ok.

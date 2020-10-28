@@ -373,6 +373,8 @@ start( UserOptions ) ->
 	trace_bridge:trace_fmt( "Starting, with following options:~n  ~p.",
 							[ UserOptions ] ),
 
+	application:ensure_all_started( letsencrypt ),
+
 	json_utils:start_parser(),
 
 	% Not registered in naming service on purpose, to allow for concurrent ACME
@@ -404,18 +406,17 @@ get_default_options( Async ) when is_boolean( Async ) ->
 % certificate for the specified domain (FQDN).
 %
 % Parameters:
-%	- Domain is the domain name to generate an ACME certificate for
-%   - FsmPid is the PID of the FSM to rely on
+% - Domain is the domain name to generate an ACME certificate for
+% - FsmPid is the PID of the FSM to rely on
 %
 % Returns:
-%	- 'async' if async is set (the default being sync)
-%	- {error, Err} if a failure happens
+% - 'async' if async is set (the default being sync)
+% - {error, Err} if a failure happens
 %
 % Belongs to the user-facing API; requires the LEEC service to be already
 % started.
 %
--spec obtain_certificate_for( Domain :: domain(), fsm_pid() ) ->
-									'async' | error_term().
+-spec obtain_certificate_for( domain(), fsm_pid() ) -> 'async' | error_term().
 obtain_certificate_for( Domain, FsmPid ) ->
 	obtain_certificate_for( Domain, FsmPid, get_default_options() ).
 

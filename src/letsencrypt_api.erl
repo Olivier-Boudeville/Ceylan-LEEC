@@ -39,6 +39,11 @@
 % Not involving Myriad's parse transform here:
 -type maybe( T ) :: T | 'undefined'.
 
+% Silenced, so that the same code can be compiled with or without Myriad's parse
+% transform:
+%
+-export_type([ maybe/1 ]).
+
 
 % Shorthands:
 -type challenge() :: letsencrypt:challenge().

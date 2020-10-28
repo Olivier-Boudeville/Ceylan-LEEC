@@ -69,10 +69,7 @@ LEEC_BEAM := $(LEEC_SRC)
 LEEC_INC = -I$(LEEC_TOP)/include
 
 
-ERLANG_COMPILER_BASE_WARNING_OPT = -W2 +warn_export_all +warn_export_vars +warn_shadow_vars +warn_obsolete_guards +warn_unused_import
-
-
-#+warnings_as_errors
+ERLANG_COMPILER_BASE_WARNING_OPT = -W2 +warn_export_all +warn_export_vars +warn_shadow_vars +warn_obsolete_guards +warn_unused_import +warnings_as_errors
 
 # In an OTP/rebar3-style application layout, at compilation time, libraries
 # making use of Myriad will expect its includes to be located in:
@@ -90,7 +87,7 @@ LEEC_BEAM_DIRS := $(LEEC_BEAM)
 
 LEEC_REBAR_BUILD_BASE = $(REBAR_BUILD_DIR)/lib/letsencrypt
 
-#
+
 # See Myriad counterpart variable (MYRIAD_BEAM_DIRS) for explanations:
 LEEC_BEAM_DIRS = $(LEEC_TOP)/src
 
@@ -115,13 +112,13 @@ endif
 
 # One may define here:
 # EXECUTION_TARGET := production / development [the default]
-# ENABLEEC_DEBUG := false / true [the default]
+# ENABLE_LEEC_DEBUG := false / true [the default]
 
 
-# Tells whether the debug mode will be activated for the next Letsencrypt modules to
-# be built (maximum performance versus extended checkings).
+# Tells whether the debug mode will be activated for the next LEEC modules to be
+# built (maximum performance versus extended checkings).
 #
-ifeq ($(ENABLEEC_DEBUG),true)
+ifeq ($(ENABLE_LEEC_DEBUG),true)
 	LEEC_DEBUG_OPT := -DDEBUG_LEEC -DLEEC_ENABLE_LOG=1
 else
 	LEEC_DEBUG_OPT := -DLEEC_ENABLE_LOG=0
@@ -149,13 +146,21 @@ ifndef PREDECESSOR_PLT
 endif
 
 
+# Prererequisites are supposedly already available and built thanks to rebar3:
+PREREQ_ROOT = $(LEEC_TOP)/_build/default/lib
+
+
 # We define the path to the Myriad layer (possibly available as a symbolic
 # link).
 #
-# For the sake of these build-related makefiles, dependencies may be found
-# either in a local _checkouts child directory (if checkout directories are used
-# and if the top-level package of interest is the current one), or in sibling
-# directories (i.e. whose build root is at the same level as this one).
+# For the sake of these build-related makefiles, Ceylan dependencies may be
+# found either in a local _checkouts child directory (if checkout directories
+# are used and if the top-level package of interest is the current one), or in
+# sibling directories (i.e. whose build root is at the same level as this one).
+#
+# This means that a Ceylan build will ignore the Myriad version in PREREQ_ROOT
+# and use instead one defined just below.
+
 # This last case happens notably if not using checkout directories, or if using
 # them and if all the packages mentioned here are themselves dependencies (in
 # which case they are all sitting together in the _checkouts child directory).
@@ -182,3 +187,28 @@ else
 	endif
 
 endif
+
+# Other LEEC dependencies:
+
+COWLIB_TOP       = $(PREREQ_ROOT)/cowlib
+GUN_TOP          = $(PREREQ_ROOT)/gun
+SHOTGUN_TOP      = $(PREREQ_ROOT)/shotgun
+ELLI_TOP         = $(PREREQ_ROOT)/elli
+
+ERLANG_COLOR_TOP = $(PREREQ_ROOT)/erlang_color
+YAMERL_TOP       = $(PREREQ_ROOT)/yamerl
+GETOPT_TOP       = $(PREREQ_ROOT)/getopt
+
+JSX_TOP          = $(PREREQ_ROOT)/jsx
+JIFFY_TOP        = $(PREREQ_ROOT)/jiffy
+
+LEEC_EXTRA_DEPS = $(COWLIB_TOP) $(GUN_TOP) $(SHOTGUN_TOP)       \
+				  $(ELLI_TOP) $(ERLANG_COLOR_TOP) $(YAMERL_TOP) \
+				  $(GETOPT_TOP) $(JSX_TOP) $(JIFFY_TOP)
+
+# $(PREREQ_ROOT) is added, as most includes are expected to be done with
+#  include_lib, hence as, for example, "elli/include/elli.hrl":
+#
+INC += $(foreach dir,$(LEEC_EXTRA_DEPS),-I$(dir)/include) -I$(PREREQ_ROOT)
+
+BEAM_DIRS += $(foreach dir,$(LEEC_EXTRA_DEPS),$(dir)/ebin)

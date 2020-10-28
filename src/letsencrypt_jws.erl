@@ -28,9 +28,10 @@
 -type table( K, V ) :: map_hashtable:map_hashtable( K, V ).
 -type maybe( T ) :: T | 'undefined'.
 
-
-% Silencing if not compiled with rebar3:
--export_type([ table/2 ]).
+% Silenced, so that the same code can be compiled with or without Myriad's parse
+% transform:
+%
+-export_type([ table/2, maybe/1 ]).
 
 
 % For the records introduced:
