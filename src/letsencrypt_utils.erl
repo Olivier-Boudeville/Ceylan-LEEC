@@ -15,13 +15,15 @@
 -module(letsencrypt_utils).
 -author("Guillaume Bour <guillaume@bour.cc>").
 
--export([ b64encode/1, jsonb64encode/1, hexdigest/1, hashdigest/2 ]).
+-export([ b64encode/1, jsonb64encode/2, hexdigest/1, hashdigest/2 ]).
 
 -type character() :: integer().
 
 
-% Shorthand:
+% Shorthands:
+
 -type binary_b64() :: letsencrypt:binary_b64().
+-type json_parser_state() :: json_utils:json_parser_state().
 
 
 % Encodes specified content in b64.
@@ -34,16 +36,16 @@ b64encode( X ) ->
 
 % Encodes specified content first in JSON, then in b64.
 %-spec jsonb64encode( string() | binary() ) -> binary_b64().
--spec jsonb64encode( map() ) -> binary_b64().
-jsonb64encode( X ) when is_map( X ) ->
+-spec jsonb64encode( map(), json_parser_state() ) -> binary_b64().
+jsonb64encode( X, ParserState ) when is_map( X ) ->
 
-	trace_bridge:debug_fmt( "Encoding in JSON then b64:~n  ~p", [ X ] ),
-	XJson = json_utils:to_json( X ),
+	%trace_bridge:debug_fmt( "Encoding in JSON then b64:~n  ~p", [ X ] ),
+	XJson = json_utils:to_json( X, ParserState ),
 	%trace_bridge:debug_fmt( "JSON result:~n~p", [ XJson ] ),
 
 	b64encode( XJson );
 
-jsonb64encode( X ) ->
+jsonb64encode( X, _ParserState ) ->
 	throw( { invalid_content_to_jsonb64encode, X } ).
 
 

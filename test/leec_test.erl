@@ -36,6 +36,26 @@ run() ->
 
 	test_facilities:display( "Testing LEEC." ),
 
+	% Not in an OTP context here, yet we need OTP applications such as LEEC to
+	% work (ex: w.r.t. their .app being found, etc.):
+
+	OrderedAppNames = letsencrypt:get_ordered_prerequisites(),
+
+   % Build root directory from which prerequisite applications may be found:
+	BuildRootDir = "..",
+
+	% Updating ebin paths so that the corresponding *.app files are found:
+	case otp_utils:prepare_for_execution( [ letsencrypt | OrderedAppNames ],
+										  BuildRootDir ) of
+
+		ready ->
+			ok;
+
+		{ lacking_app, AppName } ->
+			throw( { lacking_prerequisite_app, AppName } )
+
+	end,
+
 	% Note that a webserver is unlikely to server that directory:
 	WebrootDirPath = "/tmp",
 

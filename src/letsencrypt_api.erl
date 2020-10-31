@@ -15,9 +15,9 @@
 -module(letsencrypt_api).
 -author("Guillaume Bour <guillaume@bour.cc>").
 
--export([ get_directory_map/2, get_nonce/2, create_acme_account/4,
-		  request_new_certificate/5, get_order/4, request_authorization/4,
-		  notify_ready_for_challenge/4, finalize_order/5, get_certificate/4,
+-export([ get_directory_map/3, get_nonce/3, create_acme_account/5,
+		  request_new_certificate/6, get_order/5, request_authorization/5,
+		  notify_ready_for_challenge/5, finalize_order/6, get_certificate/5,
 		  binary_to_status/1,
 		  get_tcp_connection/3, close_tcp_connections/0 ]).
 
@@ -59,6 +59,7 @@
 -type jws() :: letsencrypt:jws().
 -type order_map() :: letsencrypt:order_map().
 -type bin_certificate() :: letsencrypt:bin_certificate().
+-type le_state() :: letsencrypt:le_state().
 
 
 -ifdef(TEST).
@@ -166,9 +167,9 @@ get_tcp_connection( Proto, Host, Port ) ->
 			Conn;
 
 		[ { _ConnectTriplet, Conn } ] ->
-			trace_bridge:debug_fmt( "[~w] Reusing connection to ~s:~B, "
-				"with the '~s' scheme: ~w.",
-				[ self(), Host, Port, Proto, Conn ] ),
+			%trace_bridge:debug_fmt( "[~w] Reusing connection to ~s:~B, "
+			%	"with the '~s' scheme: ~w.",
+			%	[ self(), Host, Port, Proto, Conn ] ),
 			Conn
 
 	end.
@@ -200,20 +201,21 @@ close_tcp_connections() ->
 %
 % Returns that response, with added JSON structure if required.
 %
--spec decode( OptionMap :: option_map(), Response :: map() ) ->
+-spec decode( OptionMap :: option_map(), Response :: map(), le_state() ) ->
 					json_http_body().
-decode( _OptionMap=#{ json := true }, Response=#{ body := Body } ) ->
+decode( _OptionMap=#{ json := true }, Response=#{ body := Body },
+		#le_state{ json_parser_state=ParserState } ) ->
 
 	%trace_bridge:debug_fmt( "Decoding from JSON following body:~n~p",
 	%						[ Body ] ),
 
-	Payload = json_utils:from_json( Body ),
+	Payload = json_utils:from_json( Body, ParserState ),
 
 	%trace_bridge:debug_fmt( "Payload decoded from JSON:~n  ~p", [ Payload ] ),
 
 	Response#{ json => Payload };
 
-decode( _OptionMap, Response ) ->
+decode( _OptionMap, Response, _LEState ) ->
 	%trace_bridge:debug_fmt( "Not requested to decode from JSON following "
 	%						"response:~n~p", [ Response ] ),
 	Response.
@@ -231,9 +233,9 @@ decode( _OptionMap, Response ) ->
 %       (check ACME documentation)
 %
 -spec request( 'get' | 'post', uri(), header_map(),
-			   maybe( bin_content() ), option_map() ) -> shotgun:result() .
+	   maybe( bin_content() ), option_map(), le_state() ) -> shotgun:result() .
 request( Method, Uri, Headers, MaybeBinContent,
-		 OptionMap=#{ netopts := Netopts } ) ->
+		 OptionMap=#{ netopts := Netopts }, LEState ) ->
 
 	UriStr = text_utils:ensure_string( Uri ),
 
@@ -316,7 +318,7 @@ request( Method, Uri, Headers, MaybeBinContent,
 				location => proplists:get_value( <<"location">>, RHeaders,
 												 _Def=null )
 			},
-			decode( OptionMap, Resp );
+			decode( OptionMap, Resp, LEState );
 
 		_ ->
 			throw( { unexpected_request_answer, Method, UriStr, ReqRes } )
@@ -333,9 +335,9 @@ request( Method, Uri, Headers, MaybeBinContent,
 % Returns a directory map listing all ACME protocol URLs (see
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.1.1).
 %
--spec get_directory_map( environment(), option_map() ) ->
+-spec get_directory_map( environment(), option_map(), le_state() ) ->
 							   letsencrypt:directory_map().
-get_directory_map( Env, OptionMap ) ->
+get_directory_map( Env, OptionMap, LEState ) ->
 
 	DirUri = case Env of
 
@@ -352,7 +354,7 @@ get_directory_map( Env, OptionMap ) ->
 
 	#{ json := DirectoryMap, status_code := StatusCode } = request( _Method=get,
 		DirUri, _Headers=#{}, _MaybeBinContent=undefined,
-		OptionMap#{ json => true } ),
+		OptionMap#{ json => true }, LEState ),
 
 	case StatusCode of
 
@@ -374,14 +376,15 @@ get_directory_map( Env, OptionMap ) ->
 % Gets and returns a fresh nonce by using the correspoding URI (see
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.2).
 %
--spec get_nonce( directory_map(), option_map() ) -> nonce().
-get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap ) ->
+-spec get_nonce( directory_map(), option_map(), le_state() ) -> nonce().
+get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap, LEState ) ->
 
-	trace_bridge:debug_fmt( "[~w] Getting new nonce from ~s.", [ self(), Uri ] ),
+	%trace_bridge:debug_fmt( "[~w] Getting new nonce from ~s.",
+	%						[ self(), Uri ] ),
 
 	% Status code: 204 (No content):
 	#{ nonce := Nonce, status_code := StatusCode } = request( _Method=get, Uri,
-				_Headers=#{}, _MaybeBinContent=undefined, OptionMap ),
+				_Headers=#{}, _MaybeBinContent=undefined, OptionMap, LEState ),
 
 	case StatusCode of
 
@@ -410,9 +413,10 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap ) ->
 % - Nonce is a new valid replay-nonce
 %
 -spec create_acme_account( directory_map(), tls_private_key(), jws(),
-			   option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
+		option_map(), le_state() ) ->
+			{ json_map_decoded(), bin_uri(), nonce() }.
 create_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
-					 OptionMap ) ->
+					 OptionMap, LEState ) ->
 
 	trace_bridge:debug_fmt( "[~w] Requesting a new account from ~s.",
 							[ self(), Uri ] ),
@@ -421,11 +425,12 @@ create_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 	Payload = #{ termsOfServiceAgreed => true,
 				 contact => [] },
 
-	ReqB64 = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri }, Payload ),
+	ReqB64 = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri }, Payload,
+									 LEState ),
 
 	#{ json := Resp, location := LocationUri, nonce := NewNonce,
 	   status_code := StatusCode } = request( _Method=post, Uri, _Headers=#{},
-			_MaybeBinContent=ReqB64, OptionMap#{ json => true } ),
+			_MaybeBinContent=ReqB64, OptionMap#{ json => true }, LEState ),
 
 	case StatusCode of
 
@@ -458,10 +463,10 @@ create_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 % - Nonce is a new valid replay-nonce
 %
 -spec request_new_certificate( directory_map(), [ bin_domain() ],
-		tls_private_key(), jws(), option_map() ) ->
+		tls_private_key(), jws(), option_map(), le_state() ) ->
 								 { json_map_decoded(), bin_uri(), nonce() }.
 request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
-						 PrivKey, AccountJws, OptionMap ) ->
+						 PrivKey, AccountJws, OptionMap, LEState ) ->
 
 	trace_bridge:debug_fmt( "[~w] Requesting a new certificate from ~s for ~p.",
 							[ self(), OrderUri, BinDomains ] ),
@@ -471,11 +476,12 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 	IdPayload = #{ identifiers => Idns },
 
 	Req = letsencrypt_jws:encode( PrivKey, AccountJws#jws{ url=OrderUri },
-								  _Content=IdPayload ),
+								  _Content=IdPayload, LEState ),
 
 	#{ json := OrderJsonMap, location := LocationUri, nonce := Nonce,
 	   status_code := StatusCode } = request( _Method=post, OrderUri,
-		_Headers=#{}, _MaybeBinContent=Req, OptionMap#{ json => true } ),
+		_Headers=#{}, _MaybeBinContent=Req, OptionMap#{ json => true },
+		LEState ),
 
 	case StatusCode of
 
@@ -508,19 +514,20 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 
 
 % Returns order state.
--spec get_order( bin_uri(), bin_key(), jws(), option_map() ) ->
+-spec get_order( bin_uri(), bin_key(), jws(), option_map(), le_state() ) ->
 		  { json_map_decoded(), bin_uri(), nonce() }.
-get_order( Uri, Key, Jws, OptionMap ) ->
+get_order( Uri, Key, Jws, OptionMap, LEState ) ->
 
 	trace_bridge:debug_fmt( "[~w] Getting order at ~s.", [ self(), Uri ] ),
 
 	% POST-as-GET implies no payload:
 
-	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined ),
+	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined,
+								  LEState ),
 
 	#{ json := Resp, location := Location, nonce := Nonce } =
 		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
-				 OptionMap#{ json=> true } ),
+				 OptionMap#{ json=> true }, LEState ),
 
 	{ Resp, Location, Nonce }.
 
@@ -535,19 +542,20 @@ get_order( Uri, Key, Jws, OptionMap ) ->
 %		- Nonce is a new valid replay-nonce
 %
 -spec request_authorization( bin_uri(), tls_private_key(), jws(),
-			 option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
-request_authorization( AuthUri, PrivKey, Jws, OptionMap ) ->
+	 option_map(), le_state() ) -> { json_map_decoded(), bin_uri(), nonce() }.
+request_authorization( AuthUri, PrivKey, Jws, OptionMap, LEState ) ->
 
 	trace_bridge:debug_fmt( "[~w] Requesting authorization from ~s.",
 							[ self(), AuthUri ] ),
 
 	% POST-as-GET implies no payload:
 	B64AuthReq = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=AuthUri },
-										 _Content=undefined ),
+										 _Content=undefined, LEState ),
 
 	#{ json := Resp, location := LocationUri, nonce := Nonce,
 	   status_code := StatusCode } = request( _Method=post, AuthUri,
-		_Headers=#{}, _MaybeBinContent=B64AuthReq, OptionMap#{ json=> true } ),
+			_Headers=#{}, _MaybeBinContent=B64AuthReq,
+			OptionMap#{ json=> true }, LEState ),
 
 	case StatusCode of
 
@@ -568,24 +576,26 @@ request_authorization( AuthUri, PrivKey, Jws, OptionMap ) ->
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.5.1).
 %
 % Returns {Response, Location, Nonce}, where:
-%		- Response is json (decoded as map)
-%		- Location is create account url
-%		- Nonce is a new valid replay-nonce
+%  - Response is json (decoded as map)
+%  - Location is create account url
+%  - Nonce is a new valid replay-nonce
 %
 -spec notify_ready_for_challenge( challenge(), bin_key(), jws(),
-			  option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
+		option_map(), le_state() ) ->
+			{ json_map_decoded(), bin_uri(), nonce() }.
 notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
-							OptionMap ) ->
+							OptionMap, LEState ) ->
 
 	trace_bridge:debug_fmt( "[~w] Notifying the ACME server that our agent is "
 		"ready for challenge validation at ~s.", [ self(), Uri ] ),
 
 	% POST-as-GET implies no payload:
-	Req = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri }, _Content=#{} ),
+	Req = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri }, _Content=#{},
+								  LEState ),
 
 	#{ json := Resp, location := Location, nonce := Nonce,
 	   status_code := StatusCode } = request( _Method=post, Uri, _Headers=#{},
-			_MaybeBinContent=Req, OptionMap#{ json => true } ),
+			_MaybeBinContent=Req, OptionMap#{ json => true }, LEState ),
 
 	case StatusCode of
 
@@ -606,24 +616,31 @@ notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.
 %
 -spec finalize_order( order_map(), bin_csr_key(), tls_private_key(), jws(),
-			  option_map() ) -> { json_map_decoded(), bin_uri(), nonce() }.
+	  option_map(), le_state() ) -> { json_map_decoded(), bin_uri(), nonce() }.
 finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
-				OptionMap ) ->
+				OptionMap, LEState ) ->
 
-	trace_bridge:debug_fmt( "[~w] Finalizing order at ~s.", [ self(), FinUri ] ),
+	%trace_bridge:debug_fmt( "[~w] Finalizing order at ~s.",
+	%						[ self(), FinUri ] ),
 
 	Payload = #{ csr => Csr },
 
-	JWSBody = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=FinUri }, Payload ),
+	JWSBody = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=FinUri }, Payload,
+									  LEState ),
 
 	#{ json := FinOrderDirMap, location := BinLocUri, nonce := Nonce,
 	   status_code := StatusCode } = request( _Method=post, FinUri,
-		  _Headers=#{}, _MaybeBinContent=JWSBody, OptionMap#{ json => true } ),
+			_Headers=#{}, _MaybeBinContent=JWSBody, OptionMap#{ json => true },
+			LEState ),
 
 	case StatusCode of
 
 		200 ->
 			ok;
+
+		% If trying to progress whereas a past operation failed:
+		_Forbidden=403 ->
+			throw( { forbidden_status_code, StatusCode, finalize_order } );
 
 		_ ->
 			throw( { unexpected_status_code, StatusCode, finalize_order } )
@@ -637,19 +654,21 @@ finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 % Downloads certificate for finalized order (see
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.2) and returns it.
 %
--spec get_certificate( order_map(), tls_private_key(), jws(), option_map() ) ->
-		  { bin_certificate(), nonce() }.
-get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, OptionMap ) ->
+-spec get_certificate( order_map(), tls_private_key(), jws(), option_map(),
+					   le_state() ) -> { bin_certificate(), nonce() }.
+get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, OptionMap,
+				 LEState ) ->
 
 	trace_bridge:debug_fmt( "[~w] Downloading certificate at ~s.",
 							[ self(), Uri ] ),
 
 	% POST-as-GET implies no payload:
-	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined ),
+	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined,
+								  LEState ),
 
 	#{ body := BinCert, nonce := NewNonce, status_code := StatusCode  } =
 		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
-				 OptionMap ),
+				 OptionMap, LEState ),
 
 	case StatusCode of
 

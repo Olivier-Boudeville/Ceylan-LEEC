@@ -21,7 +21,7 @@
 
 -author("Guillaume Bour <guillaume@bour.cc>").
 
--export([ init/1, encode/3, get_key_authorization/2 ]).
+-export([ init/1, encode/4, get_key_authorization/3 ]).
 
 
 % Not involving Myriad's parse transform here:
@@ -48,9 +48,11 @@
 
 
 % Shorthands:
-%-type key() :: letsencrypt:key().
--type tls_private_key() :: letsencrypt:tls_private_key().
+
 -type jws() :: letsencrypt:jws().
+-type le_state() :: letsencrypt:le_state().
+
+-type tls_private_key() :: letsencrypt:tls_private_key().
 
 
 
@@ -68,13 +70,16 @@ init( #tls_private_key{ b64_pair={ N, E } } ) ->
 %
 % Content is the payload (if any).
 %
--spec encode( tls_private_key(), jws(), content() ) -> letsencrypt:binary_b64().
-encode( PrivateKey, Jws, Content ) ->
+-spec encode( tls_private_key(), jws(), content(), le_state() ) ->
+					letsencrypt:binary_b64().
+encode( PrivateKey, Jws, Content,
+		#le_state{ json_parser_state=ParserState } ) ->
 
-	trace_bridge:debug_fmt( "Encoding to JSON following JWS:~n  ~p~n"
-							"with content: ~p", [ Jws, Content ] ),
+	%trace_bridge:debug_fmt( "Encoding to JSON following JWS:~n  ~p~n"
+	%						"with content: ~p", [ Jws, Content ] ),
 
-	Protected = letsencrypt_utils:jsonb64encode( jws_to_map( Jws ) ),
+	Protected = letsencrypt_utils:jsonb64encode( jws_to_map( Jws ),
+												 ParserState ),
 
 	Payload = case Content of
 
@@ -83,7 +88,7 @@ encode( PrivateKey, Jws, Content ) ->
 			<<>>;
 
 		_ ->
-			letsencrypt_utils:jsonb64encode( Content )
+			letsencrypt_utils:jsonb64encode( Content, ParserState )
 
 	end,
 
@@ -94,7 +99,7 @@ encode( PrivateKey, Jws, Content ) ->
 
 	json_utils:to_json( #{ <<"protected">> => Protected,
 						   <<"payload">> => Payload,
-						   <<"signature">> => EncSigned } ).
+						   <<"signature">> => EncSigned }, ParserState ).
 
 
 
@@ -102,12 +107,13 @@ encode( PrivateKey, Jws, Content ) ->
 %
 % See https://www.rfc-editor.org/rfc/rfc8555.html#section-8.1.
 %
--spec get_key_authorization( letsencrypt:key(), letsencrypt:token() ) ->
-								   letsencrypt:key_auth().
-get_key_authorization( #tls_public_key{ kty=Kty, n=N, e=E }, Token ) ->
+-spec get_key_authorization( letsencrypt:key(), letsencrypt:token(),
+							 le_state() ) -> letsencrypt:key_auth().
+get_key_authorization( #tls_public_key{ kty=Kty, n=N, e=E }, Token,
+					   #le_state{ json_parser_state=ParserState } ) ->
 
 	Thumbprint = json_utils:to_json( #{ <<"kty">> => Kty, <<"n">> => N,
-										<<"e">> => E } ),
+										<<"e">> => E }, ParserState ),
 
 	ThumbprintHash = crypto:hash( sha256, Thumbprint ),
 

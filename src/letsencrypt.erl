@@ -36,7 +36,8 @@
 
 
 % Public API:
--export([ start/1, get_default_options/0, get_default_options/1,
+-export([ get_ordered_prerequisites/0,
+		  start/1, get_default_options/0, get_default_options/1,
 		  obtain_certificate_for/2, obtain_certificate_for/3, stop/1 ]).
 
 
@@ -226,6 +227,8 @@
 
 -type certificate() :: #certificate{}.
 
+% Need by other LEEC modules:
+-type le_state() :: #le_state{}.
 
 -export_type([ bin_domain/0, domain/0, le_mode/0, fsm_pid/0,
 			   challenge_type/0, bin_challenge_type/0,
@@ -237,7 +240,8 @@
 			   san/0, bin_san/0, json_map_decoded/0, agent_key_file_info/0,
 			   bin_certificate/0, bin_key/0, bin_csr_key/0,
 			   jws_algorithm/0, binary_b64/0, key_auth/0,
-			   tls_private_key/0, tls_public_key/0, jws/0, certificate/0 ]).
+			   tls_private_key/0, tls_public_key/0, jws/0, certificate/0,
+			   le_state/0 ]).
 
 
 % Where Let's Encrypt will attempt to find answers to its http-01 challenges:
@@ -252,67 +256,8 @@
 
 
 
-% State of a Let's Encrypt instance:
--record( le_state, {
-
-	% ACME environment:
-	env = prod :: 'staging' | 'prod',
-
-	% URI directory, fetched from ACME servers at startup (i.e. table of the
-	% URIs to be called depending on needs regarding certificates):
-	%
-	directory_map = undefined :: maybe( directory_map() ),
-
-	% Directory where certificates are to be stored:
-	cert_dir_path = <<"/tmp">> :: bin_directory_path(),
-
-	% Ex: mode = webroot.
-	mode = undefined :: maybe( le_mode() ),
-
-	% If mode is 'webroot':
-	webroot_dir_path = undefined :: maybe( bin_directory_path() ),
-
-	% If mode is 'standalone':
-	port = 80 :: tcp_port(),
-
-	intermediate_cert = undefined :: maybe( bin_certificate() ),
 
 
-	% State-related data:
-
-	% Current nonce to be specified, in order to avoid any replay attack:
-	nonce = undefined :: maybe( nonce() ),
-
-	domain = undefined :: maybe( net_utils:bin_fqdn() ),
-
-	% The Subject Alternative Names of interest:
-	sans = [] :: [ san() ],
-
-	% Information regarding the key of the LEEC agent:
-	agent_key_file_info = undefined :: maybe( agent_key_file_info() ),
-
-	% The TLS private key that the LEEC agent generated at startup:
-	agent_private_key = undefined :: maybe( tls_private_key() ),
-
-	% JSON Web Signature of the private key of the LEEC agent:
-	jws = undefined :: maybe( jws() ),
-
-	% The public key returned by the ACME server on account creation:
-	account_key :: tls_public_key(),
-
-	order = undefined :: maybe( directory_map() ),
-
-	% Known challenges, per URI:
-	challenges = #{} :: uri_challenge_map(),
-
-	% Path to the private key file of the LEEC agent:
-	agent_key_file_path = undefined :: maybe( file_path() ),
-
-	% API options:
-	option_map = get_default_options() :: option_map() }).
-
-
--type le_state() :: #le_state{}.
 
 
 % Typically fsm_pid():
@@ -346,24 +291,37 @@
 -type ustring() :: text_utils:ustring().
 -type bin_string() :: text_utils:bin_string().
 
-%-type file_name() :: file_utils:file_name().
 -type file_path() :: file_utils:file_path().
 -type bin_file_path() :: file_utils:bin_file_path().
 -type any_file_path() :: file_utils:any_file_path().
 
-%-type directory_path() :: file_utils:directory_path().
--type bin_directory_path() :: file_utils:bin_directory_path().
 -type any_directory_path() :: file_utils:any_directory_path().
 
-%-type milliseconds() :: unit_utils:milliseconds().
 
 -type tcp_port() :: net_utils:tcp_port().
 
 -type json() :: json_utils:json().
 
+-type application_name() :: otp_utils:application_name().
+
 
 
 % Public API.
+
+
+% Returns an (ordered) list of the LEEC prerequisite OTP applications, to be
+% started in that order.
+%
+% Notes:
+% - not listed here (not relevant for that use case): elli, getopt, yamerl,
+% erlang_color
+% - jsx preferred over jiffy; yet neither needs to be initialized as an
+% application
+% - no need to start myriad either
+%
+-spec get_ordered_prerequisites() -> [ application_name() ].
+get_ordered_prerequisites() ->
+	[ shotgun ].
 
 
 % Starts an instance of the LEEC service FSM.
@@ -373,15 +331,18 @@ start( UserOptions ) ->
 	trace_bridge:trace_fmt( "Starting, with following options:~n  ~p.",
 							[ UserOptions ] ),
 
-	application:ensure_all_started( letsencrypt ),
+	JsonParserState = json_utils:start_parser(),
 
-	json_utils:start_parser(),
+	{ ok, AppNames } = application:ensure_all_started( letsencrypt ),
+
+	trace_bridge:debug_fmt( "Applications started: ~p", [ AppNames ] ),
 
 	% Not registered in naming service on purpose, to allow for concurrent ACME
 	% interactions (i.e. multiple, parallel instances).
 	%
 	% Calls init/1 on the new process, and returns its outcome:
-	gen_statem:start_link( ?MODULE, UserOptions, _Opts=[] ).
+	gen_statem:start_link( ?MODULE, { UserOptions, JsonParserState },
+						   _Opts=[] ).
 
 
 
@@ -468,7 +429,7 @@ obtain_certificate_for( Domain, FsmPid, OptionMap ) ->
 
 
 
-% Stops the specified instance of letsencrypt service.
+% Stops the specified instance of LEEC service.
 -spec stop( fsm_pid() ) -> void().
 stop( FsmPid ) ->
 
@@ -501,16 +462,17 @@ stop( FsmPid ) ->
 %
 % Transitions to the 'idle' initial state.
 %
--spec init( [ user_option() ] ) ->
+-spec init( { [ user_option() ], json_utils:parser_state() } ) ->
 		{ 'ok', InitialStateName :: 'idle', InitialData :: le_state() }.
-init( UserOptions ) ->
+init( { UserOptions, JsonParserState } ) ->
 
-	LEState = setup_mode( get_options( UserOptions, _Blank=#le_state{} ) ),
+	LEState = setup_mode( get_options( UserOptions,
+				   #le_state{ json_parser_state=JsonParserState } ) ),
 
 	trace_bridge:debug_fmt( "[~w] Initial state:~n  ~p", [ self(), LEState ] ),
 
-	% Creates the private key (a tls_private_tls_public_key()) of this LEEC agent, and
-	% initialises its JWS:
+	% Creates the private key (a tls_private_tls_public_key()) of this LEEC
+	% agent, and initialises its JWS:
 	%
 	AgentPrivateKey = letsencrypt_tls:create_private_key(
 		LEState#le_state.agent_key_file_info, LEState#le_state.cert_dir_path ),
@@ -541,9 +503,10 @@ init( UserOptions ) ->
 	%	  <<"https://acme-staging-v02.api.letsencrypt.org/acme/revoke-cert">>}
 
 	URLDirectoryMap = letsencrypt_api:get_directory_map( LEState#le_state.env,
-														 OptionMap ),
+												 OptionMap, LEState ),
 
-	FirstNonce = letsencrypt_api:get_nonce( URLDirectoryMap, OptionMap ),
+	FirstNonce = letsencrypt_api:get_nonce( URLDirectoryMap, OptionMap,
+											LEState ),
 
 	trace_bridge:trace_fmt( "[~w][state] Switching initially to 'idle'.",
 							[ self() ] ),
@@ -764,7 +727,7 @@ idle( _EventType={ call, From },
 
 	{ AccountDecodedJsonMap, AccountLocationUri, AccountNonce } =
 		letsencrypt_api:create_acme_account( DirMap, PrivKey,
-									 Jws#jws{ nonce=Nonce }, OptionMap ),
+							 Jws#jws{ nonce=Nonce }, OptionMap, LEState ),
 
 	% Payload decoded from JSON in AccountDecodedJsonMap will be like:
 	%
@@ -811,7 +774,7 @@ idle( _EventType={ call, From },
 
 	{ OrderDecodedJsonMap, OrderLocationUri, OrderNonce } =
 		letsencrypt_api:request_new_certificate( DirMap, BinDomains, PrivKey,
-												 AccountJws, OptionMap ),
+									 AccountJws, OptionMap, LEState ),
 
 	case maps:get( <<"status">>, OrderDecodedJsonMap ) of
 
@@ -899,7 +862,8 @@ pending( _EventType={ call, From }, _EventContentMsg=get_ongoing_challenges,
 	trace_bridge:trace_fmt( "[~w] Getting ongoing challenges.", [ self() ] ),
 
 	ThumbprintMap = maps:from_list( [ { Token,
-		_Thumbprint=letsencrypt_jws:get_key_authorization( AccountKey, Token ) }
+		_Thumbprint=letsencrypt_jws:get_key_authorization( AccountKey, Token,
+														   LEState ) }
 		  || #{ <<"token">> := Token } <- maps:values( TypeChallengeMap ) ] ),
 
 	trace_bridge:trace_fmt( "[~w] Returning from pending state challenge "
@@ -920,9 +884,9 @@ pending( _EventType={ call, From }, _EventContentMsg=get_ongoing_challenges,
 %
 pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 		 _Data=LEState=#le_state{
-						  order=#{ <<"authorizations">> := AuthorizationsUris },
-						  nonce=InitialNonce, agent_private_key=PrivKey, jws=Jws,
-						  option_map=OptionMap } ) ->
+					  order=#{ <<"authorizations">> := AuthorizationsUris },
+					  nonce=InitialNonce, agent_private_key=PrivKey, jws=Jws,
+					  option_map=OptionMap } ) ->
 
 	trace_bridge:trace_fmt( "[~w] Checking whether challenges are completed.",
 							[ self() ] ),
@@ -934,12 +898,12 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 
 			{ AuthJsonMap, _Location, NewNonce } =
 					letsencrypt_api:request_authorization( AuthUri, PrivKey,
-								   Jws#jws{ nonce=AccNonce }, OptionMap ),
+						Jws#jws{ nonce=AccNonce }, OptionMap, LEState ),
 
 			BinStatus = maps:get( <<"status">>, AuthJsonMap ),
 
-			trace_bridge:debug_fmt( "[~w] For auth URI ~s, received "
-				"status '~s'.", [ self(), AuthUri, BinStatus ] ),
+			%trace_bridge:debug_fmt( "[~w] For auth URI ~s, received "
+			%	"status '~s'.", [ self(), AuthUri, BinStatus ] ),
 
 			NewStateName = case { AccStateName, BinStatus } of
 
@@ -971,6 +935,12 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 						"from '~s' to unsupported 'revoked' state.",
 						[ self(), AnyState, AuthUri ] ),
 					revoked;
+
+				{ AnyState, <<"invalid">> } ->
+					trace_bridge:warning_fmt( "[~w] For auth URI ~s, switching "
+						"from '~s' to unsupported 'invalid' state.",
+						[ self(), AnyState, AuthUri ] ),
+					invalid;
 
 				% By default remains in the current state (including 'pending'):
 				{ AccStateName, AnyBinStatus } ->
@@ -1077,7 +1047,7 @@ valid( _EventType={ call, _ServerRef=From },
 	Csr = letsencrypt_tls:get_cert_request( BinDomain, BinCertDirPath, SANs ),
 
 	{ FinOrderDirMap, _BinLocUri, FinNonce } = letsencrypt_api:finalize_order(
-		OrderDirMap, Csr, PrivKey, Jws#jws{ nonce=Nonce }, OptionMap ),
+		OrderDirMap, Csr, PrivKey, Jws#jws{ nonce=Nonce }, OptionMap, LEState ),
 
 	BinStatus = maps:get( <<"status">>, FinOrderDirMap ),
 
@@ -1140,7 +1110,7 @@ finalize( _EventType={ call, _ServerRef=From },
 	Loc = maps:get( <<"location">>, OrderMap ),
 
 	{ NewOrderMap, _NullLoc, OrderNonce } = letsencrypt_api:get_order( Loc,
-					PrivKey, Jws#jws{ nonce=Nonce }, OptionMap ),
+					PrivKey, Jws#jws{ nonce=Nonce }, OptionMap, LEState ),
 
 	BinStatus = maps:get( <<"status">>, NewOrderMap ),
 
@@ -1166,7 +1136,8 @@ finalize( _EventType={ call, _ServerRef=From },
 
 			% Downloads certificate:
 			{ BinCert, DownloadNonce } = letsencrypt_api:get_certificate(
-				OrderMap, PrivKey, Jws#jws{ nonce=OrderNonce }, OptionMap ),
+				OrderMap, PrivKey, Jws#jws{ nonce=OrderNonce }, OptionMap,
+				LEState ),
 
 			Domain = text_utils:binary_to_string( BinDomain ),
 
@@ -1598,7 +1569,7 @@ perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 	%  "https://acme-staging-v02.api.letsencrypt.org/acme/authz-v3/133572032"
 
 	{ AuthMap, _LocUri, NewNonce } = letsencrypt_api:request_authorization(
-		AuthUri, PrivKey, Jws#jws{ nonce=Nonce }, OptionMap ),
+		AuthUri, PrivKey, Jws#jws{ nonce=Nonce }, OptionMap, LEState ),
 
 	trace_bridge:debug_fmt( "[~w] Step 1: authmap returned for URI '~s':~n  ~p.",
 							[ self(), AuthUri, AuthMap ] ),
@@ -1676,7 +1647,7 @@ perform_authorization_step2( _Pairs=[ { Uri, Challenge } | T ],
 
 	{ Resp, _Location, NewNonce } =
 		letsencrypt_api:notify_ready_for_challenge( Challenge, AgentPrivKey,
-										Jws#jws{ nonce=Nonce }, OptionMap ),
+								Jws#jws{ nonce=Nonce }, OptionMap, LEState ),
 
 	case maps:get( <<"status">>, Resp ) of
 
@@ -1704,7 +1675,8 @@ perform_authorization_step2( _Pairs=[ { Uri, Challenge } | T ],
 -spec init_for_challenge_type( challenge_type(), le_mode(), le_state(),
 							   uri_challenge_map() ) -> void().
 init_for_challenge_type( _ChallengeType='http-01', _Mode=webroot,
-		#le_state{ webroot_dir_path=BinWebrootPath, account_key=AccountKey },
+		LEState=#le_state{ webroot_dir_path=BinWebrootPath, 
+						   account_key=AccountKey },
 		UriChallengeMap ) ->
 
 	[ begin
@@ -1715,7 +1687,8 @@ init_for_challenge_type( _ChallengeType='http-01', _Mode=webroot,
 
 		ChlgWebPath = file_utils:join( ChlgWebDir, Token ),
 
-		Thumbprint = letsencrypt_jws:get_key_authorization( AccountKey, Token ),
+		Thumbprint = letsencrypt_jws:get_key_authorization( AccountKey, Token,
+															LEState ),
 
 		% Hopefully the default modes are fine:
 		file_utils:write_whole( ChlgWebPath, Thumbprint, _Modes=[] )
@@ -1728,7 +1701,7 @@ init_for_challenge_type( _ChallengeType, _Mode=slave, _LEState,
 	ok;
 
 init_for_challenge_type( ChallengeType, _Mode=standalone,
-			#le_state{ port=Port, domain=Domain, account_key=AccntKey },
+			LEState=#le_state{ port=Port, domain=Domain, account_key=AccntKey },
 			UriChallengeMap ) ->
 
 	%trace_bridge:debug_fmt( "Init standalone challenge for ~p.",
@@ -1747,7 +1720,7 @@ init_for_challenge_type( ChallengeType, _Mode=standalone,
 			% Iterating on values:
 			Thumbprints = maps:from_list(
 				[ { Token, letsencrypt_jws:get_key_authorization( AccntKey,
-																  Token ) }
+														  Token, LEState ) }
 				  || #{ <<"token">> := Token }
 						 <- maps:values( UriChallengeMap ) ] ),
 
