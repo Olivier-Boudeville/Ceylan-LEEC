@@ -12,7 +12,8 @@ endif
 
 # PROJECT_NAME should be defined on a per-project basis.
 ifndef PROJECT_NAME
-	PROJECT_NAME := letsencrypt-erlang-ceylan
+	# Namely letsencrypt-erlang-ceylan:
+	PROJECT_NAME := leec
 endif
 
 
