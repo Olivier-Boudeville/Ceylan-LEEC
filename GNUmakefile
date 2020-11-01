@@ -1,7 +1,7 @@
 LEEC_TOP = .
 
 
-.PHONY: all-rebar help help-intro help-leec                              \
+.PHONY: all all-rebar3 help help-intro help-leec                         \
 		all register-version-in-header register-leec test-leec           \
 		list-beam-dirs add-prerequisite-plts link-plt                    \
 		send-release release release-zip release-bz2 release-xz          \
@@ -19,9 +19,14 @@ LEEC_RELEASES = $(LEEC_RELEASE_ARCHIVE_BZ2) \
 				$(LEEC_RELEASE_ARCHIVE_ZIP) \
 				$(LEEC_RELEASE_ARCHIVE_XZ)
 
-all: all-rebar
 
-all-rebar:
+# Now the default build system is our own. Use the 'all-rebar3' target if
+# preferring the rebar3 way of building.
+#
+all:
+
+
+all-rebar3:
 	@$(REBAR3_EXEC) upgrade
 	@$(REBAR3_EXEC) compile
 

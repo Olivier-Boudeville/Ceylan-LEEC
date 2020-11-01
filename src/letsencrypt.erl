@@ -335,7 +335,7 @@ start( UserOptions ) ->
 
 	{ ok, AppNames } = application:ensure_all_started( letsencrypt ),
 
-	trace_bridge:debug_fmt( "Applications started: ~p", [ AppNames ] ),
+	trace_bridge:debug_fmt( "Applications started: ~p.", [ AppNames ] ),
 
 	% Not registered in naming service on purpose, to allow for concurrent ACME
 	% interactions (i.e. multiple, parallel instances).
@@ -469,7 +469,7 @@ init( { UserOptions, JsonParserState } ) ->
 	LEState = setup_mode( get_options( UserOptions,
 				   #le_state{ json_parser_state=JsonParserState } ) ),
 
-	trace_bridge:debug_fmt( "[~w] Initial state:~n  ~p", [ self(), LEState ] ),
+	%trace_bridge:debug_fmt( "[~w] Initial state:~n  ~p", [ self(), LEState ] ),
 
 	% Creates the private key (a tls_private_tls_public_key()) of this LEEC
 	% agent, and initialises its JWS:
@@ -758,8 +758,10 @@ idle( _EventType={ call, From },
 
 	AccountKey = letsencrypt_tls:map_to_key( AccountKeyAsMap ),
 
-	trace_bridge:trace_fmt( "[~w] The obtained ACME account key is:~n  ~p",
-							[ self(), AccountKey ] ),
+	%trace_bridge:trace_fmt( "[~w] The obtained ACME account key is:~n  ~p",
+	%						[ self(), AccountKey ] ),
+
+	trace_bridge:trace_fmt( "[~w] ACME account key obtained.", [ self() ] ),
 
 	% Apparently a difference JWS then:
 	AccountJws = #jws{ alg=Jws#jws.alg, kid=AccountLocationUri,
@@ -1104,8 +1106,11 @@ finalize( _EventType={ call, _ServerRef=From },
 			  agent_private_key=PrivKey, jws=Jws, nonce=Nonce,
 			  option_map=OptionMap } ) ->
 
+	%trace_bridge:trace_fmt( "[~w] Getting progress of creation procedure "
+	%	"based on order map:~n   ~p.", [ self(), OrderMap ] ),
+
 	trace_bridge:trace_fmt( "[~w] Getting progress of creation procedure "
-		"based on order map:~n   ~p.", [ self(), OrderMap ] ),
+							"based on order map.", [ self() ] ),
 
 	Loc = maps:get( <<"location">>, OrderMap ),
 
@@ -1365,7 +1370,8 @@ get_options( _Opts=[ { http_timeout, Timeout } | _T ], _LEState ) ->
 	throw( { invalid_http_timeout, Timeout } );
 
 get_options( _Opts=[ Unexpected | _T ], _LEState ) ->
-	trace_bridge:error_fmt( "Invalid LEEC option specified: ~p.", [ Unexpected ] ),
+	trace_bridge:error_fmt( "Invalid LEEC option specified: ~p.",
+							[ Unexpected ] ),
 	throw( { invalid_leec_option, Unexpected } ).
 
 
@@ -1522,8 +1528,8 @@ perform_authorization( ChallengeType, AuthUris,
 	{ UriChallengeMap, Nonce } = perform_authorization_step1( AuthUris,
 				BinChallengeType, LEState, _UriChallengeMap=#{} ),
 
-	trace_bridge:debug_fmt( "[~w] URI challenge map after step 1:~n  ~p.",
-							[ self(), UriChallengeMap ] ),
+	%trace_bridge:debug_fmt( "[~w] URI challenge map after step 1:~n  ~p.",
+	%						[ self(), UriChallengeMap ] ),
 
 	% UriChallengeMap is like:
 	%
@@ -1571,8 +1577,8 @@ perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 	{ AuthMap, _LocUri, NewNonce } = letsencrypt_api:request_authorization(
 		AuthUri, PrivKey, Jws#jws{ nonce=Nonce }, OptionMap, LEState ),
 
-	trace_bridge:debug_fmt( "[~w] Step 1: authmap returned for URI '~s':~n  ~p.",
-							[ self(), AuthUri, AuthMap ] ),
+	%trace_bridge:debug_fmt( "[~w] Step 1: authmap returned for URI '~s':"
+	%						"~n  ~p.", [ self(), AuthUri, AuthMap ] ),
 
 	% Ex: AuthMap =
 	% #{<<"challenges">> =>
@@ -1675,7 +1681,7 @@ perform_authorization_step2( _Pairs=[ { Uri, Challenge } | T ],
 -spec init_for_challenge_type( challenge_type(), le_mode(), le_state(),
 							   uri_challenge_map() ) -> void().
 init_for_challenge_type( _ChallengeType='http-01', _Mode=webroot,
-		LEState=#le_state{ webroot_dir_path=BinWebrootPath, 
+		LEState=#le_state{ webroot_dir_path=BinWebrootPath,
 						   account_key=AccountKey },
 		UriChallengeMap ) ->
 

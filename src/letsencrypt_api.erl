@@ -163,7 +163,7 @@ get_tcp_connection( Proto, Host, Port ) ->
 		   end,
 
 			ets:insert( ?connection_table, { ConnectTriplet, Conn } ),
-			trace_bridge:trace_fmt( "Connection ~p cached.", [ Conn ] ),
+			%trace_bridge:trace_fmt( "Connection ~p cached.", [ Conn ] ),
 			Conn;
 
 		[ { _ConnectTriplet, Conn } ] ->
@@ -366,8 +366,8 @@ get_directory_map( Env, OptionMap, LEState ) ->
 
 	end,
 
-	trace_bridge:debug_fmt( "[~w] Obtained directory map:~n~p",
-							[ self(), DirectoryMap ] ),
+	%trace_bridge:debug_fmt( "[~w] Obtained directory map:~n~p",
+	%						[ self(), DirectoryMap ] ),
 
 	DirectoryMap.
 
@@ -396,7 +396,7 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap, LEState ) ->
 
 	end,
 
-	trace_bridge:debug_fmt( "[~w] New nonce is: ~p.", [ self(), Nonce ] ),
+	%trace_bridge:debug_fmt( "[~w] New nonce is: ~p.", [ self(), Nonce ] ),
 
 	Nonce.
 
@@ -442,13 +442,14 @@ create_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 		%
 		_Success=200 ->
 			ok;
+
 		_ ->
 			throw( { unexpected_status_code, StatusCode, create_acme_account } )
 
 	end,
 
-	trace_bridge:debug_fmt( "[~w] Account location URI is '~s', "
-		"JSON response is :~n  ~p", [ self(), LocationUri, Resp ] ),
+	%trace_bridge:debug_fmt( "[~w] Account location URI is '~s', "
+	%	"JSON response is :~n  ~p", [ self(), LocationUri, Resp ] ),
 
 	{ Resp, LocationUri, NewNonce }.
 
@@ -494,9 +495,12 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 
 	end,
 
+	%trace_bridge:debug_fmt( "[~w] Obtained from order URI '~s' the "
+	%	"location '~s' and following JSON:~n  ~p",
+	%	[ self(), OrderUri, LocationUri, OrderJsonMap ] ),
+
 	trace_bridge:debug_fmt( "[~w] Obtained from order URI '~s' the "
-		"location '~s' and following JSON:~n  ~p",
-		[ self(), OrderUri, LocationUri, OrderJsonMap ] ),
+		"location '~s'.", [ self(), OrderUri, LocationUri ] ),
 
 	% OrderJsonMap like:
 	%

@@ -73,7 +73,7 @@ create_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 
 	end,
 
-	trace_bridge:debug_fmt( "[~w] A private key will be created in '~s'.",
+	trace_bridge:debug_fmt( "[~w] A private key is to be created in '~s'.",
 							[ self(), UniqPath ] ),
 
 	% Could have been more elegant:
@@ -89,6 +89,9 @@ create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 	case file_utils:is_existing_file( KeyFilePath ) of
 
 		true ->
+			% The user code shall remove any prior key first if wanting to avoid
+			% this warning:
+			%
 			trace_bridge:warning_fmt( "A '~s' key file was already existing, "
 				"it will be overwritten.", [ KeyFilePath ] );
 
@@ -278,8 +281,11 @@ write_certificate( Domain, BinDomainCert, BinCertDirPath ) ->
 
 	CertFilePath = file_utils:join( BinCertDirPath, Domain ++ ".crt" ),
 
+	%trace_bridge:debug_fmt( "Writing certificate for domain '~s' "
+	%	"in '~s':~n  ~p.", [ Domain, CertFilePath, BinDomainCert ] ),
+
 	trace_bridge:debug_fmt( "Writing certificate for domain '~s' "
-		"in '~s':~n  ~p.", [ Domain, CertFilePath, BinDomainCert ] ),
+							"in '~s'.", [ Domain, CertFilePath ] ),
 
 	% For example in case of renewal:
 	file_utils:remove_file_if_existing( CertFilePath ),

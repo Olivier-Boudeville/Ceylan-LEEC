@@ -50,10 +50,14 @@ Validation challenges
 
 ## Building
 
+Two build procedures can be used from the root of LEEC:
+- either a rebar3-based one: then run `make all-rebar3`, or just:
 ```
  $> ./rebar3 update
  $> ./rebar3 compile
 ```
+- or one relying on Ceylan's native build system: then run `make all`
+
 
 ## Quickstart (as webroot)
 
