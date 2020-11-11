@@ -21,7 +21,7 @@ pre.code {
 
 /* For command printouts: */
 .literal-block {
-  background: #f1e0a8;
+  background: #ff4008;
 }
 
 
@@ -118,7 +118,7 @@ h3 {
 
 
 h4 {
-  color : #c16811;
+  color : #ff6811;
   font-size: 21px;
   margin-left: 10%;
   margin-right: 7%;
@@ -127,7 +127,7 @@ h4 {
 
 
 h5 {
-	color : #c57e39;
+	color : #ff7e39;
   font-size: 16px;
   margin-left: 15%;
   margin-right: 15%;
@@ -303,7 +303,7 @@ th {
 
 
 td {
-   background : #e3c13b;
+   background : #bf8383;
    font-size: 15px;
 }
 
@@ -355,7 +355,7 @@ td a {
 
 
 a:link {
-  color:#e67200;
+  color:#bb3230;
   background: transparent;
   font-weight: bold;
   text-decoration: none;
@@ -364,7 +364,7 @@ a:link {
 
 
 a:visited {
-  color: #ce955d;
+  color: #cc555d;
   background: transparent;
   font-weight: bold;
   text-decoration: none;
@@ -419,7 +419,7 @@ div.banner {
 
 div.banner p {
   color: #00FF00;
-  background: #db832b;
+  background: #aa332b;
   margin-left: 0em;
   padding:  0em;
   font-family: Arial, sans-serif;
