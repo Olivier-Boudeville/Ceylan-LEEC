@@ -320,7 +320,13 @@ In spite of the appearances, it remained nevertheless very close to the original
 
 Most of the elements of [this pull request](https://github.com/gbour/letsencrypt-erlang/pull/16/) from Marc Worrell have also been integrated.
 
+## LEEC Website: under construction
+
+In some unspecified future one may also be able to refer to the [LEEC official documentation](http://leec.esperide.org), otherwise to its [mirror](http://olivier-boudeville.github.io/letsencrypt-erlang/).
+
+The 'master' branch is aimed to be the current stable version of this library.
+
 
 ## License
 
-LEEC is distributed under APACHE 2.0 license, like the original work it derives from.
+LEEC is distributed under APACHE 2.0 license, like the original work that it derives from.
