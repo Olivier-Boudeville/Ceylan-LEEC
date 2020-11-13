@@ -287,7 +287,7 @@ terminate(Reason, Req, State) ->
 
 To be used when you have no live http server running on your server.
 
-LEEC will then start its own webserver just during the time necessary in order to validate the challenge, then will stop it immediately after that.
+LEEC will then start its own webserver (based on Elli) just during the time necessary in order to validate the challenge, then will stop it immediately after that.
 
 ```erlang
 

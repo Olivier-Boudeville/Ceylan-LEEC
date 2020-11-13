@@ -5,6 +5,10 @@
  {<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},0},
  {<<"gun">>,{pkg,<<"gun">>,<<"1.3.1">>},1},
  {<<"jsx">>,{pkg,<<"jsx">>,<<"3.0.0">>},0},
+ {<<"myriad">>,
+  {git,"git://github.com/Olivier-Boudeville/Ceylan-Myriad",
+       {ref,"0ea44734ac88b733f2e6df112991d48e0a4e5329"}},
+  0},
  {<<"shotgun">>,{pkg,<<"shotgun">>,<<"0.4.0">>},0},
  {<<"yamerl">>,{pkg,<<"yamerl">>,<<"0.7.0">>},0}]}.
 [
