@@ -12,26 +12,27 @@ endif
 
 # PROJECT_NAME should be defined on a per-project basis.
 ifndef PROJECT_NAME
-	# Namely letsencrypt-erlang-ceylan:
+	# Namely Let's Encrypt Erlang Ceylan:
 	PROJECT_NAME := leec
 endif
 
 
 # REBAR3_PROJECT_NAME should be defined on a per-project basis.
 ifndef REBAR3_PROJECT_NAME
-	REBAR3_PROJECT_NAME := letsencrypt
+	#REBAR3_PROJECT_NAME := letsencrypt
+	REBAR3_PROJECT_NAME := leec
 endif
 
 
 # The uniquely-defined version of this layer, for all uses (including rebar and
 # hex):
 #
-LE_VERSION := 1.0.0
+LEEC_VERSION := 0.5.0
 
 
 # PROJECT_VERSION should be defined on a per-project basis.
 ifndef PROJECT_VERSION
-	PROJECT_VERSION := $(LE_VERSION)
+	PROJECT_VERSION := $(LEEC_VERSION)
 endif
 
 
