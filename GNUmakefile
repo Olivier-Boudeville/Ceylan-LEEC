@@ -6,7 +6,9 @@ LEEC_TOP = .
 		list-beam-dirs add-prerequisite-plts link-plt                    \
 		send-release release release-zip release-bz2 release-xz          \
 		prepare-release clean-release clean-archive                      \
-		check-types check-cross-references info-paths info-compile
+		check-types check-cross-references                               \
+		info-paths info-compile info-deps
+
 
 MODULES_DIRS = src #doc test priv
 
@@ -139,6 +141,18 @@ info-compile:
 	@echo "ERLANG_COMPILER_OPT_BASE = $(ERLANG_COMPILER_OPT_BASE)"
 	@echo "OVERALL_PZ_OPT = $(OVERALL_PZ_OPT)"
 	@echo "ERLANG_COMPILER_OPT_FOR_STANDARD_MODULES = $(ERLANG_COMPILER_OPT_FOR_STANDARD_MODULES)"
+
+
+info-deps:
+	@echo "COWLIB_TOP = $(COWLIB_TOP)"
+	@echo "GUN_TOP = $(GUN_TOP)"
+	@echo "SHOTGUN_TOP = $(SHOTGUN_TOP)"
+	@echo "ELLI_TOP = $(ELLI_TOP)"
+	@echo "ERLANG_COLOR_TOP = $(ERLANG_COLOR_TOP)"
+	@echo "YAMERL_TOP = $(YAMERL_TOP)"
+	@echo "GETOPT_TOP = $(GETOPT_TOP)"
+	@echo "JSX_TOP = $(JSX_TOP)"
+	@echo "JIFFY_TOP = $(JIFFY_TOP)"
 
 
 include $(LEEC_TOP)/GNUmakesettings.inc

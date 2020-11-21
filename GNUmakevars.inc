@@ -148,7 +148,10 @@ ifndef PREDECESSOR_PLT
 endif
 
 
-# Prererequisites are supposedly already available and built thanks to rebar3:
+# Prererequisites are supposedly already available and built as siblings,
+# otherwise thanks to rebar3:
+
+SIBLING_ROOT = $(LEEC_TOP)/..
 PREREQ_ROOT = $(LEEC_TOP)/_build/default/lib
 
 
@@ -190,26 +193,91 @@ else
 
 endif
 
+
 # Other LEEC dependencies:
 
-COWLIB_TOP       = $(PREREQ_ROOT)/cowlib
-GUN_TOP          = $(PREREQ_ROOT)/gun
-SHOTGUN_TOP      = $(PREREQ_ROOT)/shotgun
-ELLI_TOP         = $(PREREQ_ROOT)/elli
+# We must ensure to select the same locations as otp_utils, otherwise some
+# modules (typically of jsx) could be found more than once, which leads to a
+# runtime error:
 
-ERLANG_COLOR_TOP = $(PREREQ_ROOT)/erlang_color
-YAMERL_TOP       = $(PREREQ_ROOT)/yamerl
-GETOPT_TOP       = $(PREREQ_ROOT)/getopt
+ifndef COWLIB_TOP
+	ifneq ($(wildcard $(SIBLING_ROOT)/cowlib/.),)
+		COWLIB_TOP = $(SIBLING_ROOT)/cowlib
+	else
+		COWLIB_TOP = $(PREREQ_ROOT)/cowlib
+	endif
+endif
 
-JSX_TOP          = $(PREREQ_ROOT)/jsx
-JIFFY_TOP        = $(PREREQ_ROOT)/jiffy
+ifndef GUN_TOP
+	ifneq ($(wildcard $(SIBLING_ROOT)/gun/.),)
+		GUN_TOP = $(SIBLING_ROOT)/gun
+	else
+		GUN_TOP = $(PREREQ_ROOT)/gun
+	endif
+endif
+
+ifndef SHOTGUN_TOP
+	ifneq ($(wildcard $(SIBLING_ROOT)/shotgun/.),)
+		SHOTGUN_TOP = $(SIBLING_ROOT)/shotgun
+	else
+		SHOTGUN_TOP = $(PREREQ_ROOT)/shotgun
+	endif
+endif
+
+ifndef ELLI_TOP
+	ifneq ($(wildcard $(SIBLING_ROOT)/elli/.),)
+		ELLI_TOP = $(SIBLING_ROOT)/elli
+	else
+		ELLI_TOP = $(PREREQ_ROOT)/elli
+	endif
+endif
+
+ifndef ERLANG_COLOR_TOP
+	ifneq ($(wildcard $(SIBLING_ROOT)/erlang_color/.),)
+		ERLANG_COLOR_TOP = $(SIBLING_ROOT)/erlang_color
+	else
+		ERLANG_COLOR_TOP = $(PREREQ_ROOT)/erlang_color
+	endif
+endif
+
+ifndef YAMERL_TOP
+	ifneq ($(wildcard $(SIBLING_ROOT)/yamerl/.),)
+		YAMERL_TOP = $(SIBLING_ROOT)/yamerl
+	else
+		YAMERL_TOP = $(PREREQ_ROOT)/yamerl
+	endif
+endif
+
+ifndef GETOPT_TOP
+	ifneq ($(wildcard $(SIBLING_ROOT)/getopt/.),)
+		GETOPT_TOP = $(SIBLING_ROOT)/getopt
+	else
+		GETOPT_TOP = $(PREREQ_ROOT)/getopt
+	endif
+endif
+
+ifndef JSX_TOP
+	ifneq ($(wildcard $(SIBLING_ROOT)/jsx/.),)
+		JSX_TOP = $(SIBLING_ROOT)/jsx
+	else
+		JSX_TOP = $(PREREQ_ROOT)/jsx
+	endif
+endif
+
+ifndef JIFFY_TOP
+	ifneq ($(wildcard $(SIBLING_ROOT)/jiffy/.),)
+		JIFFY_TOP = $(SIBLING_ROOT)/jiffy
+	else
+		JIFFY_TOP = $(PREREQ_ROOT)/jiffy
+	endif
+endif
 
 LEEC_EXTRA_DEPS = $(COWLIB_TOP) $(GUN_TOP) $(SHOTGUN_TOP)       \
 				  $(ELLI_TOP) $(ERLANG_COLOR_TOP) $(YAMERL_TOP) \
 				  $(GETOPT_TOP) $(JSX_TOP) $(JIFFY_TOP)
 
 # $(PREREQ_ROOT) is added, as most includes are expected to be done with
-#  include_lib, hence as, for example, "elli/include/elli.hrl":
+# include_lib, hence as, for example, "elli/include/elli.hrl":
 #
 INC += $(foreach dir,$(LEEC_EXTRA_DEPS),-I$(dir)/include) -I$(PREREQ_ROOT)
 
