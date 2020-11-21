@@ -339,4 +339,13 @@ LEEC_EXTRA_DEPS = $(COWLIB_TOP) $(GUN_TOP) $(SHOTGUN_TOP)       \
 #
 INC += $(foreach dir,$(LEEC_EXTRA_DEPS),-I$(dir)/include) -I$(SIBLING_ROOT) -I$(PREREQ_ROOT)
 
-BEAM_DIRS += $(foreach dir,$(LEEC_EXTRA_DEPS),$(dir)/ebin)
+
+# These directories are not added anymore here, as otp_utils will also add them
+# programatically in the code path; moreover these paths would be transformed
+# (in launch-erl.sh) through realpath, which would lead them to be added as
+# NATIVE_BASE/leec/_build/default/lib/X instead of
+# NATIVE_BASE/us_web/_checkouts/leec/_build/default/lib/X (ex: X being jsx),
+# leading in turn the erroneous detection of duplicated BEAM files in the code
+# path (ex: jsx.beam).
+#
+#BEAM_DIRS += $(foreach dir,$(LEEC_EXTRA_DEPS),$(dir)/ebin)
