@@ -1,5 +1,66 @@
 # Prerequisite: LEEC_TOP must be set.
 
+# To understand why taking into account such conditionals requires to specify
+# them first, and in each layer, rather than at the end of the last one, refer
+# to the section about conditionals at the top of the GNUmakevars.inc of Myriad.
+
+
+# Overall settings section.
+
+#EXECUTION_TARGET = production
+
+ifndef EXECUTION_TARGET
+
+	# Other possible value: production
+	EXECUTION_TARGET = development
+
+endif
+
+
+ifeq ($(EXECUTION_TARGET),development)
+
+	#$(info Execution target is development)
+
+	ENABLE_DEBUG = true
+
+else ifeq ($(EXECUTION_TARGET),production)
+
+	#$(info Execution target is production)
+
+	ENABLE_DEBUG = false
+
+else
+
+	$(error Invalid Leec execution target '$(EXECUTION_TARGET)'; expecting either 'development' or 'production')
+
+endif
+
+
+# Enforce default values:
+
+
+
+# Defining (optional) layer-specific flags, typically used by in-code
+# conditional compilation primitives (see cond_utils for their management):
+
+# Topics covered by flags:
+#  - xx (none yet)
+
+# Defining debug flags (at least the most verbose are by default commented-out):
+ifeq ($(ENABLE_DEBUG),true)
+	#LEEC_DEBUG_FLAGS += -Dleec_debug_xx
+endif
+
+# Defining check flags:
+ifeq ($(EXECUTION_TARGET),development)
+	# Does not exist: LEEC_CHECK_FLAGS += -Dleec_check_xx
+endif
+
+ERLANG_COMPILER_OPT_BASE += $(LEEC_DEBUG_FLAGS) \
+							$(LEEC_CHECK_FLAGS)
+
+
+
 # Useful to target for example the root of the current layer (ex: to locate the
 # relevant, layer-local '_build' directory):
 #
@@ -158,14 +219,19 @@ PREREQ_ROOT = $(LEEC_TOP)/_build/default/lib
 # We define the path to the Myriad layer (possibly available as a symbolic
 # link).
 #
-# For the sake of these build-related makefiles, Ceylan dependencies may be
-# found either in a local _checkouts child directory (if checkout directories
-# are used and if the top-level package of interest is the current one), or in
-# sibling directories (i.e. whose build root is at the same level as this one).
+# For the sake of these build-related makefiles, Ceylan dependencies will be
+# searched (in that order, the one enforced in otp_utils) in a local _checkouts
+# child directory (if checkout directories are used and if the top-level package
+# of interest is the current one), otherwise in sibling directories (i.e. whose
+# build root is at the same level as this one).
+#
+# This last case happens notably if not using checkout directories, or if using
+# them and if all the packages mentioned here are themselves dependencies (in
+# which case they are all sitting together in the _checkouts child directory).
 #
 # This means that a Ceylan build will ignore the Myriad version in PREREQ_ROOT
 # and use instead one defined just below.
-
+#
 # This last case happens notably if not using checkout directories, or if using
 # them and if all the packages mentioned here are themselves dependencies (in
 # which case they are all sitting together in the _checkouts child directory).
@@ -173,24 +239,16 @@ PREREQ_ROOT = $(LEEC_TOP)/_build/default/lib
 # Note also we rely on the names of build roots (ex: myriad) as opposed to
 # project/repository names (ex: Ceylan-Myriad):
 #
-ifneq ($(wildcard $(LEEC_TOP)/../myriad),)
-
-	# By default, expect sibling directories:
-	MYRIAD_TOP = $(LEEC_TOP)/../myriad
-
+# First priority is an existing checkout directory:
+ifneq ($(wildcard $(LEEC_TOP)/_checkouts/myriad/.),)
+	MYRIAD_TOP = $(LEEC_TOP)/_checkouts/myriad
 else
-
-	# Otherwise assume a checkout one:
-	ifneq ($(wildcard $(LEEC_TOP)/_checkouts/myriad),)
-
-		MYRIAD_TOP = $(LEEC_TOP)/_checkouts/myriad
-
+	# Otherwise a sibling one is searched for:
+	ifneq ($(wildcard $(LEEC_TOP)/../myriad/.),)
+		MYRIAD_TOP = $(LEEC_TOP)/../myriad
    else
-
 		FORCE_EVAL := $(error Unable to find the build root of Ceylan-Myriad)
-
 	endif
-
 endif
 
 
@@ -276,9 +334,9 @@ LEEC_EXTRA_DEPS = $(COWLIB_TOP) $(GUN_TOP) $(SHOTGUN_TOP)       \
 				  $(ELLI_TOP) $(ERLANG_COLOR_TOP) $(YAMERL_TOP) \
 				  $(GETOPT_TOP) $(JSX_TOP) $(JIFFY_TOP)
 
-# $(PREREQ_ROOT) is added, as most includes are expected to be done with
-# include_lib, hence as, for example, "elli/include/elli.hrl":
+# $(SIBLING_ROOT) and $(PREREQ_ROOT) are added, as most includes are expected to
+# be done with include_lib, hence as, for example, "elli/include/elli.hrl":
 #
-INC += $(foreach dir,$(LEEC_EXTRA_DEPS),-I$(dir)/include) -I$(PREREQ_ROOT)
+INC += $(foreach dir,$(LEEC_EXTRA_DEPS),-I$(dir)/include) -I$(SIBLING_ROOT) -I$(PREREQ_ROOT)
 
 BEAM_DIRS += $(foreach dir,$(LEEC_EXTRA_DEPS),$(dir)/ebin)

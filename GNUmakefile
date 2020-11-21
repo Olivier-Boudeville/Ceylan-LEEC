@@ -7,7 +7,7 @@ LEEC_TOP = .
 		send-release release release-zip release-bz2 release-xz          \
 		prepare-release clean-release clean-archive                      \
 		check-types check-cross-references                               \
-		info-paths info-compile info-deps
+		info-paths info-compile info-conditionals info-deps
 
 
 MODULES_DIRS = src #doc test priv
@@ -141,6 +141,11 @@ info-compile:
 	@echo "ERLANG_COMPILER_OPT_BASE = $(ERLANG_COMPILER_OPT_BASE)"
 	@echo "OVERALL_PZ_OPT = $(OVERALL_PZ_OPT)"
 	@echo "ERLANG_COMPILER_OPT_FOR_STANDARD_MODULES = $(ERLANG_COMPILER_OPT_FOR_STANDARD_MODULES)"
+
+
+info-conditionals:
+	@echo "LEEC_DEBUG_FLAGS = $(LEEC_DEBUG_FLAGS)"
+	@echo "LEEC_CHECK_FLAGS = $(LEEC_CHECK_FLAGS)"
 
 
 info-deps:
