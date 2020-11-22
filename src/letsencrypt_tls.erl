@@ -120,10 +120,11 @@ create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 		% Not deserving a warning, as returning in case of success: "Generating
 		% RSA private key, 2048 bit long modulus (2 primes) [...]".
 		%
-		{ _ReturnCode=0, _CommandOutput } ->
+		{ _ReturnCode=0, CommandOutput } ->
 			cond_utils:if_defined( leec_debug_keys,
 				trace_bridge:info_fmt( "Private key creation successful; "
-					"following output was made: ~s.", [ CommandOutput ] ) ),
+					"following output was made: ~s.", [ CommandOutput ] ),
+				basic_utils:ignore_unused( CommandOutput ) ),
 			ok;
 
 		{ ErrorCode, CommandOutput } ->
