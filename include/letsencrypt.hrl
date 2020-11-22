@@ -106,6 +106,14 @@
 	intermediate_cert = undefined ::
 	  basic_utils:maybe( letsencrypt:bin_certificate() ),
 
+	% An (optional) identifier specified by the user when starting a LEEC
+	% instance (before requesting an operation related to any specific domain)
+	% to ensure the uniqueness thereof (ex: regarding the name of its agent key
+	% file):
+	%
+	% (might be added in the future)
+	%
+	%user_id :: maybe( term() ),
 
 	% State-related data:
 

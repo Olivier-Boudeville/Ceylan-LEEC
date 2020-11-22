@@ -49,7 +49,7 @@
 -export_type([ maybe/1, void/0, table/2 ]).
 
 
-% Creates private key.
+% Creates a private key for the current LEEC agent.
 -spec create_private_key( maybe( key_file_info() ), bin_directory_path() ) ->
 								tls_private_key().
 create_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
@@ -59,10 +59,14 @@ create_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 	%
 	% (ex: "letsencrypt-agent.key-5")
 	%
-	BasePath = file_utils:join( BinCertDirPath, "letsencrypt-agent.key" ),
+	BasePath = file_utils:join( BinCertDirPath, "letsencrypt-agent-.key" ),
+
+	% Should be sufficient to be unique:
 	UniqPath = file_utils:get_non_clashing_entry_name_from( BasePath ),
 
-	% Safety measure, not expected to trigger:
+	% Safety measure, not expected to trigger or to be passed in an (always
+	% possible) race condition:
+	%
 	case file_utils:is_existing_file( UniqPath ) of
 
 		true ->
@@ -146,8 +150,19 @@ create_private_key( _KeyFileInfo=KeyFilePath, _BinCertDirPath ) ->
 
 	PemContent = file_utils:read_whole( KeyFilePath ),
 
-	% A single ASN.1 DER encoded entry:
-	[ KeyEntry ] = public_key:pem_decode( PemContent ),
+	% A single ASN.1 DER encoded entry expected:
+	KeyEntry = case public_key:pem_decode( PemContent ) of
+
+		[ KeyEnt ] ->
+			KeyEnt;
+
+		[] ->
+			throw( { no_asn_der_entry_in, PemContent } );
+
+		KeyEntries ->
+			throw( { multiple_asn_der_entries_in, PemContent, KeyEntries } )
+
+	end,
 
 	#'RSAPrivateKey'{ modulus=N, publicExponent=E, privateExponent=D } =
 		public_key:pem_entry_decode( KeyEntry ),

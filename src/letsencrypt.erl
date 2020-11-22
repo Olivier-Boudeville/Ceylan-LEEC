@@ -475,11 +475,39 @@ init( { UserOptions, JsonParserState } ) ->
 
 	%trace_bridge:debug_fmt( "[~w] Initial state:~n  ~p", [ self(), LEState ] ),
 
+	BinCertDirPath = LEState#le_state.cert_dir_path,
+
 	% Creates the private key (a tls_private_tls_public_key()) of this LEEC
-	% agent, and initialises its JWS:
+	% agent, and initialises its JWS; in case of parallel creations, ensuring
+	% automatically the uniqueness of its filename is not trivial:
 	%
-	AgentPrivateKey = letsencrypt_tls:create_private_key(
-		LEState#le_state.agent_key_file_info, LEState#le_state.cert_dir_path ),
+	KeyFileInfo = case LEState#le_state.agent_key_file_info of
+
+		% Most probably the case:
+		undefined ->
+			% We prefer here devising out own agent filename, lest its automatic
+			% uniqueness is difficult to obtain (which is the case); we may use
+			% in the future any user-specified identifier (see user_id field);
+			% for now we stick to a simple approach based on the PID of this
+			% LEEC FSM (no domain known yet):
+			%
+			%UniqFilename = text_utils:format( "letsencrypt-agent-~s.key",
+			%								   [ LEState#le_state.user_id ] ),
+
+			% A prior run might have left a file with the same name, it will be
+			% overwritten (with a warning) in this case:
+			%
+			UniqFilename = text_utils:format( "letsencrypt-agent-s.key",
+								  [ text_utils:pid_to_core_string( self() ) ] ),
+			{ new, UniqFilename };
+
+		KInf ->
+			KInf
+
+	end,
+
+	AgentPrivateKey = letsencrypt_tls:create_private_key( KeyFileInfo,
+														  BinCertDirPath ),
 
 	KeyJws = letsencrypt_jws:init( AgentPrivateKey ),
 
@@ -1046,7 +1074,7 @@ valid( _EventType={ call, _ServerRef=From },
 
 	KeyFilename = text_utils:binary_to_string( BinDomain ) ++ ".key",
 
-	% KeyFilePath is required for csr generation:
+	% KeyFilePath is required for CSR generation:
 	CreatedTLSPrivKey = letsencrypt_tls:create_private_key(
 						  { new, KeyFilename }, BinCertDirPath ),
 
