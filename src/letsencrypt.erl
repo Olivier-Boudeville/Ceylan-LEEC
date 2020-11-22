@@ -41,7 +41,7 @@
 
 % Public API:
 -export([ get_ordered_prerequisites/0,
-		  start/1, start_bridged/2,
+		  start/1, start/2,
 		  get_default_options/0, get_default_options/1,
 		  obtain_certificate_for/2, obtain_certificate_for/3, stop/1 ]).
 
@@ -329,10 +329,18 @@ get_ordered_prerequisites() ->
 	[ shotgun ].
 
 
-% Starts an instance of the LEEC service FSM.
+% Starts a (not bridged) instance of the LEEC service FSM.
 -spec start( [ user_option() ] ) -> { 'ok', fsm_pid() } | error_term().
 start( UserOptions ) ->
+	start( UserOptions, _MaybeBridgeSpec=undefined ).
 
+
+% Starts an instance of the LEEC service FSM, possibly with a trace bridge.
+-spec start( [ user_option() ], maybe( trace_bridge:bridge_spec() ) ) ->
+				   { 'ok', fsm_pid() } | error_term().
+start( UserOptions, MaybeBridgeSpec ) ->
+
+	% Bridge not set yet, and still in the caller process:
 	trace_bridge:trace_fmt( "Starting, with following options:~n  ~p.",
 							[ UserOptions ] ),
 
@@ -347,19 +355,8 @@ start( UserOptions ) ->
 	% interactions (i.e. multiple, parallel instances).
 	%
 	% Calls init/1 on the new process, and returns its outcome:
-	gen_statem:start_link( ?MODULE, { UserOptions, JsonParserState },
-						   _Opts=[] ).
-
-
-
-% Starts an instance of the LEEC service FSM, plugging it directly to the
-% specified trace bridge first.
-%
--spec start_bridged( [ user_option() ], trace_bridge:bridge_spec() ) ->
-						   { 'ok', fsm_pid() } | error_term().
-start_bridged( UserOptions, BridgeSpec ) ->
-	trace_bridge:register( BridgeSpec ),
-	start( UserOptions ).
+	gen_statem:start_link( ?MODULE,
+		{ UserOptions, JsonParserState, MaybeBridgeSpec }, _Opts=[] ).
 
 
 
@@ -477,11 +474,16 @@ stop( FsmPid ) ->
 % - fetch ACME directory
 % - get valid nonce
 %
+% Will make use of any trace bridge transmitted.
+%
 % Transitions to the 'idle' initial state.
 %
--spec init( { [ user_option() ], json_utils:parser_state() } ) ->
+-spec init( { [ user_option() ], json_utils:parser_state(),
+			  maybe( trace_bridge:bridge_spec() ) } ) ->
 		{ 'ok', InitialStateName :: 'idle', InitialData :: le_state() }.
-init( { UserOptions, JsonParserState } ) ->
+init( { UserOptions, JsonParserState, MaybeBridgeSpec } ) ->
+
+	trace_bridge:register( MaybeBridgeSpec ),
 
 	LEState = setup_mode( get_options( UserOptions,
 				   #le_state{ json_parser_state=JsonParserState } ) ),
