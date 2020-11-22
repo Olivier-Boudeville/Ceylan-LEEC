@@ -41,7 +41,8 @@
 
 % Public API:
 -export([ get_ordered_prerequisites/0,
-		  start/1, get_default_options/0, get_default_options/1,
+		  start/1, start_bridged/2,
+		  get_default_options/0, get_default_options/1,
 		  obtain_certificate_for/2, obtain_certificate_for/3, stop/1 ]).
 
 
