@@ -73,7 +73,7 @@ One may use UNIX groups to isolate users and minimise assigned permissions (use 
 
  $> $(cd /path/to/webroot && python -m SimpleHTTPServer 80)&
  $> ./rebar3 shell
- $erl> application:ensure_all_started(letsencrypt).
+ $erl> application:ensure_all_started(leec).
  $erl> {ok, FsmPid} = letsencrypt:start([{mode,webroot},{webroot_dir_path,"/path/to/webroot"},
  {cert_dir_path,"/path/to/certs"}]).
  $erl> letsencrypt:obtain_certificate_for( <<"mydomain.tld">>, FsmPid, #{async => false}).
