@@ -340,10 +340,6 @@ start( UserOptions ) ->
 				   { 'ok', fsm_pid() } | error_term().
 start( UserOptions, MaybeBridgeSpec ) ->
 
-	% Bridge not set yet, and still in the caller process:
-	trace_bridge:trace_fmt( "Starting, with following options:~n  ~p.",
-							[ UserOptions ] ),
-
 	JsonParserState = json_utils:start_parser(),
 
 	{ ok, _AppNames } = application:ensure_all_started( leec ),
@@ -484,6 +480,9 @@ stop( FsmPid ) ->
 init( { UserOptions, JsonParserState, MaybeBridgeSpec } ) ->
 
 	trace_bridge:register( MaybeBridgeSpec ),
+
+	trace_bridge:trace_fmt( "Initialising, with following options:~n  ~p.",
+							[ UserOptions ] ),
 
 	LEState = setup_mode( get_options( UserOptions,
 				   #le_state{ json_parser_state=JsonParserState } ) ),
