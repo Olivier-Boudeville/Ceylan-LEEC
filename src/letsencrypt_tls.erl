@@ -59,7 +59,7 @@ create_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 	%
 	% (ex: "leec-agent.key-5")
 	%
-	BasePath = file_utils:join( BinCertDirPath, "leec-agent.key" ),
+	BasePath = file_utils:join( BinCertDirPath, "leec-agent-private.key" ),
 
 	% Should be sufficient to be unique:
 	UniqPath = file_utils:get_non_clashing_entry_name_from( BasePath ),

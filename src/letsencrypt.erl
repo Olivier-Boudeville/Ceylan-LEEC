@@ -351,6 +351,17 @@ start( UserOptions ) ->
 
 
 
+% Starts an instance of the LEEC service FSM, plugging it directly to the
+% specified trace bridge first.
+%
+-spec start_bridged( [ user_option() ], trace_bridge:bridge_spec() ) ->
+						   { 'ok', fsm_pid() } | error_term().
+start_bridged( UserOptions, BridgeSpec ) ->
+	trace_bridge:register( BridgeSpec ),
+	start( UserOptions ).
+
+
+
 % Returns the default API-level user options, here enabling the async
 % (non-blocking) mode.
 %
@@ -492,13 +503,14 @@ init( { UserOptions, JsonParserState } ) ->
 			% for now we stick to a simple approach based on the PID of this
 			% LEEC FSM (no domain known yet):
 			%
-			%UniqFilename = text_utils:format( "letsencrypt-agent-~s.key",
-			%								   [ LEState#le_state.user_id ] ),
+			%UniqFilename = text_utils:format(
+			%  "letsencrypt-agent-private-~s.key",
+			%  [ LEState#le_state.user_id ] ),
 
 			% A prior run might have left a file with the same name, it will be
 			% overwritten (with a warning) in this case:
 			%
-			UniqFilename = text_utils:format( "leec-agent-~s.key",
+			UniqFilename = text_utils:format( "leec-agent-private-~s.key",
 								  [ text_utils:pid_to_core_string( self() ) ] ),
 
 			{ new, UniqFilename };
