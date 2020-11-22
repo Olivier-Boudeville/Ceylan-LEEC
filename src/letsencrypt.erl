@@ -337,9 +337,10 @@ start( UserOptions ) ->
 
 	JsonParserState = json_utils:start_parser(),
 
-	{ ok, AppNames } = application:ensure_all_started( leec ),
+	{ ok, _AppNames } = application:ensure_all_started( leec ),
 
-	trace_bridge:debug_fmt( "Applications started: ~p.", [ AppNames ] ),
+	% Usually none, already started by framework (ex: otp_utils):
+	%trace_bridge:debug_fmt( "Applications started: ~p.", [ AppNames ] ),
 
 	% Not registered in naming service on purpose, to allow for concurrent ACME
 	% interactions (i.e. multiple, parallel instances).
@@ -497,8 +498,9 @@ init( { UserOptions, JsonParserState } ) ->
 			% A prior run might have left a file with the same name, it will be
 			% overwritten (with a warning) in this case:
 			%
-			UniqFilename = text_utils:format( "letsencrypt-agent-s.key",
+			UniqFilename = text_utils:format( "leec-agent-~s.key",
 								  [ text_utils:pid_to_core_string( self() ) ] ),
+
 			{ new, UniqFilename };
 
 		KInf ->

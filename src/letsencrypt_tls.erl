@@ -57,9 +57,9 @@ create_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 	% If not set, forges a unique key filename to allow for multiple, concurrent
 	% instances:
 	%
-	% (ex: "letsencrypt-agent.key-5")
+	% (ex: "leec-agent.key-5")
 	%
-	BasePath = file_utils:join( BinCertDirPath, "letsencrypt-agent-.key" ),
+	BasePath = file_utils:join( BinCertDirPath, "leec-agent.key" ),
 
 	% Should be sufficient to be unique:
 	UniqPath = file_utils:get_non_clashing_entry_name_from( BasePath ),
@@ -77,11 +77,12 @@ create_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 
 	end,
 
-	trace_bridge:debug_fmt( "[~w] A private key is to be created in '~s'.",
-							[ self(), UniqPath ] ),
-
 	% Could have been more elegant:
 	UniqFilename = file_utils:get_last_path_element( UniqPath ),
+
+	cond_utils:if_defined( leec_debug_keys,
+		trace_bridge:debug_fmt( "[~w] Generated filename for the LEEC agent "
+			"private key: '~s'.", [ self(), UniqFilename ] ) ),
 
 	create_private_key( { new, UniqFilename }, BinCertDirPath );
 
@@ -89,6 +90,10 @@ create_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 
 	KeyFilePath = file_utils:join( BinCertDirPath, KeyFilename ),
+
+	cond_utils:if_defined( leec_debug_keys,
+		trace_bridge:debug_fmt( "[~w] A private key is to be created in '~s'.",
+								[ self(), KeyFilePath ] ) ),
 
 	case file_utils:is_existing_file( KeyFilePath ) of
 
@@ -116,8 +121,9 @@ create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 		% RSA private key, 2048 bit long modulus (2 primes) [...]".
 		%
 		{ _ReturnCode=0, _CommandOutput } ->
-			%trace_bridge:info_fmt( "Private key creation successful; "
-			%  "following output was made: ~s.", [ CommandOutput ] );
+			cond_utils:if_defined( leec_debug_keys,
+				trace_bridge:info_fmt( "Private key creation successful; "
+					"following output was made: ~s.", [ CommandOutput ] ) ),
 			ok;
 
 		{ ErrorCode, CommandOutput } ->
@@ -139,8 +145,9 @@ create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 
 	end,
 
-	trace_bridge:debug_fmt( "[~w] Creation of private key in '~s' succeeded.",
-							[ self(), KeyFilePath ] ),
+	cond_utils:if_defined( leec_debug_keys,
+		trace_bridge:debug_fmt( "[~w] Creation of private key in '~s' "
+			"succeeded.", [ self(), KeyFilePath ] ) ),
 
 	% Now load it (next clause), and return it as a tls_private_key():
 	create_private_key( KeyFilePath, BinCertDirPath );
@@ -173,8 +180,9 @@ create_private_key( _KeyFileInfo=KeyFilePath, _BinCertDirPath ) ->
 				  letsencrypt_utils:b64encode( binary:encode_unsigned( E ) ) },
 	   file_path=KeyFilePath },
 
-	%trace_bridge:debug_fmt( "[~w] Returning following private key:~n  ~p",
-	%						[ self(), PrivKey ] ),
+	cond_utils:if_defined( leec_debug_keys,
+		trace_bridge:debug_fmt( "[~w] Returning following private key:~n  ~p",
+								[ self(), PrivKey ] ) ),
 
 	PrivKey.
 
@@ -185,8 +193,9 @@ create_private_key( _KeyFileInfo=KeyFilePath, _BinCertDirPath ) ->
 						[ san() ] ) -> letsencrypt:tls_csr().
 get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 
-	trace_bridge:debug_fmt( "[~w] Generating certificate request for '~s.'",
-							[ self(), BinDomain ] ),
+	cond_utils:if_defined( leec_debug_keys,
+		trace_bridge:debug_fmt( "[~w] Generating certificate request for '~s.'",
+								[ self(), BinDomain ] ) ),
 
 	Domain = text_utils:binary_to_string( BinDomain ),
 
@@ -194,7 +203,8 @@ get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 
 	CertFilePath = file_utils:join( BinCertDirPath, Domain ++ ".csr" ),
 
-	%trace_bridge:debug_fmt( "CSR file path: ~s.", [ CertFilePath ] ),
+	cond_utils:if_defined( leec_debug_keys,
+		trace_bridge:debug_fmt( "CSR file path: ~s.", [ CertFilePath ] ) ),
 
 	generate_certificate( request, BinDomain, CertFilePath, KeyFilePath, SANs ),
 
@@ -203,7 +213,8 @@ get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 	[ { 'CertificationRequest', Csr, not_encrypted } ] =
 		public_key:pem_decode( RawCsr ),
 
-	%trace_bridge:debug_fmt( "Decoded CSR: ~p", [ Csr ] ),
+	cond_utils:if_defined( leec_debug_keys,
+		trace_bridge:debug_fmt( "Decoded CSR: ~p", [ Csr ] ) ),
 
 	letsencrypt_utils:b64encode( Csr ).
 
@@ -245,6 +256,10 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 
 	ConfFilePath = file_utils:join( ConfDir,
 						"letsencrypt_san_openssl." ++ Domain ++ ".cnf" ),
+
+	cond_utils:if_defined( leec_debug_keys,
+		trace_bridge:debug_fmt( "Generating a certificate from '~s'.",
+								[ ConfFilePath ] ) ),
 
 	file_utils:write_whole( ConfFilePath, ConfDataStr ),
 
@@ -296,11 +311,9 @@ write_certificate( Domain, BinDomainCert, BinCertDirPath ) ->
 
 	CertFilePath = file_utils:join( BinCertDirPath, Domain ++ ".crt" ),
 
-	%trace_bridge:debug_fmt( "Writing certificate for domain '~s' "
-	%	"in '~s':~n  ~p.", [ Domain, CertFilePath, BinDomainCert ] ),
-
-	trace_bridge:debug_fmt( "Writing certificate for domain '~s' "
-							"in '~s'.", [ Domain, CertFilePath ] ),
+	cond_utils:if_defined( leec_debug_keys,
+		trace_bridge:debug_fmt( "Writing certificate for domain '~s' "
+			"in '~s':~n  ~p.", [ Domain, CertFilePath, BinDomainCert ] ) ),
 
 	% For example in case of renewal:
 	file_utils:remove_file_if_existing( CertFilePath ),

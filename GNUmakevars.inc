@@ -44,11 +44,11 @@ endif
 # conditional compilation primitives (see cond_utils for their management):
 
 # Topics covered by flags:
-#  - xx (none yet)
+#  - keys: regarding all kinds of keys and certificates
 
 # Defining debug flags (at least the most verbose are by default commented-out):
 ifeq ($(ENABLE_DEBUG),true)
-	#LEEC_DEBUG_FLAGS += -Dleec_debug_xx
+	LEEC_DEBUG_FLAGS += -Dleec_debug_keys
 endif
 
 # Defining check flags:
