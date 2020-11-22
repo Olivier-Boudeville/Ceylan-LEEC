@@ -39,22 +39,24 @@ run() ->
 	% Not in an OTP context here, yet we need OTP applications such as LEEC to
 	% work (ex: w.r.t. their .app being found, etc.):
 
-	OrderedAppNames = letsencrypt:get_ordered_prerequisites(),
-
-   % Build root directory from which prerequisite applications may be found:
+	% Base build root directory from which prerequisite applications may be
+	% found:
+	%
 	BuildRootDir = "..",
 
-	% Updating ebin paths so that the corresponding *.app files are found:
-	case otp_utils:prepare_for_execution( [ letsencrypt | OrderedAppNames ],
-										  BuildRootDir ) of
+	OrderedAppNames = otp_utils:prepare_for_execution( _ThisApp=leec,
+													   BuildRootDir ),
 
-		ready ->
-			ok;
+	% Retain all applications but LEEC itself, so that we can run LEEC as we
+	% want:
+	%
+	{ leec, PrereqAppNames } =
+		list_utils:extract_last_element( OrderedAppNames ),
 
-		{ lacking_app, AppName } ->
-			throw( { lacking_prerequisite_app, AppName } )
+	trace_utils:info_fmt( "Resulting prerequisite applications to start, "
+						  "in order: ~w.", [ OrderedAppNames ] ),
 
-	end,
+	otp_utils:start_applications( PrereqAppNames ),
 
 	% Note that a webserver is unlikely to server that directory:
 	WebrootDirPath = "/tmp",
@@ -62,16 +64,17 @@ run() ->
 	CertDirPath = "/tmp",
 
 	% Expected to succeed:
-	{ ok, LeecFsmPid } = letsencrypt:start( [ { mode, webroot },
-		{ webroot_dir_path, WebrootDirPath },
-		{ cert_dir_path, CertDirPath } ] ),
+	{ ok, LeecFsmPid } = letsencrypt:start( [
+									{ mode, webroot },
+									{ webroot_dir_path, WebrootDirPath },
+									{ cert_dir_path, CertDirPath } ] ),
 
 	% Unlikely to be relevant either:
 	DomainName = "www.foobar.org",
 
 	% Expected to fail:
 	case letsencrypt:obtain_certificate_for( DomainName, LeecFsmPid,
-						 letsencrypt:get_default_options( _Async=false ) ) of
+						letsencrypt:get_default_options( _Async=false ) ) of
 
 		{ certificate_ready, BinCertFilePath } ->
 			throw( { not_expected_to_succeed, BinCertFilePath } );
