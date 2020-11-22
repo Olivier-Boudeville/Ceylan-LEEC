@@ -35,6 +35,10 @@
 -behaviour(gen_statem).
 
 
+% This is a (passive) application:
+-behaviour(application).
+
+
 % Public API:
 -export([ get_ordered_prerequisites/0,
 		  start/1, get_default_options/0, get_default_options/1,
@@ -60,7 +64,7 @@
 % Implementation notes:
 %
 % Multiple FSM (Finite State Machines) can be spawned, for parallel certificate
-% management
+% management.
 %
 % URI format compatible with the shotgun library.
 
@@ -333,7 +337,7 @@ start( UserOptions ) ->
 
 	JsonParserState = json_utils:start_parser(),
 
-	{ ok, AppNames } = application:ensure_all_started( letsencrypt ),
+	{ ok, AppNames } = application:ensure_all_started( leec ),
 
 	trace_bridge:debug_fmt( "Applications started: ~p.", [ AppNames ] ),
 
@@ -1195,8 +1199,8 @@ finalize( _EventType={ call, ServerRef }, _EventContentMsg=Request,
 
 finalize( UnexpectedEventType, EventContentMsg, _LEState ) ->
 
-	trace_bridge:error_fmt( "Unknown event ~p (content: ~p) in finalize status.",
-							[ UnexpectedEventType, EventContentMsg ] ),
+	trace_bridge:error_fmt( "Unknown event ~p (content: ~p) in "
+		"finalize status.",	[ UnexpectedEventType, EventContentMsg ] ),
 
 	%{ reply, { error, UnexpectedEventType }, finalize, LEState }.
 
@@ -1470,8 +1474,8 @@ wait_challenges_valid( FsmPid, Count, MaxCount ) ->
 		  { 'ok', map() } | { 'error', 'timeout' | any() }.
 wait_creation_completed( FsmPid, C ) ->
 
-	trace_bridge:debug_fmt( "[~w] Waiting for the completion of the certificate "
-		"creation...", [ FsmPid ] ),
+	trace_bridge:debug_fmt( "[~w] Waiting for the completion of the "
+		"certificate creation...", [ FsmPid ] ),
 
 	wait_creation_completed( FsmPid, C, C ).
 
