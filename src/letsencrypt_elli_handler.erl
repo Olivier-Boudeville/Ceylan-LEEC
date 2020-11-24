@@ -61,7 +61,7 @@ handle( 'GET', [ <<".well-known">>, <<"acme-challenge">>, Token ], Req,
 
 % Handles specified request events.
 %
-% Unused
+% Unused.
 %
 handle_event( _, _, _ ) ->
 	ok.

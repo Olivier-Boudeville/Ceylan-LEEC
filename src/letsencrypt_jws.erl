@@ -24,16 +24,6 @@
 -export([ init/1, encode/4, get_key_authorization/3 ]).
 
 
-% Not involving Myriad's parse transform here:
--type table( K, V ) :: map_hashtable:map_hashtable( K, V ).
--type maybe( T ) :: T | 'undefined'.
-
-% Silenced, so that the same code can be compiled with or without Myriad's parse
-% transform:
-%
--export_type([ table/2, maybe/1 ]).
-
-
 % For the records introduced:
 -include("letsencrypt.hrl").
 
@@ -75,8 +65,9 @@ init( #tls_private_key{ b64_pair={ N, E } } ) ->
 encode( PrivateKey, Jws, Content,
 		#le_state{ json_parser_state=ParserState } ) ->
 
-	%trace_bridge:debug_fmt( "Encoding to JSON following JWS:~n  ~p~n"
-	%						"with content: ~p", [ Jws, Content ] ),
+	cond_utils:if_defined( leec_debug_codec, trace_bridge:debug_fmt(
+		"Encoding to JSON following JWS:~n  ~p~n with content: ~p",
+		[ Jws, Content ] ) ),
 
 	Protected = letsencrypt_utils:jsonb64encode( jws_to_map( Jws ),
 												 ParserState ),

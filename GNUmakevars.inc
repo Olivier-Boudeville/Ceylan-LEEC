@@ -44,11 +44,19 @@ endif
 # conditional compilation primitives (see cond_utils for their management):
 
 # Topics covered by flags:
+# - fsm: regarding the finite state machine (ex: state changes) and general
+#   operations
 #  - keys: regarding all kinds of keys and certificates
-
+#  - network: regarding network elements such as TCP connections
+#  - exchanges: regarding the exchanges with ACME servers
+#  - codec: regarding encoding/decoding activities
 # Defining debug flags (at least the most verbose are by default commented-out):
 ifeq ($(ENABLE_DEBUG),true)
+	LEEC_DEBUG_FLAGS += -Dleec_debug_fsm
 	LEEC_DEBUG_FLAGS += -Dleec_debug_keys
+	LEEC_DEBUG_FLAGS += -Dleec_debug_network
+	LEEC_DEBUG_FLAGS += -Dleec_debug_exchanges
+	LEEC_DEBUG_FLAGS += -Dleec_debug_codec
 endif
 
 # Defining check flags:

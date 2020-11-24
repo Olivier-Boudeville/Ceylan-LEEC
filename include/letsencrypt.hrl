@@ -78,6 +78,7 @@
 
 % For internal use only:
 
+
 % State of a LEEC FSM instance:
 -record( le_state, {
 
@@ -154,4 +155,7 @@
 	% Useful to be able to switch JSON parsers at runtime, yet to avoid repeated
 	% initializations thereof:
 	%
-	json_parser_state :: json_utils:parser_state() }).
+	json_parser_state :: json_utils:parser_state(),
+
+	% To re-use TCP connections, on a per FSM basis:
+	tcp_connection_cache :: letsencrypt:tcp_connection_cache() }).

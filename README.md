@@ -9,13 +9,14 @@ LEEC is notably used in the context of [US-Web](http://us-web.esperide.org/).
 
 The main differences introduced by LEEC are:
 - more comments, more spell-checking, much clarification
-- more typing, more runtime checking
+- more typing, more runtime checking, extended traces supported
 - dependency onto [Ceylan-Myriad](https://github.com/Olivier-Boudeville/Ceylan-Myriad) added, to benefit from its facilities
 - JSON parser can be JSX (the default), or Jiffy (refer to the `JSON parsers` section)
 - porting done from [gen_fsm](https://erlang.org/documentation/doc-6.1/lib/stdlib-2.1/doc/html/gen_fsm.html) (soon to be deprecated) to the newer [gen_statem](https://erlang.org/doc/man/gen_statem.html)
 - minor API changes, for a clearer mode of operation
 - fixed the compilation with Erlang version 23.0 and higher (ex: w.r.t. to http_uri/uri_string, to updated dependencies such as Jiffy, and newer Cowboy for the examples)
-- allow for *concurrent* certificate requests (ex: if managing multiple virtual hosts, all requesting new certificates at webserver start-up); so LEEC generates certificates in parallel and does not rely on a *registered* FSM anymore
+- allow for *concurrent* certificate requests (ex: if managing multiple virtual hosts, new certificates being requested for all of them at webserver start-up); so LEEC generates certificates in parallel and does not rely on a *registered* FSM anymore
+- global, ets-based TCP connection pool replaced by a per-FSM internal cache
 - `connect_timeout` deprecated in favor of `http_timeout`
 
 
@@ -68,7 +69,6 @@ TCP port 80 (`http`) must be opened, and a webserver listening on it (line 1) an
 Both `/path/to/webroot` and `/path/to/certs` must be writable by the LEEC Erlang process (at least to create respectively any `/path/to/webroot/.well-known/acme-challenge/ANY_FILE` and `/path/to/certs/ANY_FILE`).
 One may use UNIX groups to isolate users and minimise assigned permissions (use `chgrp`/`chmod` for that, and `touch` to test).
 
-
 ```erlang
 
  $> $(cd /path/to/webroot && python -m SimpleHTTPServer 80)&
@@ -76,15 +76,22 @@ One may use UNIX groups to isolate users and minimise assigned permissions (use 
  $erl> application:ensure_all_started(leec).
  $erl> {ok, FsmPid} = letsencrypt:start([{mode,webroot},{webroot_dir_path,"/path/to/webroot"},
  {cert_dir_path,"/path/to/certs"}]).
- $erl> letsencrypt:obtain_certificate_for( <<"mydomain.tld">>, FsmPid, #{async => false}).
+ $erl> letsencrypt:obtain_certificate_for(<<"mydomain.tld">>, FsmPid, #{async => false}).
 {ok, #{cert => <<"/path/to/certs/mydomain.tld.crt">>, key => <<"/path/to/certs/mydomain.tld.key">>}}
  $erl> ^C
-
  $> ls -1 /path/to/certs
- letsencrypt.key
+ leec-agent-private-XXX.key
  mydomain.tld.crt
  mydomain.tld.csr
  mydomain.tld.key
+```
+
+Non-rebar3 version is quite similar:
+```erlang
+
+ $> make all
+ $> cd test
+ $> make leec_run
 ```
 
 

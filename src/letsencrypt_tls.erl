@@ -40,14 +40,6 @@
 -type tls_public_key() :: letsencrypt:tls_public_key().
 
 
-% Not involving Myriad's parse transform here:
--type maybe( T ) :: T | 'undefined'.
--type void() :: any().
--type table( K, V ) :: map_hashtable:map_hashtable( K, V ).
-
-% Silencing if not compiled with rebar3:
--export_type([ maybe/1, void/0, table/2 ]).
-
 
 % Creates a private key for the current LEEC agent.
 -spec create_private_key( maybe( key_file_info() ), bin_directory_path() ) ->
@@ -124,8 +116,7 @@ create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 			cond_utils:if_defined( leec_debug_keys,
 				trace_bridge:info_fmt( "Private key creation successful; "
 					"following output was made: ~s.", [ CommandOutput ] ),
-				basic_utils:ignore_unused( CommandOutput ) ),
-			ok;
+				basic_utils:ignore_unused( CommandOutput ) );
 
 		{ ErrorCode, CommandOutput } ->
 			trace_bridge:error_fmt(
@@ -339,7 +330,7 @@ key_to_map( #tls_public_key{ kty=Kty, n=N, e=E } ) ->
 -spec map_to_key( map() ) -> tls_public_key().
 map_to_key( Map ) ->
 
-	% Ensures all keys are extracted:
+	% Ensures all keys are extracted (using one of our map primitives):
 	{ [ Kty, N, E ], _RemainingTable=#{} } = map_hashtable:extract_entries(
 							   [ <<"kty">>, <<"n">>, <<"e">> ], Map ),
 

@@ -48,7 +48,7 @@ run() ->
 													   BuildRootDir ),
 
 	% Retain all applications but LEEC itself, so that we can run LEEC as we
-	% want:
+	% want (anyway it is a library application):
 	%
 	{ leec, PrereqAppNames } =
 		list_utils:extract_last_element( OrderedAppNames ),
@@ -65,6 +65,7 @@ run() ->
 
 	% Expected to succeed:
 	{ ok, LeecFsmPid } = letsencrypt:start( [
+									staging,
 									{ mode, webroot },
 									{ webroot_dir_path, WebrootDirPath },
 									{ cert_dir_path, CertDirPath } ] ),
