@@ -71,6 +71,9 @@
 % concurrent FSMs, whereas eaci connection is private to a given FSM. Instead an
 % (explicit) TCP cache is managed per-FSM.
 
+% Although the netopts map (in the option map) is fairly useless (just
+% containing a time-out), we kept it, as it is a parameter directly needed as
+% such by shotgun:post/5.
 
 % URI format compatible with the shotgun library.
 
@@ -158,7 +161,7 @@
 % Known (atom) keys:
 %  - async :: boolean() [if not defined, supposed true]
 %  - callback :: fun/1
-%  - netopts :: map() => #{ timeout => non_neg_integer() }
+%  - netopts :: map() => #{ timeout => unit_utils:milliseconds() }
 %  - challenge :: challenge_type(), default being 'http-01'
 %
 -type option_map() :: table( option_id(), term() ).
@@ -417,30 +420,37 @@ obtain_certificate_for( Domain, FsmPid ) ->
 %
 -spec obtain_certificate_for( Domain :: domain(), fsm_pid(), option_map() ) ->
 		'async' | { 'certificate_ready', bin_file_path() } | error_term().
-obtain_certificate_for( Domain, FsmPid, OptionMap=#{ async := false } ) ->
+obtain_certificate_for( Domain, FsmPid, UserOptionMap ) ->
 
-	% Still in user process:
-	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
-		"Requesting FSM ~w to generate sync certificate for domain '~s'.",
-		[ FsmPid, Domain ] ) ),
+	% To ensure that all needed option entries are always defined:
+	CanonicalOptionMap = maps:merge( _Def=get_default_options(),
+									 _Prioritary=UserOptionMap ),
 
-	% Direct synchronous return:
-	obtain_cert_helper( Domain, FsmPid, OptionMap );
+	% Also a check:
+	case CanonicalOptionMap of
 
+		#{ async := true } ->
 
-% Default to async=true:
-obtain_certificate_for( Domain, FsmPid, OptionMap ) ->
+			% Still being in user process:
+			cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
+			  "Requesting FSM ~w to generate asynchronously a certificate "
+			  "for domain '~s'.", [ FsmPid, Domain ] ) ),
 
-	% Still in user process:
-	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
-		"Requesting FSM ~w to generate async certificate for domain '~s'.",
-		[ FsmPid, Domain ] ) ),
+			% Asynchronous then, in a separate process from the user one:
+			_Pid = erlang:spawn_link( ?MODULE, obtain_cert_helper,
+									  [ Domain, FsmPid, CanonicalOptionMap ] ),
+			async;
 
-	% Asynchronous (either already true, or set to true if not):
-	_Pid = erlang:spawn_link( ?MODULE, obtain_cert_helper,
-							  [ Domain, FsmPid, OptionMap#{ async => true } ] ),
+		#{ async := false } ->
+			% Everything done in user process then:
+			cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
+			  "Requesting FSM ~w to generate synchronously a certificate "
+			  "for domain '~s'.", [ FsmPid, Domain ] ) ),
 
-	async.
+			% Thus a direct synchronous return:
+			obtain_cert_helper( Domain, FsmPid, CanonicalOptionMap )
+
+	end.
 
 
 
