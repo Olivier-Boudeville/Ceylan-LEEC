@@ -51,7 +51,7 @@
 
 
 % For spawn purpose:
--export([ obtain_cert_helper/3 ]).
+-export([ obtain_cert_helper/4 ]).
 
 
 % FSM gen_statem base API:
@@ -59,7 +59,7 @@
 
 
 % FSM state-corresponding callbacks:
--export([ idle/3, pending/3, valid/3, finalize/3 ]).
+-export([ idle/3, pending/3, valid/3, finalize/3, invalid/3 ]).
 
 
 % Implementation notes:
@@ -71,11 +71,11 @@
 % concurrent FSMs, whereas eaci connection is private to a given FSM. Instead an
 % (explicit) TCP cache is managed per-FSM.
 
+% URI format compatible with the shotgun library.
+%
 % Although the netopts map (in the option map) is fairly useless (just
 % containing a time-out), we kept it, as it is a parameter directly needed as
 % such by shotgun:post/5.
-
-% URI format compatible with the shotgun library.
 
 
 -type bin_domain() :: net_utils:bin_fqdn().
@@ -124,6 +124,11 @@
 -type uri() :: string_uri() | bin_uri().
 
 
+% ACME_BASE below can be for example
+% https://acme-staging-v02.api.letsencrypt.org, ACME_COMM being
+% https://community.letsencrypt.org.
+
+
 % All known information regarding a challenge.
 %
 % As Key => example of associated value:
@@ -131,7 +136,7 @@
 % - <<"token">> => <<"qVTx6gQWZO4Dt4gUmnaTQdwTRkpaSnMiRx8L7Grzhl8">>
 % - <<"type">> => <<"http-01">>,
 % - <<"url">> =>
-%     <<"https://acme-staging-v02.api.letsencrypt.org/acme/chall-v3/132509381/-Axkdw">>}}.
+%     <<"ACME_BASE/acme/chall-v3/132509381/-Axkdw">>}}.
 %
 -type challenge() :: table:table().
 
@@ -345,6 +350,21 @@ start( UserOptions ) ->
 				{ 'ok', fsm_pid() } | error_term().
 start( UserOptions, MaybeBridgeSpec ) ->
 
+	% If a trace bridge is specified, we use it both for the current (caller)
+	% process and the ones it create, i.e. the associated FSM and, possibly, the
+	% helper process (if asynchronous operations are requested).
+	%
+	% First this caller process:
+	case MaybeBridgeSpec of
+
+		undefined ->
+			ok;
+
+		_ ->
+			trace_bridge:register( MaybeBridgeSpec )
+
+	end,
+
 	JsonParserState = json_utils:start_parser(),
 
 	{ ok, _AppNames } = application:ensure_all_started( leec ),
@@ -356,6 +376,8 @@ start( UserOptions, MaybeBridgeSpec ) ->
 	% interactions (i.e. multiple, parallel instances).
 	%
 	% Calls init/1 on the new process, and returns its outcome:
+	% (the FSM shall use any bridge as well)
+	%
 	gen_statem:start_link( ?MODULE,
 		{ UserOptions, JsonParserState, MaybeBridgeSpec }, _Opts=[] ).
 
@@ -420,7 +442,9 @@ obtain_certificate_for( Domain, FsmPid ) ->
 %
 -spec obtain_certificate_for( Domain :: domain(), fsm_pid(), option_map() ) ->
 		'async' | { 'certificate_ready', bin_file_path() } | error_term().
-obtain_certificate_for( Domain, FsmPid, UserOptionMap ) ->
+obtain_certificate_for( Domain, FsmPid, UserOptionMap )
+  when is_binary( Domain ) andalso is_pid( FsmPid )
+	   andalso is_map( UserOptionMap ) ->
 
 	% To ensure that all needed option entries are always defined:
 	CanonicalOptionMap = maps:merge( _Def=get_default_options(),
@@ -431,18 +455,23 @@ obtain_certificate_for( Domain, FsmPid, UserOptionMap ) ->
 
 		#{ async := true } ->
 
-			% Still being in user process:
+			% Still being in user process, bridge applies:
 			cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
 			  "Requesting FSM ~w to generate asynchronously a certificate "
 			  "for domain '~s'.", [ FsmPid, Domain ] ) ),
 
-			% Asynchronous then, in a separate process from the user one:
+			% Asynchronous then, in a separate process from the user one, yet
+			% using the same bridge as set for this caller process:
+			%
 			_Pid = erlang:spawn_link( ?MODULE, obtain_cert_helper,
-									  [ Domain, FsmPid, CanonicalOptionMap ] ),
+				[ Domain, FsmPid, CanonicalOptionMap,
+				  trace_bridge:get_bridge_info() ] ),
 			async;
 
 		#{ async := false } ->
-			% Everything done in user process then:
+			% Everything done in user process then, whose bridge (if any) shall
+			% be already set:
+			%
 			cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
 			  "Requesting FSM ~w to generate synchronously a certificate "
 			  "for domain '~s'.", [ FsmPid, Domain ] ) ),
@@ -496,7 +525,7 @@ stop( FsmPid ) ->
 		{ 'ok', InitialStateName :: 'idle', InitialData :: le_state() }.
 init( { UserOptions, JsonParserState, MaybeBridgeSpec } ) ->
 
-	% First action is to register any trace bridge:
+	% First action is to register this FSM to any trace bridge:
 	trace_bridge:register( MaybeBridgeSpec ),
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:trace_fmt(
@@ -553,9 +582,9 @@ init( { UserOptions, JsonParserState, MaybeBridgeSpec } ) ->
 	% Directory map is akin to:
 	%
 	% #{<<"3TblEIQUCPk">> =>
-	%	  <<"https://community.letsencrypt.org/t/adding-random-entries-to-the-directory/31417">>,
+	%	  <<"ACME_COMM/t/adding-random-entries-to-the-directory/31417">>,
 	%   <<"keyChange">> =>
-	%	  <<"https://acme-staging-v02.api.letsencrypt.org/acme/key-change">>,
+	%	  <<"ACME_BASE/acme/key-change">>,
 	%   <<"meta">> =>
 	%	  #{<<"caaIdentities">> => [<<"letsencrypt.org">>],
 	%		<<"termsOfService">> =>
@@ -563,13 +592,13 @@ init( { UserOptions, JsonParserState, MaybeBridgeSpec } ) ->
 	%		<<"website">> =>
 	%			<<"https://letsencrypt.org/docs/staging-environment/">>},
 	%   <<"newAccount">> =>
-	%	  <<"https://acme-staging-v02.api.letsencrypt.org/acme/new-acct">>,
+	%	  <<"ACME_BASE/acme/new-acct">>,
 	%   <<"newNonce">> =>
-	%	  <<"https://acme-staging-v02.api.letsencrypt.org/acme/new-nonce">>,
+	%	  <<"ACME_BASE/acme/new-nonce">>,
 	%   <<"newOrder">> =>
-	%	  <<"https://acme-staging-v02.api.letsencrypt.org/acme/new-order">>,
+	%	  <<"ACME_BASE/acme/new-order">>,
 	%   <<"revokeCert">> =>
-	%	  <<"https://acme-staging-v02.api.letsencrypt.org/acme/revoke-cert">>}
+	%	  <<"ACME_BASE/acme/revoke-cert">>}
 
 	{ URLDirectoryMap, DirLEState } = letsencrypt_api:get_directory_map(
 		LEState#le_state.env, OptionMap, LEState ),
@@ -702,8 +731,22 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 
 
 
+% (spawn helper, to be called either from a dedicated process)
+-spec obtain_cert_helper( Domain :: domain(), fsm_pid(), option_map(),
+						  maybe( trace_bridge:bridge_info() ) ) ->
+		{ 'certificate_ready', bin_file_path() } | error_term().
+obtain_cert_helper( Domain, FsmPid, OptionMap, MaybeBridgeInfo ) ->
+
+	% Let's inherit the creator bridge first:
+	trace_bridge:set_bridge_info( MaybeBridgeInfo ),
+
+	% And then branch to the main logic:
+	obtain_cert_helper( Domain, FsmPid, OptionMap ).
+
+
+
 % Returns the ongoing challenges with pre-computed thumbprints:
-% #{Challenge => Thumbrint} if ok,	'error' if fails.
+% #{Challenge => Thumbrint} if ok, 'error' if fails.
 %
 % Defined separately for testing.
 %
@@ -814,7 +857,7 @@ idle( _EventType={ call, From },
 	%   <<"status">> => <<"valid">>}
 
 	% AccountLocationUri will be like:
-	% "https://acme-staging-v02.api.letsencrypt.org/acme/acct/16210968"
+	% "ACME_BASE/acme/acct/16210968"
 
 	case maps:get( <<"status">>, AccountDecodedJsonMap ) of
 
@@ -1167,7 +1210,7 @@ valid( _EventType={ call, _ServerRef=From },
 
 
 valid( _EventType={ call, ServerRef }, _EventContentMsg=Request,
-	  _Data=LEState ) ->
+	   _Data=LEState ) ->
 	handle_call_for_all_states( ServerRef, Request, _StateName=valid,
 								LEState );
 
@@ -1312,6 +1355,29 @@ finalize( UnexpectedEventType, EventContentMsg, _LEState ) ->
 	throw( { unexpected_event, UnexpectedEventType, EventContentMsg,
 			 { state, finalize } } ).
 
+
+
+% Management of the 'invalid' state.
+%
+% When order is being finalized, and certificate generation is ongoing.
+%
+% Waits for certificate generation being complete (order status == 'valid').
+%
+% Returns the order status.
+%
+% Transitions to:
+%   state 'processing': still ongoing
+%   state 'valid'     : certificate is ready
+%
+invalid( _EventType=enter, _PreviousState, _Data=LEState ) ->
+
+	cond_utils:if_defined( leec_debug_fsm, trace_bridge:trace_fmt(
+		"[~w] Entering the 'invalid' state.", [ self() ] ) ),
+
+	trace_bridge:error_fmt( "[~w] Reached the (stable) 'invalid' state for "
+		"domain '~s'.", [ self(), LEState#le_state.domain ] ),
+
+	keep_state_and_data.
 
 
 
@@ -1654,12 +1720,12 @@ perform_authorization( ChallengeType, AuthUris,
 
 	% UriChallengeMap is like:
 	%
-	%  #{<<"https://acme-staging-v02.api.letsencrypt.org/acme/authz-v3/142509381">> =>
+	%  #{<<"ACME_BASE/acme/authz-v3/142509381">> =>
 	%   #{<<"status">> => <<"pending">>,
 	%     <<"token">> => <<"qVTq6gQWZO4Dt4gUmnaTQdwTRkpaSnMiRx8L7Grzhl8">>,
 	%     <<"type">> => <<"http-01">>,
 	%     <<"url">> =>
-	%         <<"https://acme-staging-v02.api.letsencrypt.org/acme/chall-v3/142509381/-Axkdw">>}}.
+	%         <<"ACME_BASE/acme/chall-v3/142509381/-Axkdw">>}}.
 
 	init_for_challenge_type( ChallengeType, Mode, FirstLEState,
 							 UriChallengeMap ),
@@ -1696,7 +1762,7 @@ perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 			UriChallengeMap ) ->
 
 	% Ex: AuthUri =
-	%  "https://acme-staging-v02.api.letsencrypt.org/acme/authz-v3/133572032"
+	%  "ACME_BASE/acme/authz-v3/133572032"
 
 	{ { AuthMap, _LocUri, NewNonce }, ReqLEState } =
 		letsencrypt_api:request_authorization( AuthUri, PrivKey,
@@ -1712,17 +1778,17 @@ perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 	%		  <<"token">> => <<"Nvkad5EmNiANy5-8oPvJ_a29A-iGcCS4aR3MynPc9nM">>,
 	%		  <<"type">> => <<"http-01">>,
 	%		  <<"url">> =>
-	% <<"https://acme-staging-v02.api.letsencrypt.org/acme/chall-v3/133572032/Zu9ioQ">>},
+	% <<"ACME_BASE/acme/chall-v3/133572032/Zu9ioQ">>},
 	%		#{<<"status">> => <<"pending">>,
 	%		  <<"token">> => <<"Nvkad5EmNiANy5-8oPvJ_a29A-iGcCS4aR3MynPc9nM">>,
 	%		  <<"type">> => <<"dns-01">>,
 	%		  <<"url">> =>
-	% <<"https://acme-staging-v02.api.letsencrypt.org/acme/chall-v3/133572032/u9WbrQ">>},
+	% <<"ACME_BASE/acme/chall-v3/133572032/u9WbrQ">>},
 	%		#{<<"status">> => <<"pending">>,
 	%		  <<"token">> => <<"Nvkad5EmNiANy5-8oPvJ_a29A-iGcCS4aR3MynPc9nM">>,
 	%		  <<"type">> => <<"tls-alpn-01">>,
 	%		  <<"url">> =>
-	% <<"https://acme-staging-v02.api.letsencrypt.org/acme/chall-v3/133572032/_WS56A">>}],
+	% <<"ACME_BASE/acme/chall-v3/133572032/_WS56A">>}],
 	%   <<"expires">> => <<"2020-10-18T14:48:11Z">>,
 	%   <<"identifier">> =>
 	%	   #{<<"type">> => <<"dns">>,<<"value">> => <<"www.foobar.org">>},
