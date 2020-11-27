@@ -443,8 +443,7 @@ obtain_certificate_for( Domain, FsmPid ) ->
 -spec obtain_certificate_for( Domain :: domain(), fsm_pid(), option_map() ) ->
 		'async' | { 'certificate_ready', bin_file_path() } | error_term().
 obtain_certificate_for( Domain, FsmPid, UserOptionMap )
-  when is_binary( Domain ) andalso is_pid( FsmPid )
-	   andalso is_map( UserOptionMap ) ->
+  when is_pid( FsmPid ) andalso is_map( UserOptionMap ) ->
 
 	% To ensure that all needed option entries are always defined:
 	CanonicalOptionMap = maps:merge( _Def=get_default_options(),
@@ -479,7 +478,14 @@ obtain_certificate_for( Domain, FsmPid, UserOptionMap )
 			% Thus a direct synchronous return:
 			obtain_cert_helper( Domain, FsmPid, CanonicalOptionMap )
 
-	end.
+	end;
+
+obtain_certificate_for( _Domain, FsmPid, UserOptionMap )
+  when is_pid( FsmPid ) ->
+	throw( { not_option_map, UserOptionMap } );
+
+obtain_certificate_for( _Domain, FsmPid, _UserOptionMap ) ->
+	throw( { not_pid, FsmPid } ).
 
 
 
