@@ -15,8 +15,7 @@
 -module(letsencrypt_tls).
 -author("Guillaume Bour <guillaume@bour.cc>").
 
--export([ create_private_key/2,
-		  get_cert_request/3,
+-export([ obtain_private_key/2, get_cert_request/3,
 		  generate_certificate/5, write_certificate/3,
 		  key_to_map/1, map_to_key/1 ]).
 
@@ -41,10 +40,13 @@
 
 
 
-% Creates a private key for the current LEEC agent.
--spec create_private_key( maybe( key_file_info() ), bin_directory_path() ) ->
+% Obtains a private key for the current LEEC agent, either by creating it (in a
+% specified filename or in a generated one) or by reading a pre-existing one
+% from file.
+%
+-spec obtain_private_key( maybe( key_file_info() ), bin_directory_path() ) ->
 								tls_private_key().
-create_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
+obtain_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 
 	% If not set, forges a unique key filename to allow for multiple, concurrent
 	% instances:
@@ -70,18 +72,19 @@ create_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 	end,
 
 	% Could have been more elegant:
-	UniqFilename = file_utils:get_last_path_element( UniqPath ),
+	UniqBinFilename = text_utils:string_to_binary(
+					 file_utils:get_last_path_element( UniqPath ) ),
 
 	cond_utils:if_defined( leec_debug_keys,
 		trace_bridge:debug_fmt( "[~w] Generated filename for the LEEC agent "
-			"private key: '~s'.", [ self(), UniqFilename ] ) ),
+			"private key: '~s'.", [ self(), UniqBinFilename ] ) ),
 
-	create_private_key( { new, UniqFilename }, BinCertDirPath );
+	obtain_private_key( { new, UniqBinFilename }, BinCertDirPath );
 
 
-create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
+obtain_private_key( _KeyFileInfo={ new, BinKeyFilename }, BinCertDirPath ) ->
 
-	KeyFilePath = file_utils:join( BinCertDirPath, KeyFilename ),
+	KeyFilePath = file_utils:join( BinCertDirPath, BinKeyFilename ),
 
 	cond_utils:if_defined( leec_debug_keys,
 		trace_bridge:debug_fmt( "[~w] A private key is to be created in '~s'.",
@@ -142,12 +145,15 @@ create_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 			"succeeded.", [ self(), KeyFilePath ] ) ),
 
 	% Now load it (next clause), and return it as a tls_private_key():
-	create_private_key( KeyFilePath, BinCertDirPath );
+	obtain_private_key( KeyFilePath, BinCertDirPath );
 
 
-create_private_key( _KeyFileInfo=KeyFilePath, _BinCertDirPath ) ->
+obtain_private_key( _KeyFileInfo=KeyFilePath, BinCertDirPath ) ->
 
-	PemContent = file_utils:read_whole( KeyFilePath ),
+	FullKeyFilePath = file_utils:ensure_path_is_absolute( KeyFilePath,
+								_PotentialBasePath=BinCertDirPath ),
+
+	PemContent = file_utils:read_whole( FullKeyFilePath ),
 
 	% A single ASN.1 DER encoded entry expected:
 	KeyEntry = case public_key:pem_decode( PemContent ) of
@@ -170,7 +176,7 @@ create_private_key( _KeyFileInfo=KeyFilePath, _BinCertDirPath ) ->
 	   raw=[ E, N, D ],
 	   b64_pair={ letsencrypt_utils:b64encode( binary:encode_unsigned( N ) ),
 				  letsencrypt_utils:b64encode( binary:encode_unsigned( E ) ) },
-	   file_path=KeyFilePath },
+	   file_path=text_utils:ensure_binary( FullKeyFilePath ) },
 
 	cond_utils:if_defined( leec_debug_keys,
 		trace_bridge:debug_fmt( "[~w] Returning following private key:~n  ~p",

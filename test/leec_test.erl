@@ -58,23 +58,71 @@ run() ->
 
 	otp_utils:start_applications( PrereqAppNames ),
 
-	% Note that a webserver is unlikely to server that directory:
+	% Note that a webserver is unlikely to serve that directory:
 	WebrootDirPath = "/tmp",
 
 	CertDirPath = "/tmp",
 
-	% Expected to succeed:
-	{ ok, LeecFsmPid } = letsencrypt:start( [
-									staging,
-									{ mode, webroot },
-									{ webroot_dir_path, WebrootDirPath },
-									{ cert_dir_path, CertDirPath } ] ),
+	% The options retained for the first LEEC FSM:
+	BaseLEECOpts = [ staging,
+					 { mode, webroot },
+					 { webroot_dir_path, WebrootDirPath },
+					 { cert_dir_path, CertDirPath } ],
+
+	% Not agent private key specified, it will be generated (with a generated
+	% name); expected to succeed:
+	%
+	FirstLeecFsmPid = case letsencrypt:start( BaseLEECOpts ) of
+
+		{ ok, FirstFsmPid } ->
+			FirstFsmPid;
+
+		OtherFirstStartRes ->
+			throw( { leec_first_start_failed, OtherFirstStartRes } )
+
+	 end,
+
+	BinKeyPath = case letsencrypt:get_agent_key_path( FirstLeecFsmPid ) of
+
+		undefined ->
+			throw( { no_agent_key_path_obtained, FirstLeecFsmPid } );
+
+		BinKPath ->
+			trace_utils:info_fmt( "Obtained agent key path '~s'.",
+								  [ BinKPath ] ),
+			BinKPath
+
+	end,
+
+	case file_utils:is_existing_file_or_link( BinKeyPath ) of
+
+		true ->
+			ok;
+
+		false ->
+			throw( { non_existing_agent_key_file, BinKeyPath } )
+
+	end,
+
+	% For the second LEEC FSM, to rely on the same account:
+	SecondLEECOpts = [ { agent_key_file_path, BinKeyPath } | BaseLEECOpts ],
+
+	_SecondLeecFsmPid = case letsencrypt:start( SecondLEECOpts ) of
+
+		{ ok, SecondFsmPid }  ->
+			SecondFsmPid;
+
+		OtherSecondStartRes ->
+			throw( { leec_second_start_failed, OtherSecondStartRes } )
+
+	 end,
+
 
 	% Unlikely to be relevant either:
 	DomainName = "www.foobar.org",
 
 	% Expected to fail:
-	case letsencrypt:obtain_certificate_for( DomainName, LeecFsmPid,
+	case letsencrypt:obtain_certificate_for( DomainName, FirstLeecFsmPid,
 						letsencrypt:get_default_options( _Async=false ) ) of
 
 		{ certificate_ready, BinCertFilePath } ->

@@ -13,9 +13,9 @@ The main differences introduced by LEEC are:
 - dependency onto [Ceylan-Myriad](https://github.com/Olivier-Boudeville/Ceylan-Myriad) added, to benefit from its facilities
 - JSON parser can be JSX (the default), or Jiffy (refer to the `JSON parsers` section)
 - porting done from [gen_fsm](https://erlang.org/documentation/doc-6.1/lib/stdlib-2.1/doc/html/gen_fsm.html) (soon to be deprecated) to the newer [gen_statem](https://erlang.org/doc/man/gen_statem.html)
-- minor API changes, for a clearer mode of operation
+- minor API changes and additions, for a clearer and more flexible mode of operation
 - fixed the compilation with Erlang version 23.0 and higher (ex: w.r.t. to http_uri/uri_string, to updated dependencies such as Jiffy, and newer Cowboy for the examples)
-- allow for *concurrent* certificate requests (ex: if managing multiple virtual hosts, new certificates being requested for all of them at webserver start-up); so LEEC generates certificates in parallel and does not rely on a *registered* FSM anymore
+- allow for *concurrent* certificate requests (ex: if managing multiple domains with different keys, new certificates being requested for all of them at webserver start-up); so LEEC generates certificates in parallel and does not rely on a *registered* FSM anymore
 - global, ets-based TCP connection pool replaced by a per-FSM internal cache
 - `connect_timeout` deprecated in favor of `http_timeout`
 
@@ -97,7 +97,7 @@ Non-rebar3 version is quite similar:
 
 ## Mode of Operation
 
-  The overall process is [explained here](https://ietf-wg-acme.github.io/acme/draft-ietf-acme-acme.html#rfc.section.4).
+  The overall process is [explained here](https://ietf-wg-acme.github.io/acme/draft-ietf-acme-acme.html#rfc.section.4) and in `this RFC <https://www.rfc-editor.org/rfc/rfc8555.html>`_.
 
   The LEEC agent gets in touch with the Let's Encrypt ACME server, authenticates itself (through a RSA key that it generated, nonces, etc.) and, based on the obtained URI directory, triggers the relevant operations on the ACME server, relying on a simple FSM (*Finite State Machine*) for that.
 
@@ -128,7 +128,6 @@ Optionally, you can provide as parameter the domain you want to apply options.
 
 
 ## API
-
 
 * `letsencrypt:start(Params)`: starts the LEEC client process, creating a corresponding FSM (as a separate process). Params is a list of parameters, chosen from the following ones:
   * `staging` (optional): uses staging API (generating fake certificates - the default behavior is to use real API)
@@ -317,6 +316,16 @@ If wanting to switch from the default JSX to Jiffy, following files shall be upd
 (none in Myriad)
 
 
+## Parallel certification requests
+
+LEEC is able to process any number of parallel ACME operations (thanks to autonomous agents, per-FSM connection pools, separate keys, etc.) - yet rate limits apply for Let's Encrypt servers, both in `staging <https://letsencrypt.org/docs/staging-environment/>`_ and in `production <https://letsencrypt.org/docs/rate-limits/>`_.
+
+So the approach of creating automatically per-virtual host throway accounts is not scalable enough. SAN support and, now, wildcard certificates should be sufficient for most use cases.
+
+The others shall rely on the re-use of ACME accounts, which has been added to LEEC.
+
+
+
 ## About this LEEC fork
 
 This is mostly a reckless fork, with so many differences (in terms of conventions, Myriad integration, whitespace cleanup) that a pull request can difficultly be considered.
@@ -326,6 +335,8 @@ By some ways, this fork is safer and more robust than the original, by others no
 In spite of the appearances, it remained nevertheless very close to the original (just differences of form, mainly).
 
 Most of the elements of [this pull request](https://github.com/gbour/letsencrypt-erlang/pull/16/) from Marc Worrell have also been integrated.
+
+
 
 ## LEEC Website: under construction
 

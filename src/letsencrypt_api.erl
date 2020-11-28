@@ -15,7 +15,7 @@
 -module(letsencrypt_api).
 -author("Guillaume Bour <guillaume@bour.cc>").
 
--export([ get_directory_map/3, get_nonce/3, create_acme_account/5,
+-export([ get_directory_map/3, get_nonce/3, get_acme_account/5,
 		  request_new_certificate/6, get_order/5, request_authorization/5,
 		  notify_ready_for_challenge/5, finalize_order/6, get_certificate/5,
 		  binary_to_status/1,
@@ -344,10 +344,13 @@ get_directory_map( Env, OptionMap, LEState ) ->
 
 	case StatusCode of
 
-		200 ->
+		_Success=200 ->
 			ok;
 
 		_ ->
+			trace_bridge:error_fmt( "Unexpected status code when getting "
+				"directory map: ~s",
+				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
 			throw( { unexpected_status_code, StatusCode, get_directory_map } )
 
 	end,
@@ -359,28 +362,30 @@ get_directory_map( Env, OptionMap, LEState ) ->
 
 
 
-% Gets and returns a fresh nonce by using the correspoding URI (see
+% Gets and returns a fresh nonce by using the corresponding URI (see
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.2).
 %
 -spec get_nonce( directory_map(), option_map(), le_state() ) ->
-					   { nonce(), le_state() }.
+					{ nonce(), le_state() }.
 get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges,
 		trace_bridge:debug_fmt( "[~w] Getting new nonce from ~s.",
 								[ self(), Uri ] ) ),
 
-	% Status code: 204 (No content):
 	{ #{ nonce := Nonce, status_code := StatusCode }, NewLEState }  =
 		request( _Method=get, Uri, _Headers=#{}, _MaybeBinContent=undefined,
 				 OptionMap, LEState ),
 
 	case StatusCode of
 
-		204 ->
+		_NoContent=204 ->
 			ok;
 
 		_ ->
+			trace_bridge:error_fmt( "Unexpected status code when getting "
+				"nonce: ~s",
+				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
 			throw( { unexpected_status_code, StatusCode, get_nonce } )
 
 	end,
@@ -402,17 +407,20 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap, LEState ) ->
 % - Location is the URL corresponding to the created ACME account
 % - Nonce is a new valid replay-nonce
 %
--spec create_acme_account( directory_map(), tls_private_key(), jws(),
-		option_map(), le_state() ) ->
+-spec get_acme_account( directory_map(), tls_private_key(), jws(),
+						option_map(), le_state() ) ->
 			{ { json_map_decoded(), bin_uri(), nonce() }, le_state() }.
-create_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
-					 OptionMap, LEState ) ->
+get_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
+				  OptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges,
 		trace_bridge:debug_fmt( "[~w] Requesting a new account from ~s.",
 								[ self(), Uri ] ) ),
 
-	% Terms of service should not be automatically agreed:
+	% Terms of service should not be automatically agreed.
+	%
+	% Example of contact: "mailto:cert-admin@foobar.org".
+	%
 	Payload = #{ termsOfServiceAgreed => true, contact => [] },
 
 	ReqB64 = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri }, Payload,
@@ -428,14 +436,18 @@ create_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 		_CreatedCode=201 ->
 			ok;
 
-		% Happens should this account already exist (in using the same LEEC FSM
-		% for more than one certificate operation):
+		% Happens, should this account already exist (in using the same LEEC FSM
+		% for more than one certificate operation, or re-using a pre-existing
+		% account from the start):
 		%
 		_Success=200 ->
 			ok;
 
 		_ ->
-			throw( { unexpected_status_code, StatusCode, create_acme_account } )
+			trace_bridge:error_fmt( "Unexpected status code when getting "
+				"ACME account: ~s",
+				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
+			throw( { unexpected_status_code, StatusCode, get_acme_account } )
 
 	end,
 
@@ -473,7 +485,7 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 								  _Content=IdPayload, LEState ),
 
 	{ #{ json := OrderJsonMap, location := LocationUri, nonce := Nonce,
-	   status_code := StatusCode }, NewLEState } = request( _Method=post,
+		 status_code := StatusCode }, NewLEState } = request( _Method=post,
 		OrderUri, _Headers=#{}, _MaybeBinContent=Req,
 		OptionMap#{ json => true }, LEState ),
 
@@ -483,6 +495,9 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 			ok;
 
 		_ ->
+			trace_bridge:error_fmt( "Unexpected status code when requesting "
+				"new certificate: ~s",
+				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
 			throw( { unexpected_status_code, StatusCode,
 					 request_new_certificate } )
 
@@ -524,9 +539,23 @@ get_order( Uri, Key, Jws, OptionMap, LEState ) ->
 	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined,
 								  LEState ),
 
-	{ #{ json := Resp, location := Location, nonce := Nonce }, NewLEState } =
+	{ #{ json := Resp, location := Location, nonce := Nonce,
+		 status_code := StatusCode }, NewLEState } =
 		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
 				 OptionMap#{ json=> true }, LEState ),
+
+	case StatusCode of
+
+		_Success=200 ->
+			ok;
+
+		_ ->
+			trace_bridge:error_fmt( "Unexpected status code when getting "
+				"order: ~s",
+				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
+			throw( { unexpected_status_code, StatusCode, get_order } )
+
+	end,
 
 	{ { Resp, Location, Nonce }, NewLEState }.
 
@@ -559,10 +588,13 @@ request_authorization( AuthUri, PrivKey, Jws, OptionMap, LEState ) ->
 
 	case StatusCode of
 
-		200 ->
+		_Success=200 ->
 			ok;
 
 		_ ->
+			trace_bridge:error_fmt( "Unexpected status code when requesting "
+				"authorization: ~s",
+				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
 			throw( { unexpected_status_code, StatusCode,
 					 request_authorization } )
 
@@ -601,10 +633,13 @@ notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
 
 	case StatusCode of
 
-		200 ->
+		_Success=200 ->
 			ok;
 
 		_ ->
+			trace_bridge:error_fmt( "Unexpected status code when notifying "
+				"that ready for challenge: ~s",
+				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
 			throw( { unexpected_status_code, StatusCode,
 					 notify_ready_for_challenge } )
 
@@ -638,14 +673,20 @@ finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 
 	case StatusCode of
 
-		200 ->
+		_Success=200 ->
 			ok;
 
 		% If trying to progress whereas a past operation failed:
-		_Forbidden=403 ->
+		Forbidden=403 ->
+			trace_bridge:error_fmt( "Unable to finalize order (~s). "
+				"Possibly a past operation failed.",
+				[ web_utils:interpret_http_status_code( Forbidden ) ] ),
 			throw( { forbidden_status_code, StatusCode, finalize_order } );
 
 		_ ->
+			trace_bridge:error_fmt( "Unexpected status code when finalizing "
+				"order: ~s",
+				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
 			throw( { unexpected_status_code, StatusCode, finalize_order } )
 
 	end,
@@ -675,10 +716,13 @@ get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, OptionMap,
 
 	case StatusCode of
 
-		200 ->
+		_Success=200 ->
 			ok;
 
 		_ ->
+			trace_bridge:error_fmt( "Unexpected status code when getting "
+				"certificate: ~s",
+				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
 			throw( { unexpected_status_code, StatusCode, get_certificate } )
 
 	end,

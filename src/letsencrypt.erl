@@ -47,7 +47,7 @@
 
 
 % For testing purpose:
--export([ get_ongoing_challenges/1 ]).
+-export([ get_ongoing_challenges/1, get_agent_key_path/1 ]).
 
 
 % For spawn purpose:
@@ -206,7 +206,11 @@
 
 
 % Information regarding the private key of the LEEC agent:
--type agent_key_file_info() :: { 'new', file_path() } | file_path().
+%
+% (if 'new' is used, the path is supposed to be either absolute, or relative to
+% the certificate directory)
+%
+-type agent_key_file_info() :: { 'new', bin_file_path() } | bin_file_path().
 
 
 % A certificate, as a binary:
@@ -306,7 +310,6 @@
 -type ustring() :: text_utils:ustring().
 -type bin_string() :: text_utils:bin_string().
 
--type file_path() :: file_utils:file_path().
 -type bin_file_path() :: file_utils:bin_file_path().
 -type any_file_path() :: file_utils:any_file_path().
 
@@ -430,12 +433,13 @@ obtain_certificate_for( Domain, FsmPid ) ->
 %			* async (bool): if true, blocks until complete and returns
 %				generated certificate filename
 %							if false, immediately returns
-%			* callback: function executed when async = true once domain
-%				certificate has been successfully generated
+%			* callback: function executed when Async is true, once domain
+%			certificate has been successfully generated
 %
 % Returns:
-%	- 'async' if async is set (the default being sync)
-%	- {error, Err} if a failure happens
+%   - if synchronous (the default): either { certificate_ready, BinFilePath } if
+%   successful, otherwise {error, Err}
+%	- otherwise (asynchronous), 'async'
 %
 % Belongs to the user-facing API; requires the LEEC service to be already
 % started.
@@ -553,7 +557,7 @@ init( { UserOptions, JsonParserState, MaybeBridgeSpec } ) ->
 	%
 	KeyFileInfo = case LEState#le_state.agent_key_file_info of
 
-		% Most probably the case:
+		% If a key is to be created:
 		undefined ->
 			% We prefer here devising out own agent filename, lest its automatic
 			% uniqueness is difficult to obtain (which is the case); we may use
@@ -568,17 +572,22 @@ init( { UserOptions, JsonParserState, MaybeBridgeSpec } ) ->
 			% A prior run might have left a file with the same name, it will be
 			% overwritten (with a warning) in this case:
 			%
-			UniqFilename = text_utils:format( "leec-agent-private-~s.key",
+			UniqFilename = text_utils:bin_format( "leec-agent-private-~s.key",
 								[ text_utils:pid_to_core_string( self() ) ] ),
 
+			% Already a binary:
 			{ new, UniqFilename };
 
-		KInf ->
-			KInf
+
+		% If a key is to be reused (absolute path, or relative to
+		% BinCertDirPath):
+		%
+		CurrentKeyBinPath ->
+			CurrentKeyBinPath
 
 	end,
 
-	AgentPrivateKey = letsencrypt_tls:create_private_key( KeyFileInfo,
+	AgentPrivateKey = letsencrypt_tls:obtain_private_key( KeyFileInfo,
 														  BinCertDirPath ),
 
 	KeyJws = letsencrypt_jws:init( AgentPrivateKey ),
@@ -722,6 +731,9 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 						"for ~w regarding result ~p.", [ FsmPid, Ret ] )
 								 end ),
 
+			trace_bridge:trace_fmt( "Async callback called "
+				"for ~w regarding result ~p.", [ FsmPid, CreationRes ] ),
+
 			Callback( CreationRes );
 
 		_ ->
@@ -748,6 +760,31 @@ obtain_cert_helper( Domain, FsmPid, OptionMap, MaybeBridgeInfo ) ->
 
 	% And then branch to the main logic:
 	obtain_cert_helper( Domain, FsmPid, OptionMap ).
+
+
+
+% Returns the (absolute, binary) path of the current private key of the LEEC
+% agent.
+%
+% Useful so that the same key can be used for multiple ACME orders (possibly in
+% parallel) rather than multiplying the keys.
+%
+-spec get_agent_key_path( fsm_pid() ) -> 'error' | maybe( bin_file_path() ).
+get_agent_key_path( FsmPid ) ->
+
+	case catch gen_statem:call( _ServerRef=FsmPid,
+								_Request=get_agent_key_path ) of
+
+		% Process not started, wrong state, etc.:
+		{ 'EXIT', ExitReason } ->
+			trace_bridge:error_fmt( "Agent key path not obtained: ~p.",
+									[ ExitReason ] ),
+			error;
+
+		BinKeyPath ->
+			BinKeyPath
+
+	end.
 
 
 
@@ -848,7 +885,7 @@ idle( _EventType={ call, From },
 	end,
 
 	{ { AccountDecodedJsonMap, AccountLocationUri, AccountNonce },
-	  CreateLEState } = letsencrypt_api:create_acme_account( DirMap, PrivKey,
+	  CreateLEState } = letsencrypt_api:get_acme_account( DirMap, PrivKey,
 							Jws#jws{ nonce=Nonce }, OptionMap, LEState ),
 
 	% Payload decoded from JSON in AccountDecodedJsonMap will be like:
@@ -887,7 +924,7 @@ idle( _EventType={ call, From },
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:trace_fmt(
 		"[~w] ACME account key obtained.", [ self() ] ) ),
 
-	% Apparently a difference JWS then:
+	% Apparently a different JWS then:
 	AccountJws = #jws{ alg=Jws#jws.alg, kid=AccountLocationUri,
 					   nonce=AccountNonce },
 
@@ -976,7 +1013,7 @@ idle( EventType, EventContentMsg, _LEState ) ->
 
 % Management of the 'pending' state, when challenges are on-the-go.
 %
-% Returns a list of the challenges currently on-the-go with pre-computed
+% Returns a list of the currently ongoing challenges, with pre-computed
 % thumbprints, i.e. a thumbprint_map().
 %
 pending( _EventType=enter, _PreviousState, _Data ) ->
@@ -1185,7 +1222,7 @@ valid( _EventType={ call, _ServerRef=From },
 	KeyFilename = text_utils:binary_to_string( BinDomain ) ++ ".key",
 
 	% KeyFilePath is required for CSR generation:
-	CreatedTLSPrivKey = letsencrypt_tls:create_private_key(
+	CreatedTLSPrivKey = letsencrypt_tls:obtain_private_key(
 							{ new, KeyFilename }, BinCertDirPath ),
 
 	Csr = letsencrypt_tls:get_cert_request( BinDomain, BinCertDirPath, SANs ),
@@ -1204,7 +1241,7 @@ valid( _EventType={ call, _ServerRef=From },
 				<<"location">> => maps:get( <<"location">>, OrderDirMap ) },
 
 	LastLEState = FinLEState#le_state{ order=LocOrderDirMap,
-		agent_key_file_path=CreatedTLSPrivKey#tls_private_key.file_path,
+		cert_key_file=CreatedTLSPrivKey#tls_private_key.file_path,
 		nonce=FinNonce },
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:trace_fmt(
@@ -1230,7 +1267,8 @@ valid( EventType, EventContentMsg, _LEState ) ->
 %
 % When order is being finalized, and certificate generation is ongoing.
 %
-% Waits for certificate generation being complete (order status == 'valid').
+% Waits for certificate generation being complete (order status becoming
+% 'valid').
 %
 % Returns the order status.
 %
@@ -1274,9 +1312,11 @@ finalize( _EventType={ call, _ServerRef=From },
 			case ReadStatus of
 
 		processing ->
+
 			cond_utils:if_defined( leec_debug_exchanges, trace_bridge:trace_fmt(
 				"[~w] Certificate creation still in progress on server.",
 				[ self() ] ) ),
+
 			{ { creation_in_progress, finalize, OrderNonce, Jws }, OrderState };
 
 		% Downloads certificate and saves it into file.
@@ -1402,12 +1442,32 @@ handle_call_for_all_states( ServerRef, _Request=get_status, StateName,
 							_LEState ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
-		"[~w] Returning current status: '~s'.",
-		[ ServerRef, StateName ] ) ),
+		"[~w] Returning current status: '~s'.", [ ServerRef, StateName ] ) ),
 
 	Res = StateName,
 
 	{ keep_state_and_data, _Actions={ reply, _From=ServerRef, Res } };
+
+
+handle_call_for_all_states( ServerRef, _Request=get_agent_key_path, StateName,
+							LEState ) ->
+
+	MaybeKeyPath = case LEState#le_state.agent_private_key of
+
+		undefined ->
+			undefined;
+
+		PrivKey ->
+			PrivKey#tls_private_key.file_path
+
+	end,
+
+	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
+		"[~w] Returning agent key path (while in state '~s'): ~p.",
+		[ ServerRef, StateName, MaybeKeyPath ] ) ),
+
+	{ keep_state_and_data, _Actions={ reply, _From=ServerRef,
+									  _Res=MaybeKeyPath } };
 
 
 handle_call_for_all_states( ServerRef, _Request=stop, StateName,
@@ -1487,16 +1547,32 @@ get_options( _Opts=[ { mode, Mode } | T ], LEState ) ->
 	end,
 	get_options( T, LEState#le_state{ mode=Mode } );
 
+% To re-use a previously-stored agent private key:
 get_options( _Opts=[ { agent_key_file_path, KeyFilePath } | T ], LEState ) ->
+
 	AgentKeyFilePath = text_utils:ensure_string( KeyFilePath ),
-	case file_utils:is_existing_file_or_link( AgentKeyFilePath ) of
+
+	% Not knowin the certificate directory yet, so checking only if absolute:
+	case file_utils:is_absolute_path( AgentKeyFilePath ) of
 
 		true ->
-			get_options( T, LEState#le_state{
-							  agent_key_file_info=AgentKeyFilePath } );
+			case file_utils:is_existing_file_or_link( AgentKeyFilePath ) of
+
+				true ->
+					get_options( T, LEState#le_state{
+						agent_key_file_info=
+							text_utils:string_to_binary( AgentKeyFilePath ) } );
+
+				false ->
+					throw( { non_existing_agent_key_file, AgentKeyFilePath } )
+
+			end;
 
 		false ->
-			throw( { non_existing_agent_key_file, AgentKeyFilePath } )
+			% No possible check yet:
+			get_options( T,
+				LEState#le_state{ agent_key_file_info=
+					text_utils:string_to_binary( AgentKeyFilePath ) } )
 
 	end;
 
@@ -1877,6 +1953,9 @@ perform_authorization_step2( _Pairs=[ { Uri, Challenge } | T ],
 %
 -spec init_for_challenge_type( challenge_type(), le_mode(), le_state(),
 							   uri_challenge_map() ) -> void().
+% Here we directly write challenges in a web root that is already being served
+% through other means:
+%
 init_for_challenge_type( _ChallengeType='http-01', _Mode=webroot,
 		LEState=#le_state{ webroot_dir_path=BinWebrootPath,
 						   account_key=AccountKey },
@@ -1899,10 +1978,17 @@ init_for_challenge_type( _ChallengeType='http-01', _Mode=webroot,
 	  end || #{ <<"token">> := Token } <- maps:values( UriChallengeMap ) ];
 
 
+% Here we never write challenges, we trigger the user-specified callback
+% whenever challenges are ready:
+%
 init_for_challenge_type( _ChallengeType, _Mode=slave, _LEState,
 						 _UriChallengeMap ) ->
 	ok;
 
+
+% Here we spawn a dedicated (elli-based) webserver in order to host the
+% challenges to be downloaded by the ACME server:
+%
 init_for_challenge_type( ChallengeType, _Mode=standalone,
 			LEState=#le_state{ port=Port, domain=Domain, account_key=AccntKey },
 			UriChallengeMap ) ->

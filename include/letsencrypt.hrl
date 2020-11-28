@@ -26,8 +26,8 @@
   % Ex: b64 encodings of N and E.
   b64_pair :: { letsencrypt:binary_b64(), letsencrypt:binary_b64() },
 
-  % Path of the RSA private key encoded in ASN.1 DER:
-  file_path :: file_utils:file_path() } ).
+  % Absolute path of the RSA private key encoded in ASN.1 DER:
+  file_path :: file_utils:bin_file_path() } ).
 
 
 
@@ -86,13 +86,19 @@
 	env = prod :: 'staging' | 'prod',
 
 	% URI directory, fetched from ACME servers at startup (i.e. table of the
-	% URIs to be called depending on needs regarding certificates):
+	% URIs to be called depending on operations being needed regarding
+	% certificates):
 	%
 	directory_map = undefined ::
 		basic_utils:maybe( file_utils:directory_map() ),
 
 	% Directory where certificates are to be stored:
 	cert_dir_path = <<"/tmp">> :: file_utils:bin_directory_path(),
+
+	% The filename (relative to cert_dir_path) of the target certificate (CSR)
+	% private key file (if any) for the domain(s) of interest.
+	%
+	cert_key_file = undefined :: maybe( file_utils:bin_file_path() ),
 
 	% Ex: mode = webroot.
 	mode = undefined :: basic_utils:maybe( letsencrypt:le_mode() ),
@@ -103,9 +109,6 @@
 
 	% If mode is 'standalone':
 	port = 80 :: net_utils:tcp_port(),
-
-	intermediate_cert = undefined ::
-	  basic_utils:maybe( letsencrypt:bin_certificate() ),
 
 	% An (optional) identifier specified by the user when starting a LEEC
 	% instance (before requesting an operation related to any specific domain)
@@ -126,28 +129,34 @@
 	% The Subject Alternative Names of interest:
 	sans = [] :: [ letsencrypt:san() ],
 
-	% Information regarding the key of the LEEC agent:
+	% Information regarding the key of the LEEC agent; it is either created or
+	% read from any user-specified file:
+	%
 	agent_key_file_info = undefined ::
 	  basic_utils:maybe( letsencrypt:agent_key_file_info() ),
 
-	% The TLS private key that the LEEC agent generated at startup:
+	% The TLS private key the LEEC agent is relying on:
 	agent_private_key = undefined ::
 	  basic_utils:maybe( letsencrypt:tls_private_key() ),
+
+	% No need to record the path to the private key file of the LEEC agent, as
+	% it is a field of the previous attribute:
+	%
+	%agent_key_file_path = undefined ::
+	%  basic_utils:maybe( file_utils:file_path() ),
 
 	% JSON Web Signature of the private key of the LEEC agent:
 	jws = undefined :: basic_utils:maybe( letsencrypt:jws() ),
 
-	% The public key returned by the ACME server on account creation:
+	% The public key returned by the ACME server when an account is obtained
+	% (its private key remains on the ACME server):
+	%
 	account_key :: letsencrypt:tls_public_key(),
 
 	order = undefined :: basic_utils:maybe( letsencrypt:directory_map() ),
 
 	% Known challenges, per URI:
 	challenges = #{} :: letsencrypt:uri_challenge_map(),
-
-	% Path to the private key file of the LEEC agent:
-	agent_key_file_path = undefined ::
-	  basic_utils:maybe( file_utils:file_path() ),
 
 	% API options:
 	option_map = letsencrypt:get_default_options() :: letsencrypt:option_map(),
