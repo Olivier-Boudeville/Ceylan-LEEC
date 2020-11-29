@@ -276,9 +276,6 @@
 
 
 
-
-
-
 % Typically fsm_pid():
 -type server_ref() :: gen_statem:server_ref().
 

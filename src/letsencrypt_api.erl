@@ -407,8 +407,8 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap, LEState ) ->
 % - Location is the URL corresponding to the created ACME account
 % - Nonce is a new valid replay-nonce
 %
--spec get_acme_account( directory_map(), tls_private_key(), jws(),
-						option_map(), le_state() ) ->
+-spec get_acme_account( directory_map(), tls_private_key(), jws(), option_map(),
+						le_state() ) ->
 			{ { json_map_decoded(), bin_uri(), nonce() }, le_state() }.
 get_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 				  OptionMap, LEState ) ->
