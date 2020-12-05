@@ -139,7 +139,7 @@ get_tcp_connection( Proto, Host, Port, TCPCache ) ->
 			end,
 
 			cond_utils:if_defined( leec_debug_network,
-			  trace_bridge:trace_fmt( "Connection ~p cached.", [ Conn ] ) ),
+			  trace_bridge:debug_fmt( "Connection ~p cached.", [ Conn ] ) ),
 
 			{ Conn, table:add_entry( ConnectTriplet, Conn, TCPCache ) };
 
