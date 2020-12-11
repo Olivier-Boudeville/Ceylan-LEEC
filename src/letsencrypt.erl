@@ -351,19 +351,11 @@ start( UserOptions ) ->
 start( UserOptions, MaybeBridgeSpec ) ->
 
 	% If a trace bridge is specified, we use it both for the current (caller)
-	% process and the ones it create, i.e. the associated FSM and, possibly, the
-	% helper process (if asynchronous operations are requested).
-	%
+	% process and the ones it creates, i.e. the associated FSM and, possibly,
+	% the helper process (if asynchronous operations are requested).
+
 	% First this caller process:
-	case MaybeBridgeSpec of
-
-		undefined ->
-			ok;
-
-		_ ->
-			trace_bridge:register( MaybeBridgeSpec )
-
-	end,
+	trace_bridge:register_if_not_already( MaybeBridgeSpec ),
 
 	JsonParserState = json_utils:start_parser(),
 
@@ -532,7 +524,9 @@ stop( FsmPid ) ->
 		{ 'ok', InitialStateName :: 'idle', InitialData :: le_state() }.
 init( { UserOptions, JsonParserState, MaybeBridgeSpec } ) ->
 
-	% First action is to register this FSM to any trace bridge:
+	% First action is to register this (unregistered by design) FSM to any
+	% specified trace bridge:
+	%
 	trace_bridge:register( MaybeBridgeSpec ),
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
