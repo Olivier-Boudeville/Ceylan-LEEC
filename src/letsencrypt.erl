@@ -47,7 +47,7 @@
 
 
 % For testing purpose:
--export([ get_ongoing_challenges/1, get_agent_key_path/1 ]).
+-export([ get_ongoing_challenges/1, send_ongoing_challenges/2, get_agent_key_path/1 ]).
 
 
 % For spawn purpose:
@@ -760,6 +760,8 @@ obtain_cert_helper( Domain, FsmPid, OptionMap, MaybeBridgeInfo ) ->
 % Useful so that the same key can be used for multiple ACME orders (possibly in
 % parallel) rather than multiplying the keys.
 %
+% (exported API helper)
+%
 -spec get_agent_key_path( fsm_pid() ) -> 'error' | maybe( bin_file_path() ).
 get_agent_key_path( FsmPid ) ->
 
@@ -782,7 +784,7 @@ get_agent_key_path( FsmPid ) ->
 % Returns the ongoing challenges with pre-computed thumbprints:
 % #{Challenge => Thumbrint} if ok, 'error' if fails.
 %
-% Defined separately for testing.
+% (exported API helper)
 %
 -spec get_ongoing_challenges( fsm_pid() ) ->
 					'error' | 'no_challenge' | thumbprint_map().
@@ -807,6 +809,25 @@ get_ongoing_challenges( FsmPid ) ->
 	end.
 
 
+% Sends the ongoing challenges to the specified process.
+%
+% Typically useful in a slave operation mode, when the web handler cannot access
+% directly the PID of the LEEC FSM: this code is then called by a third-party
+% process (ex: a certificate manager one, statically known of the web handler,
+% and triggered by it), and returns the requested challenged to the specified
+% target PID (most probably the one of the web handler itself).
+
+% (exported API helper)
+%
+-spec send_ongoing_challenges( fsm_pid(), pid() ) -> void().
+send_ongoing_challenges( FsmPid, TargetPid ) ->
+
+	% No error possibly reported:
+	gen_statem:cast( _ServerRef=FsmPid,
+					 _Msg={ send_ongoing_challenges, TargetPid } ).
+
+
+
 
 % Section for gen_statem API, in the 'state_functions' callback mode: the
 % branching is done depending on the current state name (as atom), so (like with
@@ -828,7 +849,7 @@ get_ongoing_challenges( FsmPid ) ->
 % State 'idle', the initial state, typically used when awaiting for certificate
 % requests to be triggered.
 %
-% idle(get_ongoing_challenges): nothing done
+% idle(get_ongoing_challenges | send_ongoing_challenges): nothing done
 %
 -spec idle( event_type(), event_content(), le_state() ) ->
 				state_callback_result().
@@ -979,16 +1000,26 @@ idle( _EventType={ call, From },
 	  _Action={ reply, From, Reply } };
 
 
-idle( _EventType={ call, From },
+idle( _EventType={ call, FromPid },
 	  _EventContentMsg=_Request=get_ongoing_challenges, _Data=_LEState ) ->
 
-	trace_bridge:warning_fmt( "Received a get_ongoing_challenges request event "
-		"from ~w while being idle.", [ From ] ),
+	trace_bridge:warning_fmt( "Received a get_ongoing_challenges request call "
+		"from ~w while being idle.", [ FromPid ] ),
 
-	% Clearer than {next_state, idle, LEState, {reply, From,
+	% Clearer than {next_state, idle, LEState, {reply, FromPid,
 	% _Reply=no_challenge}}:
 	%
-	{ keep_state_and_data, { reply, From, _Reply=no_challenge } };
+	{ keep_state_and_data, { reply, FromPid, _Reply=no_challenge } };
+
+
+idle( _EventType=cast,
+	  _EventContentMsg=_Request={ send_ongoing_challenges, TargetPid },
+	  _Data=_LEState ) ->
+
+	trace_bridge:warning_fmt( "Ignored a send_ongoing_challenges cast "
+		"(targeting ~w) while being idle.", [ TargetPid ] ),
+
+	keep_state_and_data;
 
 
 % Possibly Request=stop:
@@ -1002,10 +1033,8 @@ idle( EventType, EventContentMsg, _LEState ) ->
 
 
 
-% Management of the 'pending' state, when challenges are on-the-go.
-%
-% Returns a list of the currently ongoing challenges, with pre-computed
-% thumbprints, i.e. a thumbprint_map().
+% Management of the 'pending' state, when challenges are on-the-go, i.e. being
+% processed with the ACME server.
 %
 pending( _EventType=enter, _PreviousState, _Data ) ->
 
@@ -1015,6 +1044,9 @@ pending( _EventType=enter, _PreviousState, _Data ) ->
 	keep_state_and_data;
 
 
+% Returns a list of the currently ongoing challenges, with pre-computed
+% thumbprints, i.e. a thumbprint_map().
+%
 pending( _EventType={ call, From }, _EventContentMsg=get_ongoing_challenges,
 		 _Data=LEState=#le_state{ account_key=AccountKey,
 								  challenges=TypeChallengeMap } ) ->
@@ -1029,11 +1061,33 @@ pending( _EventType={ call, From }, _EventContentMsg=get_ongoing_challenges,
 		  || #{ <<"token">> := Token } <- maps:values( TypeChallengeMap ) ] ),
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
-		"[~w] Returning from pending state challenge "
+		"[~w] Returning (get) from pending state challenge "
 		"thumbprint map ~p.", [ self(), ThumbprintMap ] ) ),
 
 	{ next_state, _SameState=pending, _Data=LEState,
 	  _Action={ reply, From, _RetValue=ThumbprintMap } };
+
+
+pending( _EventType=cast, _EventContentMsg={ send_ongoing_challenges, TargetPid },
+		 _Data=LEState=#le_state{ account_key=AccountKey,
+								  challenges=TypeChallengeMap } ) ->
+
+	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
+		"[~w] Ongoing challenges to be sent to ~w.", [ self(), TargetPid ] ) ),
+
+	% get_key_authorization/3 not returning a le_state():
+	ThumbprintMap = maps:from_list( [ { Token,
+		_Thumbprint=letsencrypt_jws:get_key_authorization( AccountKey, Token,
+														   LEState ) }
+		  || #{ <<"token">> := Token } <- maps:values( TypeChallengeMap ) ] ),
+
+	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
+		"[~w] Returning (send) from pending state challenge "
+		"thumbprint map ~p.", [ self(), ThumbprintMap ] ) ),
+
+	TargetPid ! { leec_result, ThumbprintMap },
+
+	keep_state_and_data;
 
 
 % Checks if all challenges are completed, and returns the (possibly new) current
