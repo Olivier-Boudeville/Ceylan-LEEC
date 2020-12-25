@@ -128,18 +128,25 @@ get_tcp_connection( Proto, Host, Port, TCPCache ) ->
 			Conn = case shotgun:open( Host, Port, Proto ) of
 
 				{ ok, Connection } ->
-				   Connection;
+					Connection;
 
 				{ error, gun_open_failed } ->
+					trace_bridge:error_fmt( "[~w] Connection to ~s:~B, "
+						"with the '~s' scheme, failed.",
+						[ self(), Host, Port, Proto ] ),
 				   throw( { gun_open_failed, Host, Port, Proto } );
 
 				{ error, Error } ->
+					trace_bridge:error_fmt( "[~w] Connection to ~s:~B, "
+						"with the '~s' scheme, failed: ~p.",
+						[ self(), Host, Port, Proto, Error ] ),
 				   throw( { gun_open_failed, Error, Host, Port, Proto } )
 
 			end,
 
 			cond_utils:if_defined( leec_debug_network,
-			  trace_bridge:debug_fmt( "Connection ~p cached.", [ Conn ] ) ),
+			  trace_bridge:debug_fmt( "[~w] Connection ~p obtained and cached.",
+									  [ self(), Conn ] ) ),
 
 			{ Conn, table:add_entry( ConnectTriplet, Conn, TCPCache ) };
 
@@ -240,6 +247,10 @@ request( Method, Uri, Headers, MaybeBinContent,
 	end,
 
 	UriPort = maps:get( port, UriMap, DefaultPort ),
+
+	cond_utils:if_defined( leec_debug_exchanges,
+		trace_bridge:debug_fmt( "[~w] Preparing a ~p request to '~s'.",
+								[ self(), Method, Uri ] ) ),
 
 	ContentHeaders = Headers#{ <<"content-type">> =>
 								   <<"application/jose+json">> },
