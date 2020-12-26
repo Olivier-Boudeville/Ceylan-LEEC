@@ -47,7 +47,8 @@
 
 
 % For testing purpose:
--export([ get_ongoing_challenges/1, send_ongoing_challenges/2, get_agent_key_path/1 ]).
+-export([ get_ongoing_challenges/1, send_ongoing_challenges/2,
+		  get_agent_key_path/1 ]).
 
 
 % For spawn purpose:
@@ -60,6 +61,10 @@
 
 % FSM state-corresponding callbacks:
 -export([ idle/3, pending/3, valid/3, finalize/3, invalid/3 ]).
+
+
+% For myriad_spawn*:
+-include_lib("myriad/include/spawn_utils.hrl").
 
 
 % Implementation notes:
@@ -455,7 +460,7 @@ obtain_certificate_for( Domain, FsmPid, UserOptionMap )
 			% Asynchronous then, in a separate process from the user one, yet
 			% using the same bridge as set for this caller process:
 			%
-			_Pid = erlang:spawn_link( ?MODULE, obtain_cert_helper,
+			_Pid = ?myriad_spawn_link( ?MODULE, obtain_cert_helper,
 				[ Domain, FsmPid, CanonicalOptionMap,
 				  trace_bridge:get_bridge_info() ] ),
 			async;
@@ -740,7 +745,10 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 
 
 
-% (spawn helper, to be called either from a dedicated process)
+
+% (spawn, bridged helper, to be called either from a dedicated process or not,
+% depending on being async or not)
+%
 -spec obtain_cert_helper( Domain :: domain(), fsm_pid(), option_map(),
 						  maybe( trace_bridge:bridge_info() ) ) ->
 		{ 'certificate_ready', bin_file_path() } | error_term().
@@ -1068,7 +1076,8 @@ pending( _EventType={ call, From }, _EventContentMsg=get_ongoing_challenges,
 	  _Action={ reply, From, _RetValue=ThumbprintMap } };
 
 
-pending( _EventType=cast, _EventContentMsg={ send_ongoing_challenges, TargetPid },
+pending( _EventType=cast,
+		 _EventContentMsg={ send_ongoing_challenges, TargetPid },
 		 _Data=LEState=#le_state{ account_key=AccountKey,
 								  challenges=TypeChallengeMap } ) ->
 
@@ -1264,6 +1273,10 @@ valid( _EventType={ call, _ServerRef=From },
 	DestroyLEState = challenge_destroy( Mode, LEState ),
 
 	KeyFilename = text_utils:binary_to_string( BinDomain ) ++ ".key",
+
+	% To avoid a warning:
+	file_utils:remove_file_if_existing(
+	  file_utils:join( BinCertDirPath, KeyFilename ) ),
 
 	% KeyFilePath is required for CSR generation:
 	CreatedTLSPrivKey = letsencrypt_tls:obtain_private_key(
