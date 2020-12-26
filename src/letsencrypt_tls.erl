@@ -45,7 +45,7 @@
 % from file.
 %
 -spec obtain_private_key( maybe( key_file_info() ), bin_directory_path() ) ->
-								tls_private_key().
+									tls_private_key().
 obtain_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 
 	% If not set, forges a unique key filename to allow for multiple, concurrent
@@ -97,7 +97,7 @@ obtain_private_key( _KeyFileInfo={ new, BinKeyFilename }, BinCertDirPath ) ->
 			% this warning:
 			%
 			trace_bridge:warning_fmt( "A '~s' key file was already existing, "
-				"it will be overwritten.", [ KeyFilePath ] );
+				"overwriting it.", [ KeyFilePath ] );
 
 		false ->
 			ok
