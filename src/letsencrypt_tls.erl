@@ -15,7 +15,9 @@
 -module(letsencrypt_tls).
 -author("Guillaume Bour <guillaume@bour.cc>").
 
--export([ obtain_private_key/2, get_cert_request/3,
+-export([ obtain_private_key/2, obtain_dh_key/1,
+		  obtain_ca_cert_file/1, obtain_ca_cert_file/2,
+		  get_cert_request/3,
 		  generate_certificate/5, write_certificate/3,
 		  key_to_map/1, map_to_key/1 ]).
 
@@ -28,8 +30,12 @@
 
 % Shorthands:
 
--type bin_directory_path() :: file_utils:bin_directory_path().
 -type file_path() :: file_utils:file_path().
+-type bin_file_path() :: file_utils:bin_file_path().
+
+-type directory_path() :: file_utils:bin_directory_path().
+-type bin_directory_path() :: file_utils:bin_directory_path().
+-type any_directory_path() :: file_utils:any_directory_path().
 
 -type key_file_info() :: letsencrypt:key_file_info().
 -type san() :: letsencrypt:san().
@@ -37,6 +43,8 @@
 
 -type tls_private_key() :: letsencrypt:tls_private_key().
 -type tls_public_key() :: letsencrypt:tls_public_key().
+
+-type certificate_provider() :: letsencrypt:certificate_provider().
 
 
 
@@ -186,6 +194,117 @@ obtain_private_key( _KeyFileInfo=KeyFilePath, BinCertDirPath ) ->
 
 
 
+% Secures a proper DH file for safer key exchange, creates it only if necessary,
+% returns its path.
+%
+% The Ephemeral Diffie-Helman key exchange is a very effective way of ensuring
+% Forward Secrecy by exchanging a set of keys that never hit the wire.
+%
+-spec obtain_dh_key( directory_path() ) -> bin_file_path().
+obtain_dh_key( CertDir ) ->
+
+	% Conventional:
+	DHFilename = "dh-params.pem",
+
+	DhFilePath = file_utils:join( CertDir, DHFilename ),
+
+	BinDhFilePath = text_utils:string_to_binary( DhFilePath ),
+
+	case file_utils:is_existing_file_or_link( DhFilePath ) of
+
+		true ->
+			trace_bridge:info_fmt(
+				"A DH file was found already existing (as '~s'), not "
+				"recreating it.", [ DhFilePath ] ),
+			BinDhFilePath;
+
+		false ->
+			trace_bridge:warning_fmt( "No DH file found (no '~s'), "
+				"creating it; note that it is a longer operation.",
+				[ DhFilePath ] ),
+
+			Cmd = executable_utils:get_default_openssl_executable_path()
+				++ " dhparam -out '" ++ DhFilePath ++ "' 2048",
+
+			case system_utils:run_executable( Cmd ) of
+
+				{ _ReturnCode=0, _CommandOutput="" } ->
+					 ok;
+
+				% Not deserving a warning, as returning in case of success:
+				% "Generating DH parameters, 2048 bit long safe prime, [...]".
+				%
+				{ _ReturnCode=0, CommandOutput } ->
+					cond_utils:if_defined( leec_debug_keys,
+						trace_bridge:info_fmt( "DH key creation successful; "
+						  "following output was made: ~s.", [ CommandOutput ] ),
+						basic_utils:ignore_unused( CommandOutput ) );
+
+				{ ErrorCode, CommandOutput } ->
+					trace_bridge:error_fmt( "Command for creating private key "
+						"failed (error code: ~B): ~s.",
+						[ ErrorCode, CommandOutput ] ),
+					throw( { dh_key_generation_failed, ErrorCode, CommandOutput,
+							 DhFilePath } )
+
+			end,
+
+			case file_utils:is_existing_file( DhFilePath ) of
+
+				true ->
+					BinDhFilePath;
+
+				false ->
+					throw( { generated_dh_key_not_found, DhFilePath } )
+
+			end
+
+	end.
+
+
+
+% Obtains the intermediate certificate of the default authority.
+-spec obtain_ca_cert_file( any_directory_path() ) -> bin_file_path().
+obtain_ca_cert_file( TargetDir ) ->
+	obtain_ca_cert_file( TargetDir, _DefaultProvider=letsencrypt ).
+
+
+% Obtains the intermediate certificate of the specified authority.
+-spec obtain_ca_cert_file( any_directory_path(), certificate_provider() ) ->
+			file_path().
+obtain_ca_cert_file( TargetDir, _CertProvider=letsencrypt ) ->
+
+	CAUrl = "https://letsencrypt.org/certs/lets-encrypt-r3-cross-signed.pem",
+
+	Filename = web_utils:get_last_path_element( CAUrl ),
+
+	FilePath = file_utils:join( TargetDir, Filename ),
+
+	case file_utils:is_existing_file_or_link( FilePath ) of
+
+		true ->
+
+			trace_bridge:info_fmt(
+				"Certificate authority certificate file was found already "
+				"existing (as '~s'), not downloading  it.", [ FilePath ] ),
+
+			text_utils:string_to_binary( FilePath );
+
+		false ->
+
+			trace_bridge:info_fmt( "No certificate authority certificate "
+				"file found (no '~s'), downloading it from ~s.",
+				[ FilePath, CAUrl ] ),
+
+			% Expected to be equal to FilePath:
+			ResFilePath = web_utils:download_file( CAUrl, TargetDir ),
+
+			text_utils:string_to_binary( ResFilePath )
+
+	end.
+
+
+
 % Returns a CSR certificate request.
 -spec get_cert_request( net_utils:bin_fqdn(), bin_directory_path(),
 						[ san() ] ) -> letsencrypt:tls_csr().
@@ -295,7 +414,6 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 	end,
 
 	file_utils:remove_file( ConfFilePath ).
-
 
 
 
