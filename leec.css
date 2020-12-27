@@ -21,12 +21,12 @@ pre.code {
 
 /* For command printouts: */
 .literal-block {
-  background: #ff4008;
+  background: #d0b3ab;
 }
 
 
 div.box {
-  color: #FF0000;
+  color: #00FF00;
   background: #FFFFFF;
   border: solid;
   padding : 5px;
@@ -303,7 +303,7 @@ th {
 
 
 td {
-   background : #bf8383;
+   background : #dfa3a3;
    font-size: 15px;
 }
 
@@ -378,7 +378,7 @@ a:hover {
 
 
 code {
-  color: #FF0000;
+  color: #0000FF;
   font-size: 17px;
   font-weight: normal;
   font-family: Courier, serif;
