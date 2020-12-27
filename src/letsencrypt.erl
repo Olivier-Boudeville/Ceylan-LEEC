@@ -96,6 +96,10 @@
 -type fsm_pid() :: pid().
 
 
+% Others may be added in the future:
+-type certificate_provider() :: 'letsencrypt'.
+
+
 % Note: only the 'http-01' challenge is supported currently.
 -type challenge_type() :: 'http-01'
 						| 'tls-sni-01'
@@ -119,7 +123,6 @@
 -type tcp_connection_cache() :: table( { net_utils:protocol_type(),
 		net_utils:string_host_name(), net_utils:tcp_port() },
 		shotgun:connection() ).
-
 
 
 -type string_uri() :: ustring().
@@ -255,7 +258,7 @@
 -type le_state() :: #le_state{}.
 
 -export_type([ bin_domain/0, domain/0, le_mode/0, fsm_pid/0,
-			   challenge_type/0, bin_challenge_type/0,
+			   certificate_provider/0, challenge_type/0, bin_challenge_type/0,
 			   token/0, thumbprint/0, thumbprint_map/0, tcp_connection_cache/0,
 			   string_uri/0, bin_uri/0, uri/0,
 			   challenge/0, uri_challenge_map/0, type_challenge_map/0,
