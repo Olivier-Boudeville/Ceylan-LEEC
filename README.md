@@ -17,6 +17,9 @@ The main differences introduced by LEEC are:
 - fixed the compilation with Erlang version 23.0 and higher (ex: w.r.t. to http_uri/uri_string, to updated dependencies such as Jiffy, and newer Cowboy for the examples)
 - allow for *concurrent* certificate requests (ex: if managing multiple domains with different keys, new certificates being requested for all of them at webserver start-up); so LEEC generates certificates in parallel and does not rely on a *registered* FSM anymore
 - global, ets-based TCP connection pool replaced by a per-FSM internal cache
+- basic support for the management of:
+  - Ephemeral Diffie-Helman key, to ensure Forward Secrecy by exchanging a set of keys that are never communicated
+  - [Intermediate let's Encrypt Certificates](https://letsencrypt.org/certificates/)
 - `connect_timeout` deprecated in favor of `http_timeout`
 
 
