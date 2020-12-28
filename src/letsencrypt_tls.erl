@@ -311,8 +311,9 @@ obtain_ca_cert_file( TargetDir, _CertProvider=letsencrypt ) ->
 get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 
 	cond_utils:if_defined( leec_debug_keys,
-		trace_bridge:debug_fmt( "[~w] Generating certificate request for '~s.'",
-								[ self(), BinDomain ] ) ),
+		trace_bridge:debug_fmt( "[~w] Generating certificate request for '~s', "
+			"with SANs: ~s", [ self(), BinDomain,
+							   text_utils:strings_to_string( SANs ) ] ) ),
 
 	Domain = text_utils:binary_to_string( BinDomain ),
 
@@ -375,8 +376,9 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 						"letsencrypt_san_openssl." ++ Domain ++ ".cnf" ),
 
 	cond_utils:if_defined( leec_debug_keys,
-		trace_bridge:debug_fmt( "Generating a certificate from '~s'.",
-								[ ConfFilePath ] ) ),
+		trace_bridge:debug_fmt( "Generating a certificate from '~s', in '~s', "
+			"based on following SAN names: ~s", [ ConfFilePath, OutCertPath,
+				text_utils:strings_to_string( AllNames ) ] ) ),
 
 	file_utils:write_whole( ConfFilePath, ConfDataStr ),
 
