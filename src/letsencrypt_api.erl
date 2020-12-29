@@ -28,7 +28,7 @@
 
 -type bin_content() :: binary().
 
--type option_map() :: letsencrypt:option_map().
+-type cert_req_option_map() :: letsencrypt:cert_req_option_map().
 
 % Not 'prod':
 -type environment() :: 'default' | 'staging'.
@@ -180,9 +180,9 @@ close_tcp_connections( TCPCache ) ->
 %
 % Returns that response, with added JSON structure if required.
 %
--spec decode( OptionMap :: option_map(), Response :: map(), le_state() ) ->
-					json_http_body().
-decode( _OptionMap=#{ json := true }, Response=#{ body := Body },
+-spec decode( CertReqOptionMap :: cert_req_option_map(), Response :: map(),
+			  le_state() ) -> json_http_body().
+decode( _CertReqOptionMap=#{ json := true }, Response=#{ body := Body },
 		#le_state{ json_parser_state=ParserState } ) ->
 
 	cond_utils:if_defined( leec_debug_codec,
@@ -197,7 +197,7 @@ decode( _OptionMap=#{ json := true }, Response=#{ body := Body },
 
 	Response#{ json => Payload };
 
-decode( _OptionMap, Response, _LEState ) ->
+decode( _CertReqOptionMap, Response, _LEState ) ->
 
 	cond_utils:if_defined( leec_debug_codec,
 		trace_bridge:debug_fmt( "Not requested to decode from JSON following "
@@ -219,10 +219,10 @@ decode( _OptionMap, Response, _LEState ) ->
 % (check ACME documentation)
 %
 -spec request( 'get' | 'post', uri(), header_map(),
-	   maybe( bin_content() ), option_map(), le_state() ) ->
+	   maybe( bin_content() ), cert_req_option_map(), le_state() ) ->
 					{ shotgun:result(), le_state() }.
 request( Method, Uri, Headers, MaybeBinContent,
-		 OptionMap=#{ netopts := Netopts },
+		 CertReqOptionMap=#{ netopts := Netopts },
 		 LEState=#le_state{ tcp_connection_cache=TCPCache } ) ->
 
 	UriStr = text_utils:ensure_string( Uri ),
@@ -314,7 +314,7 @@ request( Method, Uri, Headers, MaybeBinContent,
 				location => proplists:get_value( <<"location">>, RHeaders,
 												 _Def=null ) },
 
-			{ decode( OptionMap, Resp, LEState ),
+			{ decode( CertReqOptionMap, Resp, LEState ),
 			  LEState#le_state{ tcp_connection_cache=NewTCPCache } };
 
 		_ ->
@@ -332,9 +332,9 @@ request( Method, Uri, Headers, MaybeBinContent,
 % Returns a directory map listing all ACME protocol URLs (see
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.1.1).
 %
--spec get_directory_map( environment(), option_map(), le_state() ) ->
+-spec get_directory_map( environment(), cert_req_option_map(), le_state() ) ->
 							{ letsencrypt:directory_map(), le_state() }.
-get_directory_map( Env, OptionMap, LEState ) ->
+get_directory_map( Env, CertReqOptionMap, LEState ) ->
 
 	DirUri = case Env of
 
@@ -351,7 +351,7 @@ get_directory_map( Env, OptionMap, LEState ) ->
 
 	{ #{ json := DirectoryMap, status_code := StatusCode }, NewLEState } =
 		request( _Method=get, DirUri, _Headers=#{}, _MaybeBinContent=undefined,
-				 OptionMap#{ json => true }, LEState ),
+				 CertReqOptionMap#{ json => true }, LEState ),
 
 	case StatusCode of
 
@@ -376,9 +376,9 @@ get_directory_map( Env, OptionMap, LEState ) ->
 % Gets and returns a fresh nonce by using the corresponding URI (see
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.2).
 %
--spec get_nonce( directory_map(), option_map(), le_state() ) ->
+-spec get_nonce( directory_map(), cert_req_option_map(), le_state() ) ->
 					{ nonce(), le_state() }.
-get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap, LEState ) ->
+get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges,
 		trace_bridge:debug_fmt( "[~w] Getting new nonce from ~s.",
@@ -386,7 +386,7 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap, LEState ) ->
 
 	{ #{ nonce := Nonce, status_code := StatusCode }, NewLEState }  =
 		request( _Method=get, Uri, _Headers=#{}, _MaybeBinContent=undefined,
-				 OptionMap, LEState ),
+				 CertReqOptionMap, LEState ),
 
 	case StatusCode of
 
@@ -418,11 +418,11 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, OptionMap, LEState ) ->
 % - Location is the URL corresponding to the created ACME account
 % - Nonce is a new valid replay-nonce
 %
--spec get_acme_account( directory_map(), tls_private_key(), jws(), option_map(),
-						le_state() ) ->
+-spec get_acme_account( directory_map(), tls_private_key(), jws(),
+						cert_req_option_map(), le_state() ) ->
 			{ { json_map_decoded(), bin_uri(), nonce() }, le_state() }.
 get_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
-				  OptionMap, LEState ) ->
+				  CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges,
 		trace_bridge:debug_fmt( "[~w] Requesting a new account from ~s.",
@@ -439,8 +439,8 @@ get_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 
 	{ #{ json := Resp, location := LocationUri, nonce := NewNonce,
 	   status_code := StatusCode }, NewLEState } = request( _Method=post, Uri,
-			_Headers=#{}, _MaybeBinContent=ReqB64, OptionMap#{ json => true },
-			LEState ),
+			_Headers=#{}, _MaybeBinContent=ReqB64,
+			CertReqOptionMap#{ json => true }, LEState ),
 
 	case StatusCode of
 
@@ -479,10 +479,10 @@ get_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 % - Nonce is a new valid replay-nonce
 %
 -spec request_new_certificate( directory_map(), [ bin_domain() ],
-		tls_private_key(), jws(), option_map(), le_state() ) ->
+		tls_private_key(), jws(), cert_req_option_map(), le_state() ) ->
 				{ { json_map_decoded(), bin_uri(), nonce() }, le_state() }.
 request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
-						 PrivKey, AccountJws, OptionMap, LEState ) ->
+						 PrivKey, AccountJws, CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
 		"[~w] Requesting a new certificate from ~s for ~p.",
@@ -498,7 +498,7 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 	{ #{ json := OrderJsonMap, location := LocationUri, nonce := Nonce,
 		 status_code := StatusCode }, NewLEState } = request( _Method=post,
 		OrderUri, _Headers=#{}, _MaybeBinContent=Req,
-		OptionMap#{ json => true }, LEState ),
+		CertReqOptionMap#{ json => true }, LEState ),
 
 	case StatusCode of
 
@@ -538,9 +538,10 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 
 
 % Returns order state.
--spec get_order( bin_uri(), bin_key(), jws(), option_map(), le_state() ) ->
+-spec get_order( bin_uri(), bin_key(), jws(), cert_req_option_map(),
+				 le_state() ) ->
 		{ { json_map_decoded(), bin_uri(), nonce() }, le_state() }.
-get_order( Uri, Key, Jws, OptionMap, LEState ) ->
+get_order( Uri, Key, Jws, CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
 		"[~w] Getting order at ~s.", [ self(), Uri ] ) ),
@@ -553,7 +554,7 @@ get_order( Uri, Key, Jws, OptionMap, LEState ) ->
 	{ #{ json := Resp, location := Location, nonce := Nonce,
 		 status_code := StatusCode }, NewLEState } =
 		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
-				 OptionMap#{ json=> true }, LEState ),
+				 CertReqOptionMap#{ json=> true }, LEState ),
 
 	case StatusCode of
 
@@ -581,9 +582,9 @@ get_order( Uri, Key, Jws, OptionMap, LEState ) ->
 %  - Nonce is a new valid replay-nonce
 %
 -spec request_authorization( bin_uri(), tls_private_key(), jws(),
-							 option_map(), le_state() ) ->
+							 cert_req_option_map(), le_state() ) ->
 		{ { json_map_decoded(), bin_uri(), nonce() }, le_state() }.
-request_authorization( AuthUri, PrivKey, Jws, OptionMap, LEState ) ->
+request_authorization( AuthUri, PrivKey, Jws, CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
 		"[~w] Requesting authorization from ~s.", [ self(), AuthUri ] ) ),
@@ -595,7 +596,7 @@ request_authorization( AuthUri, PrivKey, Jws, OptionMap, LEState ) ->
 	{ #{ json := Resp, location := LocationUri, nonce := Nonce,
 	   status_code := StatusCode }, NewLEState } = request( _Method=post,
 			AuthUri, _Headers=#{}, _MaybeBinContent=B64AuthReq,
-			OptionMap#{ json=> true }, LEState ),
+			CertReqOptionMap#{ json=> true }, LEState ),
 
 	case StatusCode of
 
@@ -624,10 +625,10 @@ request_authorization( AuthUri, PrivKey, Jws, OptionMap, LEState ) ->
 %  - Nonce is a new valid replay-nonce
 %
 -spec notify_ready_for_challenge( challenge(), bin_key(), jws(),
-								  option_map(), le_state() ) ->
+								  cert_req_option_map(), le_state() ) ->
 			{ { json_map_decoded(), bin_uri(), nonce() }, le_state() }.
 notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
-							OptionMap, LEState ) ->
+							CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
 		"[~w] Notifying the ACME server that our agent is "
@@ -639,7 +640,7 @@ notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
 
 	{ #{ json := Resp, location := Location, nonce := Nonce,
 	  status_code := StatusCode }, NewLEState } = request( _Method=post, Uri,
-		_Headers=#{}, _MaybeBinContent=Req, OptionMap#{ json => true },
+		_Headers=#{}, _MaybeBinContent=Req, CertReqOptionMap#{ json => true },
 														   LEState ),
 
 	case StatusCode of
@@ -664,10 +665,10 @@ notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.
 %
 -spec finalize_order( order_map(), bin_csr_key(), tls_private_key(), jws(),
-	option_map(), le_state() ) ->
+	cert_req_option_map(), le_state() ) ->
 		{ { json_map_decoded(), bin_uri(), nonce() }, le_state() }.
 finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
-				OptionMap, LEState ) ->
+				CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
 		"[~w] Finalizing order at ~s.", [ self(), FinUri ] ) ),
@@ -680,7 +681,7 @@ finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 	{ #{ json := FinOrderDirMap, location := BinLocUri, nonce := Nonce,
 	   status_code := StatusCode }, NewLEState } = request( _Method=post,
 			FinUri, _Headers=#{}, _MaybeBinContent=JWSBody,
-			OptionMap#{ json => true }, LEState ),
+			CertReqOptionMap#{ json => true }, LEState ),
 
 	case StatusCode of
 
@@ -709,9 +710,10 @@ finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 % Downloads certificate for finalized order (see
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.2) and returns it.
 %
--spec get_certificate( order_map(), tls_private_key(), jws(), option_map(),
-			le_state() ) -> { { bin_certificate(), nonce() }, le_state() }.
-get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, OptionMap,
+-spec get_certificate( order_map(), tls_private_key(), jws(),
+					   cert_req_option_map(), le_state() ) ->
+		  { { bin_certificate(), nonce() }, le_state() }.
+get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, CertReqOptionMap,
 				 LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
@@ -723,7 +725,7 @@ get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, OptionMap,
 
 	{ #{ body := BinCert, nonce := NewNonce, status_code := StatusCode  },
 	  NewLEState } = request( _Method=post, Uri, _Headers=#{},
-							  _MaybeBinContent=Req, OptionMap, LEState ),
+							  _MaybeBinContent=Req, CertReqOptionMap, LEState ),
 
 	case StatusCode of
 

@@ -152,7 +152,7 @@ Returns: `{ok, Pid}` where Pid is the PID of the LEEC agent process.
   * `Opts`: is a map of options, whose keys may be:
 	* `async` :: `boolean()` (optional, _true_ by default):
 	* `callback` (optional, used only when _async=true_): function called once the certificate has been generated
-	* `san` :: ``[binary()]`` (optional): supplementary domain names to be added to the certificate
+	* `sans` :: ``[any_string()]`` (optional): supplementary domain names to be added to the certificate
 	* `challenge` (optional): 'http-01' (default, only supported type for the time being)
 
   Returns:
@@ -197,7 +197,7 @@ Returns: `{ok, Pid}` where Pid is the PID of the LEEC agent process.
 
 	* SAN:
   ```erlang
-	> letsencrypt:obtain_certificate_for(<<"example.com">>, #{async => false, san => [<<"www.example.com">>]}).
+	> letsencrypt:obtain_certificate_for(<<"example.com">>, #{async => false, sans => ["www.example.com"]}).
 	{ok, #{cert => <<"/path/to/cert">>, key => <<"/path/to/key">>}}
   ```
 
@@ -323,7 +323,7 @@ If wanting to switch from the default JSX to Jiffy, following files shall be upd
 
 LEEC is able to process any number of parallel ACME operations (thanks to autonomous agents, per-FSM connection pools, separate keys, etc.) - yet rate limits apply for Let's Encrypt servers, both in `staging <https://letsencrypt.org/docs/staging-environment/>`_ and in `production <https://letsencrypt.org/docs/rate-limits/>`_.
 
-So the approach of creating automatically per-virtual host throway accounts is not scalable enough. SAN support and, now, wildcard certificates should be sufficient for most use cases.
+So the approach of creating automatically per-virtual host throaway accounts is not scalable enough. SAN support and, now, wildcard certificates should be sufficient for most use cases.
 
 The others shall rely on the re-use of ACME accounts, which has been added to LEEC.
 

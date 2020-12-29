@@ -312,8 +312,8 @@ get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 
 	cond_utils:if_defined( leec_debug_keys,
 		trace_bridge:debug_fmt( "[~w] Generating certificate request for '~s', "
-			"with SANs: ~s", [ self(), BinDomain,
-							   text_utils:strings_to_string( SANs ) ] ) ),
+			"with SANs: ~s",
+			[ self(), BinDomain, text_utils:strings_to_string( SANs ) ] ) ),
 
 	Domain = text_utils:binary_to_string( BinDomain ),
 
@@ -322,7 +322,7 @@ get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 	CertFilePath = file_utils:join( BinCertDirPath, Domain ++ ".csr" ),
 
 	cond_utils:if_defined( leec_debug_keys,
-		trace_bridge:debug_fmt( "CSR file path: ~s.", [ CertFilePath ] ) ),
+		trace_bridge:debug_fmt( "CSR file path: '~s'.", [ CertFilePath ] ) ),
 
 	generate_certificate( request, BinDomain, CertFilePath, KeyFilePath, SANs ),
 
@@ -332,7 +332,7 @@ get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 		public_key:pem_decode( RawCsr ),
 
 	cond_utils:if_defined( leec_debug_keys,
-		trace_bridge:debug_fmt( "Decoded CSR: ~p", [ Csr ] ) ),
+		trace_bridge:debug_fmt( "Decoded CSR:~n  ~p.", [ Csr ] ) ),
 
 	letsencrypt_utils:b64encode( Csr ).
 
@@ -415,8 +415,8 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 
 	end,
 
-	file_utils:remove_file( ConfFilePath ).
-
+	%file_utils:remove_file( ConfFilePath ).
+	ok.
 
 
 % Writes specified certificate, overwriting any prior one.

@@ -158,8 +158,9 @@
 	% Known challenges, per URI:
 	challenges = #{} :: letsencrypt:uri_challenge_map(),
 
-	% API options:
-	option_map = letsencrypt:get_default_options() :: letsencrypt:option_map(),
+	% Certificate request options:
+	cert_req_option_map = letsencrypt:get_default_cert_request_options()
+								:: letsencrypt:cert_req_option_map(),
 
 	% Useful to be able to switch JSON parsers at runtime, yet to avoid repeated
 	% initializations thereof:

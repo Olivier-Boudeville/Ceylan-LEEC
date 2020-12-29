@@ -42,7 +42,8 @@
 % Public API:
 -export([ get_ordered_prerequisites/0,
 		  start/1, start/2,
-		  get_default_options/0, get_default_options/1,
+		  get_default_cert_request_options/0,
+		  get_default_cert_request_options/1,
 		  obtain_certificate_for/2, obtain_certificate_for/3, stop/1 ]).
 
 
@@ -107,7 +108,7 @@
 
 
 % Challenge type, as a binary string:
--type bin_challenge_type() :: text_utils:bin_string().
+-type bin_challenge_type() :: bin_string().
 
 
 % Supposedly:
@@ -155,8 +156,8 @@
 -type type_challenge_map() :: table( challenge_type(), challenge() ).
 
 
-% A user-specified option:
--type user_option() :: 'staging'
+% A user-specified LEEC start option:
+-type start_option() :: 'staging'
 					 | { 'mode', le_mode() }
 					 | { 'key_file_path', any_file_path() }
 					 | { 'cert_dir_path', any_directory_path() }
@@ -165,19 +166,23 @@
 					 | { 'http_timeout', unit_utils:milliseconds() }.
 
 
-% User options.
--type option_id() :: 'async' | 'callback' | 'netopts' | 'challenge'.
+
+% Certificate request options.
+-type cert_req_option_id() :: 'async' | 'callback' | 'netopts' | 'challenge'
+							| 'sans' | 'json'.
 
 
-% Storing user options.
+% Storing certificate request options.
 %
 % Known (atom) keys:
 %  - async :: boolean() [if not defined, supposed true]
 %  - callback :: fun/1
 %  - netopts :: map() => #{ timeout => unit_utils:milliseconds() }
-%  - challenge :: challenge_type(), default being 'http-01'
+%  - challenge_type :: challenge_type(), default being 'http-01'
+%  - sans :: [ bin_san() ]
+%  - json :: boolean() (not to be set by the user)
 %
--type option_map() :: table( option_id(), term() ).
+-type cert_req_option_map() :: table( cert_req_option_id(), term() ).
 
 
 % ACME operations that may be triggered.
@@ -207,6 +212,8 @@
 -type san() :: ustring().
 
 -type bin_san() :: bin_string().
+
+-type any_san() :: san() | bin_san().
 
 
 % JSON element decoded as a map:
@@ -262,9 +269,10 @@
 			   token/0, thumbprint/0, thumbprint_map/0, tcp_connection_cache/0,
 			   string_uri/0, bin_uri/0, uri/0,
 			   challenge/0, uri_challenge_map/0, type_challenge_map/0,
-			   user_option/0, option_id/0, option_map/0,
+			   start_option/0, cert_req_option_id/0, cert_req_option_map/0,
 			   acme_operation/0, directory_map/0, nonce/0,
-			   san/0, bin_san/0, json_map_decoded/0, agent_key_file_info/0,
+			   san/0, bin_san/0, any_san/0,
+			   json_map_decoded/0, agent_key_file_info/0,
 			   bin_certificate/0, bin_key/0, bin_csr_key/0,
 			   jws_algorithm/0, binary_b64/0, key_auth/0,
 			   tls_private_key/0, tls_public_key/0, jws/0, certificate/0,
@@ -348,15 +356,15 @@ get_ordered_prerequisites() ->
 
 
 % Starts a (non-bridged) instance of the LEEC service FSM.
--spec start( [ user_option() ] ) -> { 'ok', fsm_pid() } | error_term().
-start( UserOptions ) ->
-	start( UserOptions, _MaybeBridgeSpec=undefined ).
+-spec start( [ start_option() ] ) -> { 'ok', fsm_pid() } | error_term().
+start( StartOptions ) ->
+	start( StartOptions, _MaybeBridgeSpec=undefined ).
 
 
 % Starts an instance of the LEEC service FSM, possibly with a trace bridge.
--spec start( [ user_option() ], maybe( trace_bridge:bridge_spec() ) ) ->
+-spec start( [ start_option() ], maybe( trace_bridge:bridge_spec() ) ) ->
 				{ 'ok', fsm_pid() } | error_term().
-start( UserOptions, MaybeBridgeSpec ) ->
+start( StartOptions, MaybeBridgeSpec ) ->
 
 	% If a trace bridge is specified, we use it both for the current (caller)
 	% process and the ones it creates, i.e. the associated FSM and, possibly,
@@ -379,23 +387,24 @@ start( UserOptions, MaybeBridgeSpec ) ->
 	% (the FSM shall use any bridge as well)
 	%
 	gen_statem:start_link( ?MODULE,
-		{ UserOptions, JsonParserState, MaybeBridgeSpec }, _Opts=[] ).
+		_InitParams={ StartOptions, JsonParserState, MaybeBridgeSpec },
+		_Opts=[] ).
 
 
 
-% Returns the default API-level user options, here enabling the async
+% Returns the default options for certificate requests, here enabling the async
 % (non-blocking) mode.
 %
--spec get_default_options() -> option_map().
-get_default_options() ->
-	get_default_options( _Async=true ).
+-spec get_default_cert_request_options() -> cert_req_option_map().
+get_default_cert_request_options() ->
+	get_default_cert_request_options( _Async=true ).
 
 
-% Returns the default API-level user options, with specified async mode
-% specified.
+% Returns the default optionsfor certificate requests, with specified async
+% mode.
 %
--spec get_default_options( boolean() ) -> option_map().
-get_default_options( Async ) when is_boolean( Async ) ->
+-spec get_default_cert_request_options( boolean() ) -> cert_req_option_map().
+get_default_cert_request_options( Async ) when is_boolean( Async ) ->
 	#{ async => Async, netopts => #{ timeout => ?default_timeout } }.
 
 
@@ -416,7 +425,8 @@ get_default_options( Async ) when is_boolean( Async ) ->
 %
 -spec obtain_certificate_for( domain(), fsm_pid() ) -> 'async' | error_term().
 obtain_certificate_for( Domain, FsmPid ) ->
-	obtain_certificate_for( Domain, FsmPid, get_default_options() ).
+	obtain_certificate_for( Domain, FsmPid,
+							get_default_cert_request_options() ).
 
 
 
@@ -426,32 +436,40 @@ obtain_certificate_for( Domain, FsmPid ) ->
 % Parameters:
 %	- Domain is the domain name to generate an ACME certificate for
 %   - FsmPid is the PID of the FSM to rely on
-%	- OptionMap corresponds to the API-level user options:
-%			* async (bool): if true, blocks until complete and returns
+%	- CertReqOptionMap is a map listing the options applying to this certificate
+%		request, whose key (as atom)/value pairs (all optional except 'async'
+%		and 'netopts') are:
+%			* 'async' / boolean(): if true, blocks until complete and returns
 %				generated certificate filename
-%							if false, immediately returns
-%			* callback: function executed when Async is true, once domain
-%			certificate has been successfully generated
+%								 if false, immediately returns
+%			* 'callback' / fun/1: function executed when Async is true, once
+%				domain certificate has been successfully generated
+%           * 'netopts' / map(): mostly to specify an HTTP timeout
+%           * 'challenge_type' / challenge_type() is the type of challenge to
+%               rely on when interacting with the ACME server
+%           * 'sans' / [ any_san() ]: a list of the Subject Alternative Names
+%           for that certificate
 %
 % Returns:
-%   - if synchronous (the default): either { certificate_ready, BinFilePath } if
+%   - if synchronous (the default): either {certificate_ready, BinFilePath} if
 %   successful, otherwise {error, Err}
 %	- otherwise (asynchronous), 'async'
 %
 % Belongs to the user-facing API; requires the LEEC service to be already
 % started.
 %
--spec obtain_certificate_for( Domain :: domain(), fsm_pid(), option_map() ) ->
+-spec obtain_certificate_for( Domain :: domain(), fsm_pid(),
+							  cert_req_option_map() ) ->
 		'async' | { 'certificate_ready', bin_file_path() } | error_term().
-obtain_certificate_for( Domain, FsmPid, UserOptionMap )
-  when is_pid( FsmPid ) andalso is_map( UserOptionMap ) ->
+obtain_certificate_for( Domain, FsmPid, CertReqOptionMap )
+  when is_pid( FsmPid ) andalso is_map( CertReqOptionMap ) ->
 
 	% To ensure that all needed option entries are always defined:
-	CanonicalOptionMap = maps:merge( _Def=get_default_options(),
-									 _Prioritary=UserOptionMap ),
+	ReadyCertReqOptMap = maps:merge( _Def=get_default_cert_request_options(),
+									 _Prioritary=CertReqOptionMap ),
 
 	% Also a check:
-	case CanonicalOptionMap of
+	case ReadyCertReqOptMap of
 
 		#{ async := true } ->
 
@@ -464,7 +482,7 @@ obtain_certificate_for( Domain, FsmPid, UserOptionMap )
 			% using the same bridge as set for this caller process:
 			%
 			_Pid = ?myriad_spawn_link( ?MODULE, obtain_cert_helper,
-				[ Domain, FsmPid, CanonicalOptionMap,
+				[ Domain, FsmPid, ReadyCertReqOptMap,
 				  trace_bridge:get_bridge_info() ] ),
 			async;
 
@@ -477,182 +495,31 @@ obtain_certificate_for( Domain, FsmPid, UserOptionMap )
 			  "for domain '~s'.", [ FsmPid, Domain ] ) ),
 
 			% Thus a direct synchronous return:
-			obtain_cert_helper( Domain, FsmPid, CanonicalOptionMap )
+			obtain_cert_helper( Domain, FsmPid, ReadyCertReqOptMap )
 
 	end;
 
-obtain_certificate_for( _Domain, FsmPid, UserOptionMap )
+obtain_certificate_for( _Domain, FsmPid, CertReqOptionMap )
   when is_pid( FsmPid ) ->
-	throw( { not_option_map, UserOptionMap } );
+	throw( { not_an_option_map, CertReqOptionMap } );
 
-obtain_certificate_for( _Domain, FsmPid, _UserOptionMap ) ->
+obtain_certificate_for( _Domain, FsmPid, _CertReqOptionMap ) ->
 	throw( { not_pid, FsmPid } ).
 
-
-
-% Stops the specified instance of LEEC service.
--spec stop( fsm_pid() ) -> void().
-stop( FsmPid ) ->
-
-	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
-		"Requesting FSM ~w to stop.", [ FsmPid ] ) ),
-
-	% No more gen_fsm:sync_send_all_state_event/2 available, so
-	% handle_call_for_all_states/4 will have to be called from all states
-	% defined:
-	%
-	% (synchronous)
-	%
-	Res = gen_statem:call( _ServerRef=FsmPid, _Request=stop, ?base_timeout ),
-
-	% Not stopped here, as stopping is only going back to the 'idle' state:
-	%json_utils:stop_parser().
-
-	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
-		"FSM ~w stopped (result: ~p).", [ FsmPid, Res ] ) ).
-
-
-
-
-
-% FSM internal API.
-
-
-% Initializes the LEEC state machine:
-% - init TLS private key and its JWS
-% - fetch ACME directory
-% - get valid nonce
-%
-% Will make use of any trace bridge transmitted.
-%
-% Transitions to the 'idle' initial state.
-%
--spec init( { [ user_option() ], json_utils:parser_state(),
-				maybe( trace_bridge:bridge_spec() ) } ) ->
-		{ 'ok', InitialStateName :: 'idle', InitialData :: le_state() }.
-init( { UserOptions, JsonParserState, MaybeBridgeSpec } ) ->
-
-	% First action is to register this (unregistered by design) FSM to any
-	% specified trace bridge:
-	%
-	trace_bridge:register( MaybeBridgeSpec ),
-
-	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
-		"Initialising, with following options:~n  ~p.", [ UserOptions ] ) ),
-
-	InitLEState = #le_state{ json_parser_state=JsonParserState,
-							 tcp_connection_cache=table:new() },
-
-	LEState = setup_mode( get_options( UserOptions, InitLEState ) ),
-
-	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
-		"[~w] Initial state:~n  ~p", [ self(), LEState ] ) ),
-
-	BinCertDirPath = LEState#le_state.cert_dir_path,
-
-	% Creates the private key (a tls_private_tls_public_key()) of this LEEC
-	% agent, and initialises its JWS; in case of parallel creations, ensuring
-	% automatically the uniqueness of its filename is not trivial:
-	%
-	KeyFileInfo = case LEState#le_state.agent_key_file_info of
-
-		% If a key is to be created:
-		undefined ->
-			% We prefer here devising out own agent filename, lest its automatic
-			% uniqueness is difficult to obtain (which is the case); we may use
-			% in the future any user-specified identifier (see user_id field);
-			% for now we stick to a simple approach based on the PID of this
-			% LEEC FSM (no domain known yet):
-			%
-			%UniqFilename = text_utils:format(
-			%  "letsencrypt-agent-private-~s.key",
-			%  [ LEState#le_state.user_id ] ),
-
-			% A prior run might have left a file with the same name, it will be
-			% overwritten (with a warning) in this case:
-			%
-			UniqFilename = text_utils:bin_format( "leec-agent-private-~s.key",
-								[ text_utils:pid_to_core_string( self() ) ] ),
-
-			% Already a binary:
-			{ new, UniqFilename };
-
-
-		% If a key is to be reused (absolute path, or relative to
-		% BinCertDirPath):
-		%
-		CurrentKeyBinPath ->
-			CurrentKeyBinPath
-
-	end,
-
-	AgentPrivateKey = letsencrypt_tls:obtain_private_key( KeyFileInfo,
-														  BinCertDirPath ),
-
-	KeyJws = letsencrypt_jws:init( AgentPrivateKey ),
-
-	OptionMap = LEState#le_state.option_map,
-
-	% Directory map is akin to:
-	%
-	% #{<<"3TblEIQUCPk">> =>
-	%	  <<"ACME_COMM/t/adding-random-entries-to-the-directory/31417">>,
-	%   <<"keyChange">> =>
-	%	  <<"ACME_BASE/acme/key-change">>,
-	%   <<"meta">> =>
-	%	  #{<<"caaIdentities">> => [<<"letsencrypt.org">>],
-	%		<<"termsOfService">> =>
-	%	<<"https://letsencrypt.org/documents/LE-SA-v1.2-November-15-2017.pdf">>,
-	%		<<"website">> =>
-	%			<<"https://letsencrypt.org/docs/staging-environment/">>},
-	%   <<"newAccount">> =>
-	%	  <<"ACME_BASE/acme/new-acct">>,
-	%   <<"newNonce">> =>
-	%	  <<"ACME_BASE/acme/new-nonce">>,
-	%   <<"newOrder">> =>
-	%	  <<"ACME_BASE/acme/new-order">>,
-	%   <<"revokeCert">> =>
-	%	  <<"ACME_BASE/acme/revoke-cert">>}
-
-	{ URLDirectoryMap, DirLEState } = letsencrypt_api:get_directory_map(
-		LEState#le_state.env, OptionMap, LEState ),
-
-	{ FirstNonce, NonceLEState } = letsencrypt_api:get_nonce( URLDirectoryMap,
-										OptionMap, DirLEState ),
-
-	cond_utils:if_defined( leec_debug_fsm,
-		trace_bridge:debug_fmt( "[~w][state] Switching initially to 'idle'.",
-								[ self() ] ) ),
-
-	% Next transition typically triggered by user code calling
-	% obtain_certificate_for/{2,3}:
-	%
-	{ ok, _NewStateName=idle,
-	  NonceLEState#le_state{ directory_map=URLDirectoryMap,
-							 agent_private_key=AgentPrivateKey,
-							 jws=KeyJws,
-							 nonce=FirstNonce } }.
-
-
-
-% One callback function per state, akin to gen_fsm:
--spec callback_mode() -> gen_statem:callback_mode().
-callback_mode() ->
-	% state_enter useful to trigger code once, when entering the 'finalize'
-	% state for the first time:
-	%
-	[ state_functions, state_enter ].
 
 
 
 % (spawn helper, to be called either from a dedicated process or not, depending
 % on being async or not)
 %
--spec obtain_cert_helper( Domain :: domain(), fsm_pid(), option_map() ) ->
+-spec obtain_cert_helper( Domain :: domain(), fsm_pid(),
+						  cert_req_option_map() ) ->
 		{ 'certificate_ready', bin_file_path() } | error_term().
-obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
+obtain_cert_helper( Domain, FsmPid,
+					CertReqOptionMap=#{ async := Async,
+										netopts := NetOpts } ) ->
 
-	Timeout = maps:get( timeout, OptionMap, ?default_timeout ),
+	Timeout = maps:get( timeout, NetOpts, ?default_timeout ),
 
 	BinDomain = text_utils:ensure_binary( Domain ),
 
@@ -660,7 +527,7 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 	% BinDomain, Opts}, _, LEState):
 	%
 	CreationRes = case gen_statem:call( _ServerRef=FsmPid,
-				_Request={ create, BinDomain, OptionMap }, Timeout ) of
+				_Request={ create, BinDomain, CertReqOptionMap }, Timeout ) of
 
 		% State of FSM shall thus be 'idle' now:
 		ErrorTerm={ creation_failed, Error } ->
@@ -724,7 +591,7 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 	case Async of
 
 		true ->
-			Callback = maps:get( callback, OptionMap,
+			Callback = maps:get( callback, CertReqOptionMap,
 				_DefaultCallback=fun( Ret ) ->
 					trace_bridge:warning_fmt( "Default async callback called "
 						"for ~w regarding result ~p.", [ FsmPid, Ret ] )
@@ -752,16 +619,171 @@ obtain_cert_helper( Domain, FsmPid, OptionMap=#{ async := Async } ) ->
 % (spawn, bridged helper, to be called either from a dedicated process or not,
 % depending on being async or not)
 %
--spec obtain_cert_helper( Domain :: domain(), fsm_pid(), option_map(),
+-spec obtain_cert_helper( Domain :: domain(), fsm_pid(), cert_req_option_map(),
 						  maybe( trace_bridge:bridge_info() ) ) ->
 		{ 'certificate_ready', bin_file_path() } | error_term().
-obtain_cert_helper( Domain, FsmPid, OptionMap, MaybeBridgeInfo ) ->
+obtain_cert_helper( Domain, FsmPid, CertReqOptionMap, MaybeBridgeInfo ) ->
 
 	% Let's inherit the creator bridge first:
 	trace_bridge:set_bridge_info( MaybeBridgeInfo ),
 
 	% And then branch to the main logic:
-	obtain_cert_helper( Domain, FsmPid, OptionMap ).
+	obtain_cert_helper( Domain, FsmPid, CertReqOptionMap ).
+
+
+
+% Stops the specified instance of LEEC service.
+-spec stop( fsm_pid() ) -> void().
+stop( FsmPid ) ->
+
+	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
+		"Requesting FSM ~w to stop.", [ FsmPid ] ) ),
+
+	% No more gen_fsm:sync_send_all_state_event/2 available, so
+	% handle_call_for_all_states/4 will have to be called from all states
+	% defined:
+	%
+	% (synchronous)
+	%
+	Res = gen_statem:call( _ServerRef=FsmPid, _Request=stop, ?base_timeout ),
+
+	% Not stopped here, as stopping is only going back to the 'idle' state:
+	%json_utils:stop_parser().
+
+	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
+		"FSM ~w stopped (result: ~p).", [ FsmPid, Res ] ) ).
+
+
+
+
+
+% FSM internal API.
+
+
+% Initializes the LEEC state machine:
+% - init TLS private key and its JWS
+% - fetch ACME directory
+% - get valid nonce
+%
+% Will make use of any trace bridge transmitted.
+%
+% Transitions to the 'idle' initial state.
+%
+-spec init( { [ start_option() ], json_utils:parser_state(),
+				maybe( trace_bridge:bridge_spec() ) } ) ->
+		{ 'ok', InitialStateName :: 'idle', InitialData :: le_state() }.
+init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
+
+	% First action is to register this (unregistered by design) FSM to any
+	% specified trace bridge:
+	%
+	trace_bridge:register( MaybeBridgeSpec ),
+
+	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
+		"Initialising, with following options:~n  ~p.", [ StartOptions ] ) ),
+
+	InitLEState = #le_state{ json_parser_state=JsonParserState,
+							 tcp_connection_cache=table:new() },
+
+	LEState = setup_mode( get_start_options( StartOptions, InitLEState ) ),
+
+	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
+		"[~w] Initial state:~n  ~p", [ self(), LEState ] ) ),
+
+	BinCertDirPath = LEState#le_state.cert_dir_path,
+
+	% Creates the private key (a tls_private_tls_public_key()) of this LEEC
+	% agent, and initialises its JWS; in case of parallel creations, ensuring
+	% automatically the uniqueness of its filename is not trivial:
+	%
+	KeyFileInfo = case LEState#le_state.agent_key_file_info of
+
+		% If a key is to be created:
+		undefined ->
+			% We prefer here devising out own agent filename, lest its automatic
+			% uniqueness is difficult to obtain (which is the case); we may use
+			% in the future any user-specified identifier (see user_id field);
+			% for now we stick to a simple approach based on the PID of this
+			% LEEC FSM (no domain known yet):
+			%
+			%UniqFilename = text_utils:format(
+			%  "letsencrypt-agent-private-~s.key",
+			%  [ LEState#le_state.user_id ] ),
+
+			% A prior run might have left a file with the same name, it will be
+			% overwritten (with a warning) in this case:
+			%
+			UniqFilename = text_utils:bin_format( "leec-agent-private-~s.key",
+								[ text_utils:pid_to_core_string( self() ) ] ),
+
+			% Already a binary:
+			{ new, UniqFilename };
+
+
+		% If a key is to be reused (absolute path, or relative to
+		% BinCertDirPath):
+		%
+		CurrentKeyBinPath ->
+			CurrentKeyBinPath
+
+	end,
+
+	AgentPrivateKey = letsencrypt_tls:obtain_private_key( KeyFileInfo,
+														  BinCertDirPath ),
+
+	KeyJws = letsencrypt_jws:init( AgentPrivateKey ),
+
+	OptionMap = LEState#le_state.cert_req_option_map,
+
+	% Directory map is akin to:
+	%
+	% #{<<"3TblEIQUCPk">> =>
+	%	  <<"ACME_COMM/t/adding-random-entries-to-the-directory/31417">>,
+	%   <<"keyChange">> =>
+	%	  <<"ACME_BASE/acme/key-change">>,
+	%   <<"meta">> =>
+	%	  #{<<"caaIdentities">> => [<<"letsencrypt.org">>],
+	%		<<"termsOfService">> =>
+	%	<<"https://letsencrypt.org/documents/LE-SA-v1.2-November-15-2017.pdf">>,
+	%		<<"website">> =>
+	%			<<"https://letsencrypt.org/docs/staging-environment/">>},
+	%   <<"newAccount">> =>
+	%	  <<"ACME_BASE/acme/new-acct">>,
+	%   <<"newNonce">> =>
+	%	  <<"ACME_BASE/acme/new-nonce">>,
+	%   <<"newOrder">> =>
+	%	  <<"ACME_BASE/acme/new-order">>,
+	%   <<"revokeCert">> =>
+	%	  <<"ACME_BASE/acme/revoke-cert">>}
+
+	{ URLDirectoryMap, DirLEState } = letsencrypt_api:get_directory_map(
+		LEState#le_state.env, OptionMap, LEState ),
+
+	{ FirstNonce, NonceLEState } = letsencrypt_api:get_nonce( URLDirectoryMap,
+										OptionMap, DirLEState ),
+
+	cond_utils:if_defined( leec_debug_fsm,
+		trace_bridge:debug_fmt( "[~w][state] Switching initially to 'idle'.",
+								[ self() ] ) ),
+
+	% Next transition typically triggered by user code calling
+	% obtain_certificate_for/{2,3}:
+	%
+	{ ok, _NewStateName=idle,
+	  NonceLEState#le_state{ directory_map=URLDirectoryMap,
+							 agent_private_key=AgentPrivateKey,
+							 jws=KeyJws,
+							 nonce=FirstNonce } }.
+
+
+
+% One callback function per state, akin to gen_fsm:
+-spec callback_mode() -> gen_statem:callback_mode().
+callback_mode() ->
+	% state_enter useful to trigger code once, when entering the 'finalize'
+	% state for the first time:
+	%
+	[ state_functions, state_enter ].
 
 
 
@@ -820,6 +842,7 @@ get_ongoing_challenges( FsmPid ) ->
 	end.
 
 
+
 % Sends the ongoing challenges to the specified process.
 %
 % Typically useful in a slave operation mode, when the web handler cannot access
@@ -864,13 +887,13 @@ send_ongoing_challenges( FsmPid, TargetPid ) ->
 %
 -spec idle( event_type(), event_content(), le_state() ) ->
 				state_callback_result().
-% idle with request {create, BinDomain, OptionMap}: starts the certificate
-% creation procedure.
+% idle with request {create, BinDomain, CertReqOptionMap}: starts the
+% certificate creation procedure.
 %
-% Starts a new certificate delivery process:
-%  - create new account
+% Starts a new certificate creation process:
+%  - create a new ACME account, or connect to a pre-existing one
 %  - send a new order
-%  - require authorization (returns challenges list)
+%  - request authorization (returns challenges list)
 %  - initiate chosen challenge
 %
 % Transition to:
@@ -886,16 +909,18 @@ idle( _EventType=enter, _PreviousState, _Data ) ->
 
 
 idle( _EventType={ call, From },
-	  _EventContentMsg=_Request={ create, BinDomain, OptionMap },
+	  _EventContentMsg=_Request={ create, BinDomain, CertReqOptionMap },
 	  _Data=LEState=#le_state{ directory_map=DirMap, agent_private_key=PrivKey,
 							   jws=Jws, nonce=Nonce } ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] While idle: received a certificate creation "
-		"request for domain '~s'.", [ self(), BinDomain ] ) ),
+		"request for domain '~s', with following options:~n  ~p.",
+		[ self(), BinDomain, CertReqOptionMap ] ) ),
 
 	% Ex: 'http-01', 'tls-sni-01', etc.:
-	ChallengeType = maps:get( challenge, OptionMap, _DefaultChlg='http-01' ),
+	ChallengeType = maps:get( challenge_type, CertReqOptionMap,
+							  _DefaultChlgType='http-01' ),
 
 	case ChallengeType of
 
@@ -909,7 +934,7 @@ idle( _EventType={ call, From },
 
 	{ { AccountDecodedJsonMap, AccountLocationUri, AccountNonce },
 	  CreateLEState } = letsencrypt_api:get_acme_account( DirMap, PrivKey,
-							Jws#jws{ nonce=Nonce }, OptionMap, LEState ),
+							Jws#jws{ nonce=Nonce }, CertReqOptionMap, LEState ),
 
 	% Payload decoded from JSON in AccountDecodedJsonMap will be like:
 	%
@@ -952,15 +977,16 @@ idle( _EventType={ call, From },
 					   nonce=AccountNonce },
 
 	% Subject Alternative Names:
-	Sans = maps:get( san, OptionMap, _DefaultSans=[] ),
+	Sans = maps:get( sans, CertReqOptionMap, _DefaultSans=[] ),
 
-	BinSans = text_utils:strings_to_binaries( Sans ),
+	BinSans = [ text_utils:ensure_binary( S ) || S <- Sans ],
 
 	BinDomains = [ BinDomain | BinSans ],
 
+	% Will transition to 'pending' to manage this request:
 	{ { OrderDecodedJsonMap, OrderLocationUri, OrderNonce }, ReqState } =
 		letsencrypt_api:request_new_certificate( DirMap, BinDomains, PrivKey,
-									AccountJws, OptionMap, CreateLEState ),
+								AccountJws, CertReqOptionMap, CreateLEState ),
 
 	case maps:get( <<"status">>, OrderDecodedJsonMap ) of
 
@@ -981,7 +1007,7 @@ idle( _EventType={ call, From },
 	LocOrder = OrderDecodedJsonMap#{ <<"location">> => OrderLocationUri },
 
 	AuthLEState = ReqState#le_state{ domain=BinDomain, jws=AccountJws,
-		account_key=AccountKey, nonce=OrderNonce, sans=Sans },
+		account_key=AccountKey, nonce=OrderNonce },
 
 	AuthUris = maps:get( <<"authorizations">>, OrderDecodedJsonMap ),
 
@@ -1079,6 +1105,9 @@ pending( _EventType={ call, From }, _EventContentMsg=get_ongoing_challenges,
 	  _Action={ reply, From, _RetValue=ThumbprintMap } };
 
 
+% Same as previous, except that the returned lessage is sent to target PID
+% rather than to caller.
+%
 pending( _EventType=cast,
 		 _EventContentMsg={ send_ongoing_challenges, TargetPid },
 		 _Data=LEState=#le_state{ account_key=AccountKey,
@@ -1115,19 +1144,19 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 		 _Data=LEState=#le_state{
 					order=#{ <<"authorizations">> := AuthorizationsUris },
 					nonce=InitialNonce, agent_private_key=PrivKey, jws=Jws,
-					option_map=OptionMap } ) ->
+					cert_req_option_map=CertReqOptionMap } ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Checking whether challenges are completed.", [ self() ] ) ),
 
-	% Checking the status for each authorization URI:
+	% Checking the status for each authorization URI (one per host/SAN):
 	{ NextStateName, ResultingNonce, FoldLEState } = lists:foldl(
 
 		fun( AuthUri, _Acc={ AccStateName, AccNonce, AccState } ) ->
 
 			{ { AuthJsonMap, _Location, NewNonce }, ReqState } =
 					letsencrypt_api:request_authorization( AuthUri, PrivKey,
-						Jws#jws{ nonce=AccNonce }, OptionMap, AccState ),
+						Jws#jws{ nonce=AccNonce }, CertReqOptionMap, AccState ),
 
 			BinStatus = maps:get( <<"status">>, AuthJsonMap ),
 
@@ -1135,6 +1164,7 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 				"[~w] For auth URI ~s, received status '~s'.",
 				[ self(), AuthUri, BinStatus ] ) ),
 
+			% State remains 'pending' until all URIs report 'valid':
 			NewStateName = case { AccStateName, BinStatus } of
 
 				% Only status allowing to remain in 'valid' state:
@@ -1218,12 +1248,12 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 	  _Action={ reply, From, _RetValue=NextStateName } };
 
 
-pending( _EventType={ call, From }, _EventContentMsg=_Request=switchTofinalize,
+pending( _EventType={ call, From }, _EventContentMsg=Request=switchTofinalize,
 		 _Data=_LEState ) ->
 
 	%cond_utils:if_defined( leec_debug_exchanges,
-	trace_bridge:debug_fmt(	"[~w] Received, while in 'pending' state, "
-		"request '~s' from ~w, currently ignored.", [ self(), From ] ),
+	trace_bridge:debug_fmt( "[~w] Received, while in 'pending' state, "
+		"request '~s' from ~w, currently ignored.", [ self(), Request, From ] ),
 
 	% { next_state, finalize, ...}?
 
@@ -1267,7 +1297,7 @@ valid( _EventType={ call, _ServerRef=From },
 	   _Data=LEState=#le_state{ mode=Mode, domain=BinDomain, sans=SANs,
 			cert_dir_path=BinCertDirPath, order=OrderDirMap,
 			agent_private_key=PrivKey, jws=Jws, nonce=Nonce,
-			option_map=OptionMap } ) ->
+			cert_req_option_map=CertReqOptionMap } ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Trying to switch to finalize while being in the 'valid' state.",
@@ -1289,7 +1319,7 @@ valid( _EventType={ call, _ServerRef=From },
 
 	{ { FinOrderDirMap, _BinLocUri, FinNonce }, FinLEState } =
 		letsencrypt_api:finalize_order( OrderDirMap, Csr, PrivKey,
-			Jws#jws{ nonce=Nonce }, OptionMap, DestroyLEState ),
+			Jws#jws{ nonce=Nonce }, CertReqOptionMap, DestroyLEState ),
 
 	BinStatus = maps:get( <<"status">>, FinOrderDirMap ),
 
@@ -1349,7 +1379,7 @@ finalize( _EventType={ call, _ServerRef=From },
 			  %agent_key_file_path=KeyFilePath,
 			  cert_dir_path=BinCertDirPath,
 			  agent_private_key=PrivKey, jws=Jws, nonce=Nonce,
-			  option_map=OptionMap } ) ->
+			  cert_req_option_map=CertReqOptionMap } ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
 		"[~w] Getting progress of creation procedure "
@@ -1362,7 +1392,7 @@ finalize( _EventType={ call, _ServerRef=From },
 
 	{ { NewOrderMap, _NullLoc, OrderNonce }, OrderState } =
 		letsencrypt_api:get_order( Loc, PrivKey, Jws#jws{ nonce=Nonce },
-								   OptionMap, LEState ),
+								   CertReqOptionMap, LEState ),
 
 	BinStatus = maps:get( <<"status">>, NewOrderMap ),
 
@@ -1395,7 +1425,7 @@ finalize( _EventType={ call, _ServerRef=From },
 
 			{ { BinCert, DownloadNonce }, CertLEState } =
 				letsencrypt_api:get_certificate( OrderMap, PrivKey,
-					Jws#jws{ nonce=OrderNonce }, OptionMap, OrderState ),
+					Jws#jws{ nonce=OrderNonce }, CertReqOptionMap, OrderState ),
 
 			Domain = text_utils:binary_to_string( BinDomain ),
 
@@ -1588,14 +1618,14 @@ code_change( _, StateName, LEState, _ ) ->
 % Returns LEState (type record 'le_state') filled with corresponding, checked
 % option values.
 %
--spec get_options( [ user_option() ], le_state() ) -> le_state().
-get_options( _Opts=[], LEState ) ->
+-spec get_start_options( [ start_option() ], le_state() ) -> le_state().
+get_start_options( _Opts=[], LEState ) ->
 	LEState;
 
-get_options( _Opts=[ staging | T ], LEState ) ->
-	get_options( T, LEState#le_state{ env=staging } );
+get_start_options( _Opts=[ staging | T ], LEState ) ->
+	get_start_options( T, LEState#le_state{ env=staging } );
 
-get_options( _Opts=[ { mode, Mode } | T ], LEState ) ->
+get_start_options( _Opts=[ { mode, Mode } | T ], LEState ) ->
 	case lists:member( Mode, [ webroot, slave, standalone ] ) of
 
 		true ->
@@ -1605,10 +1635,11 @@ get_options( _Opts=[ { mode, Mode } | T ], LEState ) ->
 			throw( { invalid_leec_mode, Mode } )
 
 	end,
-	get_options( T, LEState#le_state{ mode=Mode } );
+	get_start_options( T, LEState#le_state{ mode=Mode } );
 
 % To re-use a previously-stored agent private key:
-get_options( _Opts=[ { agent_key_file_path, KeyFilePath } | T ], LEState ) ->
+get_start_options( _Opts=[ { agent_key_file_path, KeyFilePath } | T ],
+				   LEState ) ->
 
 	AgentKeyFilePath = text_utils:ensure_string( KeyFilePath ),
 
@@ -1619,7 +1650,7 @@ get_options( _Opts=[ { agent_key_file_path, KeyFilePath } | T ], LEState ) ->
 			case file_utils:is_existing_file_or_link( AgentKeyFilePath ) of
 
 				true ->
-					get_options( T, LEState#le_state{
+					get_start_options( T, LEState#le_state{
 						agent_key_file_info=
 							text_utils:string_to_binary( AgentKeyFilePath ) } );
 
@@ -1630,19 +1661,20 @@ get_options( _Opts=[ { agent_key_file_path, KeyFilePath } | T ], LEState ) ->
 
 		false ->
 			% No possible check yet:
-			get_options( T,
+			get_start_options( T,
 				LEState#le_state{ agent_key_file_info=
 					text_utils:string_to_binary( AgentKeyFilePath ) } )
 
 	end;
 
 
-get_options( _Opts=[ { cert_dir_path, BinCertDirPath } | T ], LEState )
+get_start_options( _Opts=[ { cert_dir_path, BinCertDirPath } | T ], LEState )
   when is_binary( BinCertDirPath ) ->
 	case file_utils:is_existing_directory_or_link( BinCertDirPath ) of
 
 		true ->
-			get_options( T, LEState#le_state{ cert_dir_path=BinCertDirPath } );
+			get_start_options( T, LEState#le_state{
+									cert_dir_path=BinCertDirPath } );
 
 		false ->
 			throw( { non_existing_certificate_directory,
@@ -1650,17 +1682,17 @@ get_options( _Opts=[ { cert_dir_path, BinCertDirPath } | T ], LEState )
 
 	end;
 
-get_options( _Opts=[ { cert_dir_path, CertDirPath } | T ], LEState ) ->
+get_start_options( _Opts=[ { cert_dir_path, CertDirPath } | T ], LEState ) ->
 	BinCertDirPath = text_utils:string_to_binary( CertDirPath ),
-	get_options( [ { cert_dir_path, BinCertDirPath } | T ], LEState );
+	get_start_options( [ { cert_dir_path, BinCertDirPath } | T ], LEState );
 
 
-get_options( _Opts=[ { webroot_dir_path, BinWebDirPath } | T ], LEState )
+get_start_options( _Opts=[ { webroot_dir_path, BinWebDirPath } | T ], LEState )
   when is_binary( BinWebDirPath ) ->
 	case file_utils:is_existing_directory_or_link( BinWebDirPath ) of
 
 		true ->
-			get_options( T,
+			get_start_options( T,
 						 LEState#le_state{ webroot_dir_path=BinWebDirPath } );
 
 		false ->
@@ -1669,26 +1701,27 @@ get_options( _Opts=[ { webroot_dir_path, BinWebDirPath } | T ], LEState )
 
 	end;
 
-get_options( _Opts=[ { webroot_dir_path, WebDirPath } | T ], LEState ) ->
-	BinWebDirPath = text_utils:string_to_binary( WebDirPath ),
-	get_options( [ { webroot_dir_path, BinWebDirPath } | T ], LEState );
+get_start_options( _Opts=[ { webroot_dir_path, WebDirPath } | T ], LEState ) ->
+	BinWebDirPath = text_utils:ensure_binary( WebDirPath ),
+	get_start_options( [ { webroot_dir_path, BinWebDirPath } | T ], LEState );
 
 
-get_options( _Opts=[ { port, Port } | T ], LEState ) when is_integer( Port ) ->
-	get_options( T, LEState#le_state{ port=Port } );
+get_start_options( _Opts=[ { port, Port } | T ], LEState )
+  when is_integer( Port ) ->
+	get_start_options( T, LEState#le_state{ port=Port } );
 
-get_options( _Opts=[ { port, Port } | _T ], _LEState ) ->
+get_start_options( _Opts=[ { port, Port } | _T ], _LEState ) ->
 	throw( { invalid_standalone_tcp_port, Port } );
 
-get_options( _Opts=[ { http_timeout, Timeout } | T ], LEState )
+get_start_options( _Opts=[ { http_timeout, Timeout } | T ], LEState )
   when is_integer( Timeout ) ->
-	get_options( T, LEState#le_state{
-				  option_map=#{ netopts => #{ timeout => Timeout } } } );
+	get_start_options( T, LEState#le_state{
+			  cert_req_option_map=#{ netopts => #{ timeout => Timeout } } } );
 
-get_options( _Opts=[ { http_timeout, Timeout } | _T ], _LEState ) ->
+get_start_options( _Opts=[ { http_timeout, Timeout } | _T ], _LEState ) ->
 	throw( { invalid_http_timeout, Timeout } );
 
-get_options( _Opts=[ Unexpected | _T ], _LEState ) ->
+get_start_options( _Opts=[ Unexpected | _T ], _LEState ) ->
 	trace_bridge:error_fmt( "Invalid LEEC option specified: ~p.",
 							[ Unexpected ] ),
 	throw( { invalid_leec_option, Unexpected } ).
@@ -1900,7 +1933,7 @@ perform_authorization_step1( _AuthUris=[], _BinChallengeType,
 
 perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 			LEState=#le_state{ nonce=Nonce, agent_private_key=PrivKey,
-							   jws=Jws, option_map=OptionMap },
+							   jws=Jws, cert_req_option_map=CertReqOptionMap },
 			UriChallengeMap ) ->
 
 	% Ex: AuthUri =
@@ -1908,7 +1941,7 @@ perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 
 	{ { AuthMap, _LocUri, NewNonce }, ReqLEState } =
 		letsencrypt_api:request_authorization( AuthUri, PrivKey,
-							Jws#jws{ nonce=Nonce }, OptionMap, LEState ),
+							Jws#jws{ nonce=Nonce }, CertReqOptionMap, LEState ),
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
 		"[~w] Step 1: authmap returned for URI '~s':~n  ~p.",
@@ -1982,11 +2015,11 @@ perform_authorization_step2( _Pairs=[], LEState=#le_state{ nonce=Nonce } ) ->
 
 perform_authorization_step2( _Pairs=[ { Uri, Challenge } | T ],
 			LEState=#le_state{ nonce=Nonce, agent_private_key=AgentPrivKey,
-							   jws=Jws, option_map=OptionMap } ) ->
+						   jws=Jws, cert_req_option_map=CertReqOptionMap } ) ->
 
 	{ { Resp, _Location, NewNonce }, NotifLEState } =
 		letsencrypt_api:notify_ready_for_challenge( Challenge, AgentPrivKey,
-								Jws#jws{ nonce=Nonce }, OptionMap, LEState ),
+							Jws#jws{ nonce=Nonce }, CertReqOptionMap, LEState ),
 
 	case maps:get( <<"status">>, Resp ) of
 
