@@ -485,7 +485,7 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 						 PrivKey, AccountJws, CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
-		"[~w] Requesting a new certificate from ~s for ~p.",
+		"[~w] Requesting a new certificate from ~s for:~n  ~p",
 		[ self(), OrderUri, BinDomains ] ) ),
 
 	Idns = [ #{ type => dns, value => BinDomain } || BinDomain <- BinDomains ],

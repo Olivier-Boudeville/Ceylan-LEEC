@@ -1007,7 +1007,7 @@ idle( _EventType={ call, From },
 	LocOrder = OrderDecodedJsonMap#{ <<"location">> => OrderLocationUri },
 
 	AuthLEState = ReqState#le_state{ domain=BinDomain, jws=AccountJws,
-		account_key=AccountKey, nonce=OrderNonce },
+		account_key=AccountKey, nonce=OrderNonce, sans=BinSans },
 
 	AuthUris = maps:get( <<"authorizations">>, OrderDecodedJsonMap ),
 
@@ -1613,7 +1613,7 @@ code_change( _, StateName, LEState, _ ) ->
 %  them
 %  - port: the TCP port at which the corresponding webserver shall be available,
 %  in standalone mode
-%  - http_timeout: timeout for ACME API requests (in seconds)
+%  - http_timeout: timeout for ACME API requests (in milliseconds)
 %
 % Returns LEState (type record 'le_state') filled with corresponding, checked
 % option values.

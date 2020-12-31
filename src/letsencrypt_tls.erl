@@ -331,8 +331,9 @@ get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 	[ { 'CertificationRequest', Csr, not_encrypted } ] =
 		public_key:pem_decode( RawCsr ),
 
-	cond_utils:if_defined( leec_debug_keys,
-		trace_bridge:debug_fmt( "Decoded CSR:~n  ~p.", [ Csr ] ) ),
+	% Not relevant, an opaque binary:
+	%cond_utils:if_defined( leec_debug_keys,
+	%	trace_bridge:debug_fmt( "Decoded CSR:~n  ~p.", [ Csr ] ) ),
 
 	letsencrypt_utils:b64encode( Csr ).
 
@@ -415,8 +416,8 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 
 	end,
 
-	%file_utils:remove_file( ConfFilePath ).
-	ok.
+	file_utils:remove_file( ConfFilePath ).
+
 
 
 % Writes specified certificate, overwriting any prior one.
