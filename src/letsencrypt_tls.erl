@@ -113,7 +113,7 @@ obtain_private_key( _KeyFileInfo={ new, BinKeyFilename }, BinCertDirPath ) ->
 	end,
 
 	Cmd = executable_utils:get_default_openssl_executable_path()
-		++ " genrsa -out '" ++ KeyFilePath ++ "' 2048",
+		++ " genrsa -out '" ++ KeyFilePath ++ "' 4096",
 
 	case system_utils:run_executable( Cmd ) of
 
@@ -121,11 +121,11 @@ obtain_private_key( _KeyFileInfo={ new, BinKeyFilename }, BinCertDirPath ) ->
 			ok;
 
 		% Not deserving a warning, as returning in case of success: "Generating
-		% RSA private key, 2048 bit long modulus (2 primes) [...]".
+		% RSA private key, 4096 bit long modulus (2 primes) [...]".
 		%
 		{ _ReturnCode=0, CommandOutput } ->
 			cond_utils:if_defined( leec_debug_keys,
-				trace_bridge:info_fmt( "Private key creation successful; "
+				trace_bridge:debug_fmt( "Private key creation successful; "
 					"following output was made: ~s.", [ CommandOutput ] ),
 				basic_utils:ignore_unused( CommandOutput ) );
 
@@ -224,7 +224,7 @@ obtain_dh_key( CertDir ) ->
 				[ DhFilePath ] ),
 
 			Cmd = executable_utils:get_default_openssl_executable_path()
-				++ " dhparam -out '" ++ DhFilePath ++ "' 2048",
+				++ " dhparam -out '" ++ DhFilePath ++ "' 3072",
 
 			case system_utils:run_executable( Cmd ) of
 
