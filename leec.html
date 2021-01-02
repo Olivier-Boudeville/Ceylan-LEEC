@@ -20,7 +20,7 @@
 <p><span class="raw-html"><center><img src="leec-title.png" width="50%"></img></center></span>
 </p>
 <div class="section" id="leec-let-s-encrypt-erlang-with-ceylan">
-<h1><a class="toc-backref" href="#id2">LEEC: Let's Encrypt Erlang with Ceylan</a></h1>
+<h1><a class="toc-backref" href="#id4">LEEC: Let's Encrypt Erlang with Ceylan</a></h1>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -31,7 +31,7 @@
 </tr>
 <tr class="field"><th class="field-name">Creation date:</th><td class="field-body">Wednesday, November 11, 2020</td>
 </tr>
-<tr class="field"><th class="field-name">Lastly updated:</th><td class="field-body">Sunday, December 27, 2020</td>
+<tr class="field"><th class="field-name">Lastly updated:</th><td class="field-body">Saturday, January 2, 2021</td>
 </tr>
 <tr class="field"><th class="field-name">Dedication:</th><td class="field-body">Users and maintainers of the <tt class="docutils literal">LEEC</tt> library, version 0.6.</td>
 </tr>
@@ -46,23 +46,48 @@
 <div class="contents topic" id="id1">
 <span id="table-of-contents"></span><p class="topic-title">Table of Contents</p>
 <ul class="simple">
-<li><a class="reference internal" href="#leec-let-s-encrypt-erlang-with-ceylan" id="id2">LEEC: Let's Encrypt Erlang with Ceylan</a><ul>
-<li><a class="reference internal" href="#overview" id="id3">Overview</a></li>
-<li><a class="reference internal" href="#getting-information-about-the-generated-certificates" id="id4">Getting Information about the Generated Certificates</a></li>
-<li><a class="reference internal" href="#support" id="id5">Support</a></li>
-<li><a class="reference internal" href="#please-react" id="id6">Please React!</a></li>
-<li><a class="reference internal" href="#ending-word" id="id7">Ending Word</a></li>
+<li><a class="reference internal" href="#leec-let-s-encrypt-erlang-with-ceylan" id="id4">LEEC: Let's Encrypt Erlang with Ceylan</a><ul>
+<li><a class="reference internal" href="#overview" id="id5">Overview</a></li>
+<li><a class="reference internal" href="#design-notes" id="id6">Design Notes</a><ul>
+<li><a class="reference internal" href="#multiple-domains-having-each-multiple-hostnames" id="id7">Multiple Domains Having Each Multiple Hostnames</a></li>
+<li><a class="reference internal" href="#concurrent-certificate-operations" id="id8">Concurrent Certificate Operations</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#getting-information-about-the-generated-certificates" id="id9">Getting Information about the Generated Certificates</a></li>
+<li><a class="reference internal" href="#support" id="id10">Support</a></li>
+<li><a class="reference internal" href="#please-react" id="id11">Please React!</a></li>
+<li><a class="reference internal" href="#ending-word" id="id12">Ending Word</a></li>
 </ul>
 </li>
 </ul>
 </div>
 <p></p>
 <div class="section" id="overview">
-<h2><a class="toc-backref" href="#id3">Overview</a></h2>
+<h2><a class="toc-backref" href="#id5">Overview</a></h2>
 <p>The online documentation for LEEC is currently available <a class="reference external" href="https://github.com/Olivier-Boudeville/letsencrypt-erlang">here</a>.</p>
 </div>
+<div class="section" id="design-notes">
+<h2><a class="toc-backref" href="#id6">Design Notes</a></h2>
+<div class="section" id="multiple-domains-having-each-multiple-hostnames">
+<h3><a class="toc-backref" href="#id7">Multiple Domains Having Each Multiple Hostnames</a></h3>
+<p>At least the ACME servers from Let's Encrypt enforce various fairly low <a class="reference external" href="https://letsencrypt.org/docs/rate-limits/">rate limits</a>, which leads to preferring requesting certificates only on a per-domain basis (ex: for <tt class="docutils literal">foobar.org</tt>) rather than on a per-hostname one (ex: for <tt class="docutils literal">baz.foobar.org</tt>, <tt class="docutils literal">hurrican.foobar.org</tt>, etc., these hosts being virtual ones or not), as such requests would become too numerous to respect these thresholds.</p>
+<p>A per-domain certificate should then include directly its various hostnames as <em>Subject Alternative Names</em> (SAN entries).</p>
+<p>With the <tt class="docutils literal"><span class="pre">http-01</span></tt> challenge type, no wildcard for such SAN hosts (ex: <tt class="docutils literal">*.foobar.org</tt>) cannot be specified), so all the wanted ones have to be explicitly listed <a class="footnote-reference" href="#id3" id="id2">[1]</a>.</p>
+<table class="docutils footnote" frame="void" id="id3" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[1]</a></td><td>As a result, the certificate may disclose virtual hosts that would be otherwise invisible from the Internet (as no even declared in the DNS).</td></tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="concurrent-certificate-operations">
+<h3><a class="toc-backref" href="#id8">Concurrent Certificate Operations</a></h3>
+<p>LEEC implemented independent (<tt class="docutils literal">gen_statem</tt>) FSMs to allow typically for concurrent certificate renewals to be triggered. A drawback of the aforementioned Let's Encrypt rate limits is that, while a given FSM is to remain below said thresholds, a set of parallel ones may not.</p>
+<p>If a <a class="reference external" href="https://olivier-boudeville.github.io/us-common/#facilities-provided-by-this-layer">task ring</a> may be used to avoid by design such FSMs to overlap, another option is to use a single FSM and to trigger certificate requests in turn.</p>
+</div>
+</div>
 <div class="section" id="getting-information-about-the-generated-certificates">
-<h2><a class="toc-backref" href="#id4">Getting Information about the Generated Certificates</a></h2>
+<h2><a class="toc-backref" href="#id9">Getting Information about the Generated Certificates</a></h2>
 <p>If using LEEC to generate a certificate for a <tt class="docutils literal">baz.foobar.org</tt> host, the following three files shall be obtained from the Let's Encrypt ACME server:</p>
 <ul class="simple">
 <li><tt class="docutils literal">baz.foobar.org.csr</tt>: the PEM certificate request, sent to the ACME server (~980 bytes)</li>
@@ -71,7 +96,7 @@
 </ul>
 <p>To get information about this certificate:</p>
 <pre class="literal-block">
-$ openssl x509 -in baz.foobar.org.crt -text -noout
+$ openssl x509 -text -noout -in baz.foobar.org.crt
 
 Certificate:
    Data:
@@ -87,19 +112,61 @@ Certificate:
        Subject Public Key Info:
            Public Key Algorithm: rsaEncryption
                RSA Public-Key: (2048 bit)
-[...]
+
+              Modulus:
+                   [...]
+               Exponent: 65537 (0x10001)
+       X509v3 extensions:
+           X509v3 Key Usage: critical
+               Digital Signature, Key Encipherment
+           X509v3 Extended Key Usage:
+               TLS Web Server Authentication, TLS Web Client Authentication
+           X509v3 Basic Constraints: critical
+               CA:FALSE
+           X509v3 Subject Key Identifier:
+               [...]
+           X509v3 Authority Key Identifier:
+               keyid:C0:CC:03:46:B9:58:20:CC:5C:72:70:F3:E1:2E:CB:20:B6:F5:68:3A
+
+           Authority Information Access:
+               OCSP - URI:http://ocsp.stg-int-x1.letsencrypt.org
+               CA Issuers - URI:http://cert.stg-int-x1.letsencrypt.org/
+
+           X509v3 Subject Alternative Name:
+               DNS:hello.baz.foobar.org.crt, DNS:world.foobar.org.crt, DNS:somesite.foobar.org.crt
+           X509v3 Certificate Policies:
+               Policy: 2.23.140.1.2.1
+               Policy: 1.3.6.1.4.1.44947.1.1.1
+                 CPS: http://cps.letsencrypt.org
+
+           CT Precertificate SCTs:
+               Signed Certificate Timestamp:
+                   Version   : v1 (0x0)
+                   Log ID    : [...]
+                   Timestamp : Jan  2 09:23:20.310 2021 GMT
+                   Extensions: none
+                   Signature : ecdsa-with-SHA256
+               Signed Certificate Timestamp:
+                   Version   : v1 (0x0)
+                   Log ID    : [...]
+                   Timestamp : Jan  2 09:23:20.320 2021 GMT
+                   Extensions: none
+                   Signature : ecdsa-with-SHA256
+                               [...]
+   Signature Algorithm: sha256WithRSAEncryption
+   [...]
 </pre>
 </div>
 <div class="section" id="support">
-<h2><a class="toc-backref" href="#id5">Support</a></h2>
+<h2><a class="toc-backref" href="#id10">Support</a></h2>
 <p>Bugs, questions, remarks, patches, requests for enhancements, etc. are to be sent through the <a class="reference external" href="https://github.com/Olivier-Boudeville/letsencrypt-erlang">project interface</a>, or directly at the email address mentioned at the beginning of this document.</p>
 </div>
 <div class="section" id="please-react">
-<h2><a class="toc-backref" href="#id6">Please React!</a></h2>
+<h2><a class="toc-backref" href="#id11">Please React!</a></h2>
 <p>If you have information more detailed or more recent than those presented in this document, if you noticed errors, neglects or points insufficiently discussed, drop us a line! (for that, follow the <a class="reference internal" href="#support">Support</a> guidelines).</p>
 </div>
 <div class="section" id="ending-word">
-<h2><a class="toc-backref" href="#id7">Ending Word</a></h2>
+<h2><a class="toc-backref" href="#id12">Ending Word</a></h2>
 <p>Have fun with LEEC!</p>
 <div class="figure align-center">
 <img alt="LEEC logo" src="leec-title.png" style="width: 35%;" />
