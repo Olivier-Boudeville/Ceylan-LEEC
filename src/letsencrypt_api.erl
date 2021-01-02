@@ -38,6 +38,9 @@
 
 
 % Shorthands:
+
+-type http_status_code() :: web_utils:http_status_code().
+
 -type challenge() :: letsencrypt:challenge().
 -type uri() :: letsencrypt:uri().
 -type tls_private_key() :: letsencrypt:tls_private_key().
@@ -197,6 +200,8 @@ decode( _CertReqOptionMap=#{ json := true }, Response=#{ body := Body },
 
 	Response#{ json => Payload };
 
+
+% At least most of the time, there is no body is the specified response:
 decode( _CertReqOptionMap, Response, _LEState ) ->
 
 	cond_utils:if_defined( leec_debug_codec,
@@ -211,7 +216,7 @@ decode( _CertReqOptionMap, Response, _LEState ) ->
 % updated state.
 %
 % Returned result:
-%	{ok, #{status_coe, body, headers}}: query succeeded
+%	{ok, #{status_code, body, headers}}: query succeeded
 %	{error, invalid_method}           : method must be either 'get' or 'post'
 %   {error, term()}                   : query failed
 %
@@ -220,7 +225,7 @@ decode( _CertReqOptionMap, Response, _LEState ) ->
 %
 -spec request( 'get' | 'post', uri(), header_map(),
 	   maybe( bin_content() ), cert_req_option_map(), le_state() ) ->
-					{ shotgun:result(), le_state() }.
+					{ json_http_body(), le_state() }.
 request( Method, Uri, Headers, MaybeBinContent,
 		 CertReqOptionMap=#{ netopts := Netopts },
 		 LEState=#le_state{ tcp_connection_cache=TCPCache } ) ->
@@ -254,6 +259,14 @@ request( Method, Uri, Headers, MaybeBinContent,
 
 	ContentHeaders = Headers#{ <<"content-type">> =>
 								   <<"application/jose+json">> },
+
+	% We introduced here an (optional) waiting, as we could see, when using an
+	% ACME server in production (not staging) mode, a 'too many requests' error
+	% (code 429: client-side error), whereas no other interaction with the ACME
+	% server was taking place. However we found out since then it was another,
+	% unrelated rate limit that applied, so this is of no use:
+	%
+	%timer:sleep( 1000 ),
 
 	% We want to reuse connection if it already exists:
 	{ Connection, NewTCPCache } = get_tcp_connection( UriProtoAtom, UriHost,
@@ -314,13 +327,66 @@ request( Method, Uri, Headers, MaybeBinContent,
 				location => proplists:get_value( <<"location">>, RHeaders,
 												 _Def=null ) },
 
-			{ decode( CertReqOptionMap, Resp, LEState ),
+			JsonHttpBody = decode( CertReqOptionMap, Resp, LEState ),
+
+			{ JsonHttpBody,
 			  LEState#le_state{ tcp_connection_cache=NewTCPCache } };
 
 		_ ->
 			throw( { unexpected_request_answer, Method, UriStr, ReqRes } )
 
 	end.
+
+
+% Called whenever an (ACME) request failed, whereas no suitable JSON body is
+% available in the answer: reports error information and throws a corresponding
+% exception.
+%
+-spec on_failed_request( http_status_code(), atom() ) -> no_return().
+on_failed_request( StatusCode, StepAtom ) ->
+
+	StatusStr = web_utils:interpret_http_status_code( StatusCode ),
+
+	trace_bridge:critical_fmt( "An ACME request failed at the '~s' step: ~s.",
+							   [ StepAtom, StatusStr ] ),
+
+	throw( { request_failed, { status_code, StatusCode }, { reason, StatusStr },
+			 { step, StepAtom } } ).
+
+
+
+% Called whenever an (ACME) request failed, whereas a suitable JSON body is
+% available in the answer: reports error information and throws a corresponding
+% exception.
+%
+-spec on_failed_request( http_status_code(), json_map_decoded(), atom() ) ->
+								no_return().
+on_failed_request( StatusCode, JsonMapBody, StepAtom ) ->
+
+	StatusStr = web_utils:interpret_http_status_code( StatusCode ),
+
+	Type = maps:get( _K= <<"type">>, JsonMapBody, _Def=unknown ),
+
+	Detail = maps:get( <<"detail">>, JsonMapBody, unknown ),
+
+	trace_bridge:critical_fmt( "An ACME request failed at the '~s' step: ~s, "
+		"for the following reason: ~s (error type: ~s).",
+		[ StepAtom, StatusStr, Detail, Type ] ),
+
+	Reason = case Detail of
+
+		unknown ->
+			StatusStr;
+
+		_ ->
+			Detail
+
+	end,
+
+	throw( { request_failed, { status_code, StatusCode },
+			 { reason, text_utils:ensure_string( Reason ) },
+			 { step, StepAtom } } ).
+
 
 
 
@@ -359,10 +425,7 @@ get_directory_map( Env, CertReqOptionMap, LEState ) ->
 			ok;
 
 		_ ->
-			trace_bridge:error_fmt( "Unexpected status code when getting "
-				"directory map: ~s",
-				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
-			throw( { unexpected_status_code, StatusCode, get_directory_map } )
+			on_failed_request( StatusCode, DirectoryMap, get_directory_map )
 
 	end,
 
@@ -394,10 +457,7 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, CertReqOptionMap, LEState ) ->
 			ok;
 
 		_ ->
-			trace_bridge:error_fmt( "Unexpected status code when getting "
-				"nonce: ~s",
-				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
-			throw( { unexpected_status_code, StatusCode, get_nonce } )
+			on_failed_request( StatusCode, get_nonce )
 
 	end,
 
@@ -437,7 +497,7 @@ get_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 	ReqB64 = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri }, Payload,
 									 LEState ),
 
-	{ #{ json := Resp, location := LocationUri, nonce := NewNonce,
+	{ #{ json := RespMap, location := LocationUri, nonce := NewNonce,
 	   status_code := StatusCode }, NewLEState } = request( _Method=post, Uri,
 			_Headers=#{}, _MaybeBinContent=ReqB64,
 			CertReqOptionMap#{ json => true }, LEState ),
@@ -455,22 +515,19 @@ get_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 			ok;
 
 		_ ->
-			trace_bridge:error_fmt( "Unexpected status code when getting "
-				"ACME account: ~s",
-				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
-			throw( { unexpected_status_code, StatusCode, get_acme_account } )
+			on_failed_request( StatusCode, RespMap, get_acme_account )
 
 	end,
 
 	cond_utils:if_defined( leec_debug_exchanges,
 		trace_bridge:debug_fmt( "[~w] Account location URI is '~s', "
-			"JSON response is :~n  ~p", [ self(), LocationUri, Resp ] ) ),
+			"JSON response is :~n  ~p", [ self(), LocationUri, RespMap ] ) ),
 
-	{ { Resp, LocationUri, NewNonce }, NewLEState }.
+	{ { RespMap, LocationUri, NewNonce }, NewLEState }.
 
 
 
-% Requests (orders from ACME) a new (DNS) certificate, see
+% Requests (orders from ACME) a new certificate (of DNS type), see
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.
 %
 % Returns {Response, Location, Nonce}, where:
@@ -495,10 +552,10 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 	Req = letsencrypt_jws:encode( PrivKey, AccountJws#jws{ url=OrderUri },
 								  _Content=IdPayload, LEState ),
 
-	{ #{ json := OrderJsonMap, location := LocationUri, nonce := Nonce,
-		 status_code := StatusCode }, NewLEState } = request( _Method=post,
-		OrderUri, _Headers=#{}, _MaybeBinContent=Req,
-		CertReqOptionMap#{ json => true }, LEState ),
+	{ #{ json := OrderJsonMap, location := LocationUri,
+		 nonce := Nonce, status_code := StatusCode }, NewLEState } =
+			request( _Method=post, OrderUri, _Headers=#{}, _MaybeBinContent=Req,
+					 CertReqOptionMap#{ json => true }, LEState ),
 
 	case StatusCode of
 
@@ -506,11 +563,8 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 			ok;
 
 		_ ->
-			trace_bridge:error_fmt( "Unexpected status code when requesting "
-				"new certificate: ~s",
-				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
-			throw( { unexpected_status_code, StatusCode,
-					 request_new_certificate } )
+			on_failed_request( StatusCode, OrderJsonMap,
+							   request_new_certificate )
 
 	end,
 
@@ -537,7 +591,7 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 
 
 
-% Returns order state.
+% Orders a new certificate from the ACME server.
 -spec get_order( bin_uri(), bin_key(), jws(), cert_req_option_map(),
 				 le_state() ) ->
 		{ { json_map_decoded(), bin_uri(), nonce() }, le_state() }.
@@ -551,7 +605,7 @@ get_order( Uri, Key, Jws, CertReqOptionMap, LEState ) ->
 	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined,
 								  LEState ),
 
-	{ #{ json := Resp, location := Location, nonce := Nonce,
+	{ #{ json := RespMap, location := Location, nonce := Nonce,
 		 status_code := StatusCode }, NewLEState } =
 		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
 				 CertReqOptionMap#{ json=> true }, LEState ),
@@ -562,14 +616,11 @@ get_order( Uri, Key, Jws, CertReqOptionMap, LEState ) ->
 			ok;
 
 		_ ->
-			trace_bridge:error_fmt( "Unexpected status code when getting "
-				"order: ~s",
-				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
-			throw( { unexpected_status_code, StatusCode, get_order } )
+			on_failed_request( StatusCode, RespMap, get_order )
 
 	end,
 
-	{ { Resp, Location, Nonce }, NewLEState }.
+	{ { RespMap, Location, Nonce }, NewLEState }.
 
 
 
@@ -593,7 +644,7 @@ request_authorization( AuthUri, PrivKey, Jws, CertReqOptionMap, LEState ) ->
 	B64AuthReq = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=AuthUri },
 										 _Content=undefined, LEState ),
 
-	{ #{ json := Resp, location := LocationUri, nonce := Nonce,
+	{ #{ json := RespMap, location := LocationUri, nonce := Nonce,
 	   status_code := StatusCode }, NewLEState } = request( _Method=post,
 			AuthUri, _Headers=#{}, _MaybeBinContent=B64AuthReq,
 			CertReqOptionMap#{ json=> true }, LEState ),
@@ -604,15 +655,11 @@ request_authorization( AuthUri, PrivKey, Jws, CertReqOptionMap, LEState ) ->
 			ok;
 
 		_ ->
-			trace_bridge:error_fmt( "Unexpected status code when requesting "
-				"authorization: ~s",
-				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
-			throw( { unexpected_status_code, StatusCode,
-					 request_authorization } )
+			on_failed_request( StatusCode, RespMap, request_authorization )
 
 	end,
 
-	{ { Resp, LocationUri, Nonce }, NewLEState }.
+	{ { RespMap, LocationUri, Nonce }, NewLEState }.
 
 
 
@@ -638,7 +685,7 @@ notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
 	Req = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri }, _Content=#{},
 								  LEState ),
 
-	{ #{ json := Resp, location := Location, nonce := Nonce,
+	{ #{ json := RespMap, location := Location, nonce := Nonce,
 	  status_code := StatusCode }, NewLEState } = request( _Method=post, Uri,
 		_Headers=#{}, _MaybeBinContent=Req, CertReqOptionMap#{ json => true },
 														   LEState ),
@@ -649,15 +696,11 @@ notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
 			ok;
 
 		_ ->
-			trace_bridge:error_fmt( "Unexpected status code when notifying "
-				"that ready for challenge: ~s",
-				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
-			throw( { unexpected_status_code, StatusCode,
-					 notify_ready_for_challenge } )
+			on_failed_request( StatusCode, RespMap, notify_ready_for_challenge )
 
 	end,
 
-	{ { Resp, Location, Nonce }, NewLEState }.
+	{ { RespMap, Location, Nonce }, NewLEState }.
 
 
 
@@ -696,10 +739,8 @@ finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 			throw( { forbidden_status_code, StatusCode, finalize_order } );
 
 		_ ->
-			trace_bridge:error_fmt( "Unexpected status code when finalizing "
-				"order: ~s",
-				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
-			throw( { unexpected_status_code, StatusCode, finalize_order } )
+			% If code 403 ("forbidden"), possibly a past operation failed.
+			on_failed_request( StatusCode, FinOrderDirMap, finalize_order )
 
 	end,
 
@@ -733,10 +774,7 @@ get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, CertReqOptionMap,
 			ok;
 
 		_ ->
-			trace_bridge:error_fmt( "Unexpected status code when getting "
-				"certificate: ~s",
-				[ web_utils:interpret_http_status_code( StatusCode ) ] ),
-			throw( { unexpected_status_code, StatusCode, get_certificate } )
+			on_failed_request( StatusCode, get_certificate )
 
 	end,
 
