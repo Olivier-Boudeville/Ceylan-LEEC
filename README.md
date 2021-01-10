@@ -10,13 +10,15 @@ LEEC is notably used in the context of [US-Web](http://us-web.esperide.org/).
 The main differences introduced by LEEC are:
 - more comments, more spell-checking, much clarification
 - more typing, more runtime checking, extended traces supported
+- security increased (notably using 4096-bit RSA keys)
 - dependency onto [Ceylan-Myriad](https://github.com/Olivier-Boudeville/Ceylan-Myriad) added, to benefit from its facilities
 - JSON parser can be JSX (the default), or Jiffy (refer to the `JSON parsers` section)
+- http client can be either Shotgun or the Erlang-native httpc client, to avoid any extra dependencies on Gun and Cowlib (whose versions could potentially clash with the ones required by any Cowboy-based integrating webserver)
 - porting done from [gen_fsm](https://erlang.org/documentation/doc-6.1/lib/stdlib-2.1/doc/html/gen_fsm.html) (soon to be deprecated) to the newer [gen_statem](https://erlang.org/doc/man/gen_statem.html)
 - minor API changes and additions, for a clearer and more flexible mode of operation
 - fixed the compilation with Erlang version 23.0 and higher (ex: w.r.t. to http_uri/uri_string, to updated dependencies such as Jiffy, and newer Cowboy for the examples)
 - allow for *concurrent* certificate requests (ex: if managing multiple domains with different keys, new certificates being requested for all of them at webserver start-up); so LEEC generates certificates in parallel and does not rely on a *registered* FSM anymore
-- global, ets-based TCP connection pool replaced by a per-FSM internal cache
+- global, ETS-based TCP connection pool replaced by an (optional) per-FSM internal cache (if relying on Shotgun)
 - basic support for the management of:
   - Ephemeral Diffie-Helman key, to ensure Forward Secrecy by exchanging a set of keys that are never communicated
   - [Intermediate let's Encrypt Certificates](https://letsencrypt.org/certificates/)
@@ -31,7 +33,7 @@ Features:
 - [ ] registering client (with email)
 - [x] issuing RSA certificate
 - [ ] revoking certificate
-- [?] SAN certificate (_Subject Alternative Names_; added yet not tested yet)
+- [x] SAN certificate (_Subject Alternative Names_)
 - [ ] allow EC keys
 - [ ] choose RSA key length
 - [?] unittests (inherited from upstream, possibly still functional)
@@ -47,9 +49,18 @@ Validation challenges
 - [ ] dns-01
 - [ ] proof-of-possession-01
 
+
 ## Prerequisites
+
+General ones:
 - openssl >= 1.1.1 (required to generate RSA key and certificate request)
 - Erlang OTP (tested with 23.1 versions and upwards)
+
+LEEC-specific ones (automatically managed by rebar3 if opting for a rebar-based build):
+- a JSON parser: either [JSX](https://github.com/talentdeficit/jsx) (the default) or [Jiffy](https://github.com/davisp/jiffy)
+- [Ceylan-Myriad](http://myriad.esperide.org/)
+- optional: a more advanced HTTP client that the Erlang-native ones ([httpc](https://erlang.org/doc/man/httpc.html)]: [Shotgun](https://github.com/inaka/shotgun)
+
 
 
 ## Building
@@ -60,7 +71,7 @@ Two build procedures can be used from the root of LEEC:
  $> ./rebar3 update
  $> ./rebar3 compile
 ```
-- or one relying on Ceylan's native build system: then run `make all`
+- or one relying on Ceylan's native build system, once the relevant prerequisites have been setup (selected, downloaded, built): then run `make all`; this is the procedure that we prefer and use routinely (see the [US-Web native deployment script](https://github.com/Olivier-Boudeville/us-web/blob/master/priv/bin/deploy-us-web-native-build.sh) as an example thereof)
 
 
 ## Quickstart (as webroot)
@@ -313,7 +324,7 @@ main() ->
 
 ## JSON parsers
 
-If wanting to switch from the default JSX to Jiffy, following files shall be updated:
+If wanting to switch from the default [JSX](https://github.com/talentdeficit/jsx) to [Jiffy](https://github.com/davisp/jiffy), following files shall be updated:
 - [rebar.config](https://github.com/Olivier-Boudeville/letsencrypt-erlang/blob/master/rebar.config)
 - [src/letsencrypt.app.src](https://github.com/Olivier-Boudeville/letsencrypt-erlang/blob/master/src/letsencrypt.app.src)
 (none in Myriad)
