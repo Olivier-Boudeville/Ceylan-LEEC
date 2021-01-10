@@ -151,6 +151,8 @@ info-conditionals:
 info-deps:
 	@echo "COWLIB_TOP = $(COWLIB_TOP)"
 	@echo "GUN_TOP = $(GUN_TOP)"
+	@echo "USE_SHOTGUN = $(USE_SHOTGUN)"
+	@echo "HTTPC_OPT = $(HTTPC_OPT)"
 	@echo "SHOTGUN_TOP = $(SHOTGUN_TOP)"
 	@echo "ELLI_TOP = $(ELLI_TOP)"
 	@echo "ERLANG_COLOR_TOP = $(ERLANG_COLOR_TOP)"

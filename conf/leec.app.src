@@ -29,6 +29,8 @@
 
   {registered, []},
 
+  % Shotgun used by default with OTP/rebar3 builds.
+  %
   % Regarding Myriad, see http://myriad.esperide.org/myriad.html#otp
   %
   % Elli is useful iff in standalone mode (i.e. if needing to run our own

@@ -286,7 +286,7 @@ obtain_ca_cert_file( TargetDir, _CertProvider=letsencrypt ) ->
 
 			trace_bridge:info_fmt(
 				"Certificate authority certificate file was found already "
-				"existing (as '~s'), not downloading  it.", [ FilePath ] ),
+				"existing (as '~s'), not downloading it.", [ FilePath ] ),
 
 			text_utils:string_to_binary( FilePath );
 

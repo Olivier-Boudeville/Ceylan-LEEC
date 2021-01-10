@@ -1,4 +1,4 @@
-%% Copyright 2015-2020 Guillaume Bour
+%% Copyright 2015-2021 Guillaume Bour
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -21,8 +21,21 @@
 		  binary_to_status/1,
 		  get_tcp_connection/4, close_tcp_connections/1 ]).
 
+-compile( { nowarn_unused_function,
+			[ request_via_shotgun/6, request_via_native_httpc/6 ] } ).
 
--type json_http_body() :: map().
+
+% Key :: Value entries being typically:
+%  - body :: body()
+%  - headers :: headers()
+%  - location :: location()
+%  - nonce :: nonce()
+%  - status_code: http_status_code()
+%
+-type http_body() :: map().
+
+% Additional 'json' key, whose value is the body once decoded from JSON:
+-type json_http_body() :: http_body().
 
 -type header_map() :: map().
 
@@ -39,19 +52,20 @@
 
 % Shorthands:
 
+-type body() :: web_utils:body().
+-type nonce() :: web_utils:nonce().
 -type http_status_code() :: web_utils:http_status_code().
 
 -type challenge() :: letsencrypt:challenge().
 -type uri() :: letsencrypt:uri().
+-type bin_uri() :: letsencrypt:bin_uri().
 -type tls_private_key() :: letsencrypt:tls_private_key().
 -type tcp_connection_cache() :: letsencrypt:tcp_connection_cache().
 -type bin_domain() :: letsencrypt:bin_domain().
 -type bin_key() :: letsencrypt:bin_key().
 -type bin_csr_key() :: letsencrypt:bin_csr_key().
 -type directory_map() :: letsencrypt:directory_map().
--type bin_uri() :: letsencrypt:bin_uri().
 -type json_map_decoded() :: letsencrypt:json_map_decoded().
--type nonce() :: letsencrypt:nonce().
 -type jws() :: letsencrypt:jws().
 -type order_map() :: letsencrypt:order_map().
 -type bin_certificate() :: letsencrypt:bin_certificate().
@@ -200,8 +214,6 @@ decode( _CertReqOptionMap=#{ json := true }, Response=#{ body := Body },
 
 	Response#{ json => Payload };
 
-
-% At least most of the time, there is no body is the specified response:
 decode( _CertReqOptionMap, Response, _LEState ) ->
 
 	cond_utils:if_defined( leec_debug_codec,
@@ -212,8 +224,8 @@ decode( _CertReqOptionMap, Response, _LEState ) ->
 
 
 
-% Queries an URI (GET or POST) and returns the corresponding result, with an
-% updated state.
+% Queries the specified URI (GET or POST) and returns the corresponding result,
+% with an updated state.
 %
 % Returned result:
 %	{ok, #{status_code, body, headers}}: query succeeded
@@ -223,10 +235,37 @@ decode( _CertReqOptionMap, Response, _LEState ) ->
 % TODO: is 'application/jose+json' content type always required?
 % (check ACME documentation)
 %
--spec request( 'get' | 'post', uri(), header_map(),
-	   maybe( bin_content() ), cert_req_option_map(), le_state() ) ->
-					{ json_http_body(), le_state() }.
-request( Method, Uri, Headers, MaybeBinContent,
+-spec request( 'get' | 'post', uri(), header_map(), maybe( bin_content() ),
+			   cert_req_option_map(), le_state() ) -> { body(), le_state() }.
+request( Method, Uri, Headers, MaybeBinContent, CertReqOptionMap, LEState ) ->
+
+	% We used to introduce in these implementations an (optional) waiting (with
+	% timer:sleep/1), as we could see, when using an ACME server in production
+	% (not staging) mode, a 'too many requests' error (code 429: client-side
+	% error), whereas no other interaction with the ACME server was taking
+	% place. However we found out since then it was another, unrelated rate
+	% limit that applied, so this would be of no use.
+
+	cond_utils:if_set_to( myriad_httpc_backend, shotgun,
+
+		_ExprIfMatching=request_via_shotgun( Method, Uri, Headers,
+			MaybeBinContent, CertReqOptionMap, LEState ),
+
+		% Expecting the myriad_httpc_backend define to be set to 'native_httpc'
+		% instead of 'shotgun' here:
+		%
+		_ExprIfNotMatching=request_via_native_httpc( Method, Uri, Headers,
+			MaybeBinContent, CertReqOptionMap, LEState ) ).
+
+
+
+% Queries the specified URI (GET or POST) with the shotgun library, and returns
+% the corresponding result with an updated state.
+%
+-spec request_via_shotgun( 'get' | 'post', uri(), header_map(),
+				maybe( bin_content() ), cert_req_option_map(), le_state() ) ->
+						{ http_body(), le_state() }.
+request_via_shotgun( Method, Uri, Headers, MaybeBinContent,
 		 CertReqOptionMap=#{ netopts := Netopts },
 		 LEState=#le_state{ tcp_connection_cache=TCPCache } ) ->
 
@@ -254,19 +293,12 @@ request( Method, Uri, Headers, MaybeBinContent,
 	UriPort = maps:get( port, UriMap, DefaultPort ),
 
 	cond_utils:if_defined( leec_debug_exchanges,
-		trace_bridge:debug_fmt( "[~w] Preparing a ~p request to '~s'.",
-								[ self(), Method, Uri ] ) ),
+		trace_bridge:debug_fmt( "[~w] Preparing a (shotgun-based) ~p request "
+								"to '~s'.", [ self(), Method, Uri ] ) ),
 
 	ContentHeaders = Headers#{ <<"content-type">> =>
 								   <<"application/jose+json">> },
 
-	% We introduced here an (optional) waiting, as we could see, when using an
-	% ACME server in production (not staging) mode, a 'too many requests' error
-	% (code 429: client-side error), whereas no other interaction with the ACME
-	% server was taking place. However we found out since then it was another,
-	% unrelated rate limit that applied, so this is of no use:
-	%
-	%timer:sleep( 1000 ),
 
 	% We want to reuse connection if it already exists:
 	{ Connection, NewTCPCache } = get_tcp_connection( UriProtoAtom, UriHost,
@@ -275,6 +307,12 @@ request( Method, Uri, Headers, MaybeBinContent,
 	ReqRes = case Method of
 
 		get ->
+			cond_utils:if_defined( leec_debug_exchanges,
+				trace_bridge:debug_fmt( "[~w][client] GET request to URI "
+					"'~s', with following content headers:~n  ~p~n and "
+					"network options ~p.",
+					[ self(), UriStr, ContentHeaders, Netopts ] ) ),
+
 			shotgun:get( Connection, UriPath, ContentHeaders, Netopts );
 
 		post ->
@@ -288,6 +326,13 @@ request( Method, Uri, Headers, MaybeBinContent,
 
 			end,
 
+			cond_utils:if_defined( leec_debug_exchanges,
+				trace_bridge:debug_fmt( "[~w][client] POST request to URI "
+					"'~s', with following content headers:~n  ~p~n and "
+					"content ~p, with network options ~p.",
+					[ self(), UriStr, ContentHeaders, NillableContent,
+					  Netopts ] ) ),
+
 			shotgun:post( Connection, UriPath, ContentHeaders, NillableContent,
 						  Netopts );
 
@@ -297,23 +342,22 @@ request( Method, Uri, Headers, MaybeBinContent,
 	end,
 
 	% Very useful yet quite verbose:
-
 	cond_utils:if_defined( leec_debug_codec,
-		trace_bridge:debug_fmt( "[~w] The '~s' request to ~s resulted in:~n~p",
-								[ self(), Method, UriStr, ReqRes ] ) ),
+		trace_bridge:debug_fmt( "[~w][client] The '~s' request to ~s resulted "
+			"in:~n  ~p", [ self(), Method, UriStr, ReqRes ] ) ),
 
 	% Typically success results in ReqRes like:
 
 	% {ok,#{headers =>
-	%           [{<<"server">>,<<"nginx">>},
-	%            {<<"date">>,<<"Mon, 12 Oct 2020 20:24:37 GMT">>},
-	%            {<<"cache-control">>,<<"public, max-age=0, no-cache">>},
-	%            {<<"link">>,
-	%             <<"<https://acme-staging-v02.api.letsencrypt.org/directory>;rel=\"index\"">>},
-	%            {<<"replay-nonce">>,
-	%             <<"0004Rvtq_vk_FFeGDLHnbeb6ySKpkePx_frQeodOZ1byAPg">>},
-	%            {<<"x-frame-options">>,<<"DENY">>},
-	%            {<<"strict-transport-security">>,<<"max-age=604800">>}],
+	%  [{<<"server">>,<<"nginx">>},
+	%   {<<"date">>,<<"Mon, 12 Oct 2020 20:24:37 GMT">>},
+	%   {<<"cache-control">>,<<"public, max-age=0, no-cache">>},
+	%   {<<"link">>,
+	%      <<"<https://acme-staging-v02.api.letsencrypt.org/directory>;rel=\"index\"">>},
+	%   {<<"replay-nonce">>,
+	%    <<"0004Rvtq_vk_FFeGDLHnbeb6ySKpkePx_frQeodOZ1byAPg">>},
+	%   {<<"x-frame-options">>,<<"DENY">>},
+	%   {<<"strict-transport-security">>,<<"max-age=604800">>}],
 	%       status_code => 204}}
 
 	case ReqRes of
@@ -333,9 +377,112 @@ request( Method, Uri, Headers, MaybeBinContent,
 			  LEState#le_state{ tcp_connection_cache=NewTCPCache } };
 
 		_ ->
-			throw( { unexpected_request_answer, Method, UriStr, ReqRes } )
+			throw( { request_failed, Method, UriStr, ReqRes } )
 
 	end.
+
+
+
+% Queries the specified URI (GET or POST) with the Erlang-native httpc module
+% (through Myriad support), and returns the corresponding result with an updated
+% state.
+%
+-spec request_via_native_httpc( 'get' | 'post', uri(), header_map(),
+				maybe( bin_content() ), cert_req_option_map(), le_state() ) ->
+						{ http_body(), le_state() }.
+request_via_native_httpc( Method, Uri, Headers, MaybeBinContent,
+			CertReqOptionMap=#{ netopts := Netopts }, LEState ) ->
+
+	cond_utils:if_defined( leec_debug_exchanges,
+		trace_bridge:debug_fmt( "[~w] Preparing a (httpc-based) ~p request "
+								"to '~s'.", [ self(), Method, Uri ] ) ),
+
+	% Readily compliant:
+	HttpOpts = Netopts,
+
+	ReqRes = case Method of
+
+		get ->
+			cond_utils:if_defined( leec_debug_exchanges,
+				trace_bridge:debug_fmt( "[~w][client] GET request to URI "
+					"'~s', with following headers:~n  ~p~nand "
+					"HTTP options: ~p.",
+					[ self(), Uri, Headers, Netopts ] ) ),
+
+			web_utils:get( Uri, Headers, HttpOpts );
+
+		post ->
+			MaybeContentType = case MaybeBinContent of
+
+				undefined ->
+					% Hopefully not already set in Headers:
+					undefined;
+
+				_ ->
+					"application/jose+json"
+
+			end,
+
+			cond_utils:if_defined( leec_debug_exchanges,
+				trace_bridge:debug_fmt( "[~w][client] POST request to URI "
+					"'~s', with following headers:~n  ~p~n"
+					"HTTP options: ~p~nContent: ~p~nContent-type: ~s.",
+					[ self(), Uri, Headers, HttpOpts, MaybeBinContent,
+					  MaybeContentType ] ) ),
+
+			web_utils:post( Uri, Headers, HttpOpts, MaybeBinContent,
+							MaybeContentType )
+
+	end,
+
+	% Very useful yet quite verbose:
+	cond_utils:if_defined( leec_debug_codec,
+		trace_bridge:debug_fmt( "[~w][client] The '~s' request to ~s resulted "
+			"in:~n  ~p", [ self(), Method, Uri, ReqRes ] ) ),
+
+	% Typically success results in ReqRes like:
+
+	% {ok,#{headers =>
+	%           [{<<"server">>,<<"nginx">>},
+	%            {<<"date">>,<<"Mon, 12 Oct 2020 20:24:37 GMT">>},
+	%            {<<"cache-control">>,<<"public, max-age=0, no-cache">>},
+	%            {<<"link">>,
+	%             <<"<https://acme-staging-v02.api.letsencrypt.org/directory>;rel=\"index\"">>},
+	%            {<<"replay-nonce">>,
+	%             <<"0004Rvtq_vk_FFeGDLHnbeb6ySKpkePx_frQeodOZ1byAPg">>},
+	%            {<<"x-frame-options">>,<<"DENY">>},
+	%            {<<"strict-transport-security">>,<<"max-age=604800">>}],
+	%       status_code => 204}}
+
+	case ReqRes of
+
+		{ error, _ErrorReason } ->
+			throw( { request_failed, Method, Uri, ReqRes } );
+
+		{ ReqStatusCode, ReqHeaders, ReqBody } ->
+
+			BaseResponse = #{ status_code => ReqStatusCode,
+							  headers => ReqHeaders,
+							  body =>  ReqBody },
+
+			% Updates response from its headers:
+			Resp = BaseResponse#{
+
+				nonce => table:get_value_with_defaults( <<"replay-nonce">>,
+														_Def=null, ReqHeaders ),
+
+				location => table:get_value_with_defaults( <<"location">>,
+													_Def=null, ReqHeaders ) },
+
+			JsonHttpBody = decode( CertReqOptionMap, Resp, LEState ),
+
+			{ JsonHttpBody, LEState };
+
+		_ ->
+			throw( { request_failed, Method, Uri, ReqRes } )
+
+	end.
+
 
 
 % Called whenever an (ACME) request failed, whereas no suitable JSON body is
@@ -505,14 +652,19 @@ get_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 	case StatusCode of
 
 		_CreatedCode=201 ->
-			ok;
+			cond_utils:if_defined( leec_debug_exchanges,
+				trace_bridge:debug_fmt( "[~w] Account created.", [ self() ] ),
+				ok );
 
 		% Happens, should this account already exist (in using the same LEEC FSM
 		% for more than one certificate operation, or re-using a pre-existing
 		% account from the start):
 		%
 		_Success=200 ->
-			ok;
+			cond_utils:if_defined( leec_debug_exchanges,
+				trace_bridge:debug_fmt( "[~w] Account connected to "
+					"(was already created).", [ self() ] ),
+				ok );
 
 		_ ->
 			on_failed_request( StatusCode, RespMap, get_acme_account )

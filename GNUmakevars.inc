@@ -68,6 +68,7 @@ ifeq ($(EXECUTION_TARGET),development)
 	# Does not exist: LEEC_CHECK_FLAGS += -Dleec_check_xx
 endif
 
+
 ERLANG_COMPILER_OPT_BASE += $(LEEC_DEBUG_FLAGS) \
 							$(LEEC_CHECK_FLAGS)
 
@@ -190,22 +191,33 @@ endif
 # ENABLE_LEEC_DEBUG := false / true [the default]
 
 
-# Tells whether the debug mode will be activated for the next LEEC modules to be
-# built (maximum performance versus extended checkings).
-#
-ifeq ($(ENABLE_LEEC_DEBUG),true)
-	LEEC_DEBUG_OPT := -DDEBUG_LEEC -DLEEC_ENABLE_LOG=1
-else
-	LEEC_DEBUG_OPT := -DLEEC_ENABLE_LOG=0
-endif
-
-
 
 # Build section.
 
 
 
 # Compiler section.
+
+
+#USE_SHOTGUN := true
+
+# By default, in terms of HTTP client, LEEC uses (through Myriad's web_utils)
+# the Erlang-native httpc library.
+#
+# Otherwise Shotgun may be used:
+#
+ifndef USE_SHOTGUN
+	USE_SHOTGUN = false
+endif
+
+ifeq ($(USE_SHOTGUN),true)
+	HTTPC_OPT = -Dmyriad_httpc_backend=shotgun
+else
+	HTTPC_OPT = -Dmyriad_httpc_backend=native_httpc
+endif
+
+ERLANG_COMPILER_OPT_BASE += $(HTTPC_OPT)
+
 
 
 # Checking section.

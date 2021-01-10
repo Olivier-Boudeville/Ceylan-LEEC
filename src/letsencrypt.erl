@@ -352,7 +352,9 @@
 %
 -spec get_ordered_prerequisites() -> [ application_name() ].
 get_ordered_prerequisites() ->
-	[ shotgun ].
+	cond_utils:if_set_to( myriad_httpc_backend, shotgun,
+						  [ shotgun ],
+						  _ThenNativeHttpc=[] ).
 
 
 % Starts a (non-bridged) instance of the LEEC service FSM.
@@ -372,6 +374,15 @@ start( StartOptions, MaybeBridgeSpec ) ->
 
 	% First this caller process:
 	trace_bridge:register_if_not_already( MaybeBridgeSpec ),
+
+	cond_utils:if_set_to( myriad_httpc_backend, shotgun,
+		trace_bridge:info_fmt( "Starting LEEC (shotgun-based), with following "
+			"start options:~n  ~p.", [ StartOptions ] ) ),
+
+	cond_utils:if_set_to( myriad_httpc_backend, native_httpc, [
+		trace_bridge:info_fmt( "Starting LEEC (httpc-based), with following "
+			"start options:~n  ~p.", [ StartOptions ] ),
+		web_utils:start( _Opt=ssl ) ] ),
 
 	JsonParserState = json_utils:start_parser(),
 
