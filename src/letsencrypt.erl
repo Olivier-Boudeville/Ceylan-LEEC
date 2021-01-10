@@ -375,9 +375,16 @@ start( StartOptions, MaybeBridgeSpec ) ->
 	% First this caller process:
 	trace_bridge:register_if_not_already( MaybeBridgeSpec ),
 
+	% shotgun not being listed in LEEC's .app file anymore (otherwise it would
+	% be started even if native_httpc had been preferred), it is not
+	% automatically started; this is thus done here (elli also is not wanted
+	% anymore by default, it might be started only iff in standalone mode):
+	%
 	cond_utils:if_set_to( myriad_httpc_backend, shotgun,
 		trace_bridge:info_fmt( "Starting LEEC (shotgun-based), with following "
-			"start options:~n  ~p.", [ StartOptions ] ) ),
+			"start options:~n  ~p.", [ StartOptions ] ),
+		[ { ok, _Started } = application:ensure_all_started( A )
+		  || A <- [ shotgun, elli ] ] ),
 
 	cond_utils:if_set_to( myriad_httpc_backend, native_httpc, [
 		trace_bridge:info_fmt( "Starting LEEC (httpc-based), with following "

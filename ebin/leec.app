@@ -25,19 +25,25 @@
 
   {description, "A letsencrypt.org client library for Erlang, the Ceylan fork of letsencrypt-erlang"},
 
-  {vsn, "0.5.0"},
+  {vsn, "0.6.0"},
 
   {registered, []},
 
   % Regarding Myriad, see http://myriad.esperide.org/myriad.html#otp
   %
-  % Elli is useful iff in standalone mode (i.e. if needing to run our own
-  % webserver).
-  %
   % Note that, to select the JSON parser to use, 'jsx' might be replaced by
-  % 'jiffy' here:
+  % 'jiffy' here.
   %
-  {applications, [kernel, stdlib, shotgun, jsx, elli, myriad]},
+  % Elli is useful iff in standalone mode (i.e. if needing to run our own
+  % webserver), so we finally do not list anymore here by default, and start it
+  % explicitly, iff needed.
+  %
+  % Finally, shotgun is not listed here anymore either (as it will be started by
+  % LEEC iff needed), otherwise starting LEEC with OTP would imply starting
+  % shotgun, whereas in native builds it is generally not used (httpc being used
+  % instead, through Myriad's web_utils) and not even built.
+  %
+  {applications, [kernel, stdlib, jsx, myriad]},
 
   {env,[]},
 
