@@ -2,7 +2,7 @@
 .. _Top:
 
 
-.. title:: Welcome to the Ceylan-LEEC 0.5.0 documentation
+.. title:: Welcome to the Ceylan-LEEC 0.6.0 documentation
 
 .. comment stylesheet specified through GNUmakefile
 
@@ -39,7 +39,7 @@ LEEC: Let's Encrypt Erlang with Ceylan
 :Organisation: Copyright (C) 2020-2021 Olivier Boudeville
 :Contact: about (dash) leec (at) esperide (dot) com
 :Creation date: Wednesday, November 11, 2020
-:Lastly updated: Saturday, January 2, 2021
+:Lastly updated: Sunday, January 10, 2021
 :Dedication: Users and maintainers of the ``LEEC`` library, version 0.6.
 :Abstract:
 
@@ -75,7 +75,7 @@ The latest version of this documentation is to be found at the `official LEEC we
 Overview
 ========
 
-The online documentation for LEEC is currently available `here <https://github.com/Olivier-Boudeville/letsencrypt-erlang>`_.
+The online documentation for LEEC is currently available mostly `here <https://github.com/Olivier-Boudeville/letsencrypt-erlang>`_.
 
 
 
@@ -86,13 +86,16 @@ Design Notes
 Multiple Domains Having Each Multiple Hostnames
 -----------------------------------------------
 
-At least the ACME servers from Let's Encrypt enforce various fairly low `rate limits <https://letsencrypt.org/docs/rate-limits/>`_, which leads to preferring requesting certificates only on a per-domain basis (ex: for ``foobar.org``) rather than on a per-hostname one (ex: for ``baz.foobar.org``, ``hurrican.foobar.org``, etc., these hosts being virtual ones or not), as such requests would become too numerous to respect these thresholds.
+At least the ACME servers from Let's Encrypt enforce various fairly low `rate limits <https://letsencrypt.org/docs/rate-limits/>`_, which leads to preferring requesting certificates only on a per-domain basis (ex: for ``foobar.org``) rather than on a per-hostname one (ex: for ``baz.foobar.org``, ``hurrican.foobar.org``, etc., these hosts being virtual ones or not), as such requests would quickly become too numerous to respect these rate thresholds.
 
 A per-domain certificate should then include directly its various hostnames as *Subject Alternative Names* (SAN entries).
 
 With the ``http-01`` challenge type, no wildcard for such SAN hosts (ex: ``*.foobar.org``) cannot be specified), so all the wanted ones have to be explicitly listed [#]_.
 
-.. [#] As a result, the certificate may disclose virtual hosts that would be otherwise invisible from the Internet (as no even declared in the DNS).
+.. [#] As a result, the certificate may disclose virtual hosts that would be otherwise invisible from the Internet (as not even declared in the DNS entries for that domain).
+
+So for example, with LEEC, the certificate for ``foobar.org`` should list following SAN entries: ``baz.foobar.org``, ``hurrican.foobar.org``, etc.
+
 
 
 Concurrent Certificate Operations
@@ -176,6 +179,44 @@ To get information about this certificate::
 	Signature Algorithm: sha256WithRSAEncryption
 	[...]
 
+
+
+Troubleshooting HTTPS Certificate-related Issues
+================================================
+
+In order to understand why a given host (typically a webserver) does not seem to handle properly certificates, one may experiment with these commands from a client computer::
+
+ $ curl -vvv -I https://foobar.org
+ $ wget -v https://foobar.org -O -
+ $ openssl s_client -connect foobar.org:443
+
+
+From the server itself::
+
+ $ iptables -nL
+ $ lsof -i:443
+ $ netstat -ltpn | grep ':443'
+
+
+Using third-party solutions:
+
+- test your server with `SSL Labs <https://www.ssllabs.com/ssltest/analyze.html>`_
+
+
+
+
+Dependency Issues between Webservers and HTTP(s) Clients
+========================================================
+
+A potential dependency problem is that many Erlang-based webservers are powered by Cowboy (thus Cowlib) whereas LEEC used to rely necessarily on Shotgun, thus on Gun (and thus Cowlib) as well. Most of the time this implied different (potentially incompatible) versions of Cowlib, whereas only one should exist in the code path.
+
+We prefer sticking to the Cowlib version induced by Cowboy. At the time of this writing, the latest Cowboy stable version (the one that webserver projects such as `US-Web <https://github.com/Olivier-Boudeville/us-web/>`_ want) is 2.8.0 and relies on Cowlib 2.9.1, whereas the latest Shotgun stable version, 0.5.0, is lagging behind, relying on Gun 1.3.1, itself relying on Cowlib 2.6.0 (too old).
+
+An attempt of solution was to remove the dependency of LEEC onto Shotgun (as it induced a dependency on an older Cowlib) but to use Gun instead, which is lower-level yet might be chosen in order to rely on the target Cowlib version. However we did not found a suitable Gun version for that (1.3 being too old, 2.0.* not ready).
+
+So a last-resort solution has been to rely instead on the even lower-level Erlang-native `httpc <https://erlang.org/doc/man/httpc.html>`_ client module (involving ``inets`` and ``ssl``). The result, although based only on HTTP/1.1 with no connection-reuse, proved satisfactory right from the start and thus is provided as an alternate way of using LEEC, without any extra dependency.
+
+This allows embedding LEEC with only a dependency onto Myriad and a JSON parser (either JSX or Jiffy), and no other one (top-level or induced).
 
 
 Support
