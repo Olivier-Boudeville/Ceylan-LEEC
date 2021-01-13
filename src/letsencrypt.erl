@@ -380,16 +380,18 @@ start( StartOptions, MaybeBridgeSpec ) ->
 	% automatically started; this is thus done here (elli also is not wanted
 	% anymore by default, it might be started only iff in standalone mode):
 	%
-	cond_utils:if_set_to( myriad_httpc_backend, shotgun,
-		trace_bridge:info_fmt( "Starting LEEC (shotgun-based), with following "
-			"start options:~n  ~p.", [ StartOptions ] ),
-		[ { ok, _Started } = application:ensure_all_started( A )
-		  || A <- [ shotgun, elli ] ] ),
+	cond_utils:switch_set_to( myriad_httpc_backend, [
 
-	cond_utils:if_set_to( myriad_httpc_backend, native_httpc, [
-		trace_bridge:info_fmt( "Starting LEEC (httpc-based), with following "
-			"start options:~n  ~p.", [ StartOptions ] ),
-		web_utils:start( _Opt=ssl ) ] ),
+		{ shotgun, [
+			trace_bridge:info_fmt( "Starting LEEC (shotgun-based), with "
+				"following start options:~n  ~p.", [ StartOptions ] ),
+			[ { ok, _Started } = application:ensure_all_started( A )
+			  || A <- [ shotgun, elli ] ] ] },
+
+		{ native_httpc, [
+			trace_bridge:info_fmt( "Starting LEEC (httpc-based), with "
+				"following start options:~n  ~p.", [ StartOptions ] ),
+			web_utils:start( _Opt=ssl ) ] } ] ),
 
 	JsonParserState = json_utils:start_parser(),
 
