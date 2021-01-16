@@ -106,6 +106,14 @@ LEEC implemented independent (``gen_statem``) FSMs to allow typically for concur
 If a `task ring <https://olivier-boudeville.github.io/us-common/#facilities-provided-by-this-layer>`_ may be used to avoid by design such FSMs to overlap, another option is to use a single FSM and to trigger certificate requests in turn.
 
 
+.. _CAA:
+
+Let's Encrypt Accounts
+----------------------
+
+Currently LEEC creates automatically throwaway ACME accounts, which is convenient yet may prevent the use if `CAA <https://letsencrypt.org/docs/caa/>`_ (*Certificate Authority Authorization*).
+
+
 
 Getting Information about the Generated Certificates
 ====================================================
