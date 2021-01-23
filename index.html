@@ -20,7 +20,7 @@
 <p><span class="raw-html"><center><img src="leec-title.png" width="50%"></img></center></span>
 </p>
 <div class="section" id="leec-let-s-encrypt-erlang-with-ceylan">
-<h1><a class="toc-backref" href="#id4">LEEC: Let's Encrypt Erlang with Ceylan</a></h1>
+<h1><a class="toc-backref" href="#id5">LEEC: Let's Encrypt Erlang with Ceylan</a></h1>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -31,7 +31,7 @@
 </tr>
 <tr class="field"><th class="field-name">Creation date:</th><td class="field-body">Wednesday, November 11, 2020</td>
 </tr>
-<tr class="field"><th class="field-name">Lastly updated:</th><td class="field-body">Sunday, January 10, 2021</td>
+<tr class="field"><th class="field-name">Lastly updated:</th><td class="field-body">Saturday, January 23, 2021</td>
 </tr>
 <tr class="field"><th class="field-name">Dedication:</th><td class="field-body">Users and maintainers of the <tt class="docutils literal">LEEC</tt> library, version 0.6.</td>
 </tr>
@@ -46,32 +46,34 @@
 <div class="contents topic" id="id1">
 <span id="table-of-contents"></span><p class="topic-title">Table of Contents</p>
 <ul class="simple">
-<li><a class="reference internal" href="#leec-let-s-encrypt-erlang-with-ceylan" id="id4">LEEC: Let's Encrypt Erlang with Ceylan</a><ul>
-<li><a class="reference internal" href="#overview" id="id5">Overview</a></li>
-<li><a class="reference internal" href="#design-notes" id="id6">Design Notes</a><ul>
-<li><a class="reference internal" href="#multiple-domains-having-each-multiple-hostnames" id="id7">Multiple Domains Having Each Multiple Hostnames</a></li>
-<li><a class="reference internal" href="#concurrent-certificate-operations" id="id8">Concurrent Certificate Operations</a></li>
+<li><a class="reference internal" href="#leec-let-s-encrypt-erlang-with-ceylan" id="id5">LEEC: Let's Encrypt Erlang with Ceylan</a><ul>
+<li><a class="reference internal" href="#overview" id="id6">Overview</a></li>
+<li><a class="reference internal" href="#design-notes" id="id7">Design Notes</a><ul>
+<li><a class="reference internal" href="#multiple-domains-having-each-multiple-hostnames" id="id8">Multiple Domains Having Each Multiple Hostnames</a></li>
+<li><a class="reference internal" href="#concurrent-certificate-operations" id="id9">Concurrent Certificate Operations</a></li>
+<li><a class="reference internal" href="#let-s-encrypt-accounts" id="id10">Let's Encrypt Accounts</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#getting-information-about-the-generated-certificates" id="id9">Getting Information about the Generated Certificates</a></li>
-<li><a class="reference internal" href="#troubleshooting-https-certificate-related-issues" id="id10">Troubleshooting HTTPS Certificate-related Issues</a></li>
-<li><a class="reference internal" href="#dependency-issues-between-webservers-and-http-s-clients" id="id11">Dependency Issues between Webservers and HTTP(s) Clients</a></li>
-<li><a class="reference internal" href="#support" id="id12">Support</a></li>
-<li><a class="reference internal" href="#please-react" id="id13">Please React!</a></li>
-<li><a class="reference internal" href="#ending-word" id="id14">Ending Word</a></li>
+<li><a class="reference internal" href="#getting-information-about-the-generated-certificates" id="id11">Getting Information about the Generated Certificates</a></li>
+<li><a class="reference internal" href="#other-files-of-interest" id="id12">Other Files of Interest</a></li>
+<li><a class="reference internal" href="#troubleshooting-https-certificate-related-issues" id="id13">Troubleshooting HTTPS Certificate-related Issues</a></li>
+<li><a class="reference internal" href="#dependency-issues-between-webservers-and-http-s-clients" id="id14">Dependency Issues between Webservers and HTTP(s) Clients</a></li>
+<li><a class="reference internal" href="#support" id="id15">Support</a></li>
+<li><a class="reference internal" href="#please-react" id="id16">Please React!</a></li>
+<li><a class="reference internal" href="#ending-word" id="id17">Ending Word</a></li>
 </ul>
 </li>
 </ul>
 </div>
 <p></p>
 <div class="section" id="overview">
-<h2><a class="toc-backref" href="#id5">Overview</a></h2>
+<h2><a class="toc-backref" href="#id6">Overview</a></h2>
 <p>The online documentation for LEEC is currently available mostly <a class="reference external" href="https://github.com/Olivier-Boudeville/letsencrypt-erlang">here</a>.</p>
 </div>
 <div class="section" id="design-notes">
-<h2><a class="toc-backref" href="#id6">Design Notes</a></h2>
+<h2><a class="toc-backref" href="#id7">Design Notes</a></h2>
 <div class="section" id="multiple-domains-having-each-multiple-hostnames">
-<h3><a class="toc-backref" href="#id7">Multiple Domains Having Each Multiple Hostnames</a></h3>
+<h3><a class="toc-backref" href="#id8">Multiple Domains Having Each Multiple Hostnames</a></h3>
 <p>At least the ACME servers from Let's Encrypt enforce various fairly low <a class="reference external" href="https://letsencrypt.org/docs/rate-limits/">rate limits</a>, which leads to preferring requesting certificates only on a per-domain basis (ex: for <tt class="docutils literal">foobar.org</tt>) rather than on a per-hostname one (ex: for <tt class="docutils literal">baz.foobar.org</tt>, <tt class="docutils literal">hurrican.foobar.org</tt>, etc., these hosts being virtual ones or not), as such requests would quickly become too numerous to respect these rate thresholds.</p>
 <p>A per-domain certificate should then include directly its various hostnames as <em>Subject Alternative Names</em> (SAN entries).</p>
 <p>With the <tt class="docutils literal"><span class="pre">http-01</span></tt> challenge type, no wildcard for such SAN hosts (ex: <tt class="docutils literal">*.foobar.org</tt>) cannot be specified), so all the wanted ones have to be explicitly listed <a class="footnote-reference" href="#id3" id="id2">[1]</a>.</p>
@@ -84,13 +86,17 @@
 <p>So for example, with LEEC, the certificate for <tt class="docutils literal">foobar.org</tt> should list following SAN entries: <tt class="docutils literal">baz.foobar.org</tt>, <tt class="docutils literal">hurrican.foobar.org</tt>, etc.</p>
 </div>
 <div class="section" id="concurrent-certificate-operations">
-<h3><a class="toc-backref" href="#id8">Concurrent Certificate Operations</a></h3>
+<h3><a class="toc-backref" href="#id9">Concurrent Certificate Operations</a></h3>
 <p>LEEC implemented independent (<tt class="docutils literal">gen_statem</tt>) FSMs to allow typically for concurrent certificate renewals to be triggered. A drawback of the aforementioned Let's Encrypt rate limits is that, while a given FSM is to remain below said thresholds, a set of parallel ones may not.</p>
 <p>If a <a class="reference external" href="https://olivier-boudeville.github.io/us-common/#facilities-provided-by-this-layer">task ring</a> may be used to avoid by design such FSMs to overlap, another option is to use a single FSM and to trigger certificate requests in turn.</p>
 </div>
+<div class="section" id="let-s-encrypt-accounts">
+<span id="caa"></span><h3><a class="toc-backref" href="#id10">Let's Encrypt Accounts</a></h3>
+<p>Currently LEEC creates automatically throwaway ACME accounts, which is convenient yet may prevent the use if <a class="reference external" href="https://letsencrypt.org/docs/caa/">CAA</a> (<em>Certificate Authority Authorization</em>).</p>
+</div>
 </div>
 <div class="section" id="getting-information-about-the-generated-certificates">
-<h2><a class="toc-backref" href="#id9">Getting Information about the Generated Certificates</a></h2>
+<h2><a class="toc-backref" href="#id11">Getting Information about the Generated Certificates</a></h2>
 <p>If using LEEC to generate a certificate for a <tt class="docutils literal">baz.foobar.org</tt> host, the following three files shall be obtained from the Let's Encrypt ACME server:</p>
 <ul class="simple">
 <li><tt class="docutils literal">baz.foobar.org.csr</tt>: the PEM certificate request, sent to the ACME server (~980 bytes)</li>
@@ -160,19 +166,25 @@ Certificate:
    [...]
 </pre>
 </div>
+<div class="section" id="other-files-of-interest">
+<h2><a class="toc-backref" href="#id12">Other Files of Interest</a></h2>
+<p>A <tt class="docutils literal">*.key</tt> (ex: <tt class="docutils literal"><span class="pre">my-foobar-leec-agent-private.key</span></tt>) file is (PEM, strong enough) RSA private key generated by LEEC so that its agent can safely authenticate to the ACME servers it is interacting with.</p>
+<p><tt class="docutils literal"><span class="pre">lets-encrypt-r3-cross-signed.pem</span></tt> is the (PEM) certificate associated to the <em>Certificate Authority</em> (Let's Encrypt here). It is automatically downloaded by LEEC if not already available.</p>
+<p>The <tt class="docutils literal"><span class="pre">dh-params.pem</span></tt> file contains the parameters generated by LEEC in order to allow for safer <em>Ephemeral Diffie-Helman key exchanges</em> that is used to provide Forward Secrecy with TLS (see <a class="reference external" href="https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange">this article</a> for further information).</p>
+</div>
 <div class="section" id="troubleshooting-https-certificate-related-issues">
-<h2><a class="toc-backref" href="#id10">Troubleshooting HTTPS Certificate-related Issues</a></h2>
+<h2><a class="toc-backref" href="#id13">Troubleshooting HTTPS Certificate-related Issues</a></h2>
 <p>In order to understand why a given host (typically a webserver) does not seem to handle properly certificates, one may experiment with these commands from a client computer:</p>
-<pre class="literal-block">
+<pre class="code bash literal-block">
 $ curl -vvv -I https://foobar.org
 $ wget -v https://foobar.org -O -
 $ openssl s_client -connect foobar.org:443
 </pre>
 <p>From the server itself:</p>
-<pre class="literal-block">
+<pre class="code bash literal-block">
 $ iptables -nL
 $ lsof -i:443
-$ netstat -ltpn | grep ':443'
+$ netstat -ltpn <span class="p">|</span> grep <span class="s1">':443'</span>
 </pre>
 <p>Using third-party solutions:</p>
 <ul class="simple">
@@ -180,24 +192,24 @@ $ netstat -ltpn | grep ':443'
 </ul>
 </div>
 <div class="section" id="dependency-issues-between-webservers-and-http-s-clients">
-<h2><a class="toc-backref" href="#id11">Dependency Issues between Webservers and HTTP(s) Clients</a></h2>
-<p>A potential dependency problem is that many Erlang-based webservers are powered by Cowboy (thus Cowlib) whereas LEEC used to rely necessarily on Shotgun, thus on Gun (and thus Cowlib) as well. Most of the time this implied different (potentially incompatible) versions of Cowlib, whereas only one should exist in the code path.</p>
-<p>We prefer sticking to the Cowlib version induced by Cowboy. At the time of this writing, the latest Cowboy stable version (the one that webserver projects such as <a class="reference external" href="https://github.com/Olivier-Boudeville/us-web/">US-Web</a> want) is 2.8.0 and relies on Cowlib 2.9.1, whereas the latest Shotgun stable version, 0.5.0, is lagging behind, relying on Gun 1.3.1, itself relying on Cowlib 2.6.0 (too old).</p>
+<h2><a class="toc-backref" href="#id14">Dependency Issues between Webservers and HTTP(s) Clients</a></h2>
+<p>A potential dependency problem is that many Erlang-based webservers are powered by Cowboy (thus Cowlib) whereas LEEC used to rely necessarily on Shotgun, thus on Gun (and thus Cowlib) as well. Most of the time this implied different (potentially incompatible) versions of Cowlib, whereas only up to one should exist in the code path at any time.</p>
+<p>We prefer sticking to the Cowlib version that is induced by Cowboy. At the time of this writing, the latest Cowboy stable version (the one that webserver projects such as <a class="reference external" href="https://github.com/Olivier-Boudeville/us-web/">US-Web</a> want) is 2.8.0 and relies on Cowlib 2.9.1, whereas the latest Shotgun stable version, 0.5.0, is lagging behind, relying on Gun 1.3.1, itself relying on Cowlib 2.6.0 (too old).</p>
 <p>An attempt of solution was to remove the dependency of LEEC onto Shotgun (as it induced a dependency on an older Cowlib) but to use Gun instead, which is lower-level yet might be chosen in order to rely on the target Cowlib version. However we did not found a suitable Gun version for that (1.3 being too old, 2.0.* not ready).</p>
 <p>So a last-resort solution has been to rely instead on the even lower-level Erlang-native <a class="reference external" href="https://erlang.org/doc/man/httpc.html">httpc</a> client module (involving <tt class="docutils literal">inets</tt> and <tt class="docutils literal">ssl</tt>). The result, although based only on HTTP/1.1 with no connection-reuse, proved satisfactory right from the start and thus is provided as an alternate way of using LEEC, without any extra dependency.</p>
 <p>This allows embedding LEEC with only a dependency onto Myriad and a JSON parser (either JSX or Jiffy), and no other one (top-level or induced).</p>
 </div>
 <div class="section" id="support">
-<h2><a class="toc-backref" href="#id12">Support</a></h2>
+<h2><a class="toc-backref" href="#id15">Support</a></h2>
 <p>Bugs, questions, remarks, patches, requests for enhancements, etc. are to be sent through the <a class="reference external" href="https://github.com/Olivier-Boudeville/letsencrypt-erlang">project interface</a>, or directly at the email address mentioned at the beginning of this document.</p>
 </div>
 <div class="section" id="please-react">
-<h2><a class="toc-backref" href="#id13">Please React!</a></h2>
+<h2><a class="toc-backref" href="#id16">Please React!</a></h2>
 <p>If you have information more detailed or more recent than those presented in this document, if you noticed errors, neglects or points insufficiently discussed, drop us a line! (for that, follow the <a class="reference internal" href="#support">Support</a> guidelines).</p>
 </div>
 <div class="section" id="ending-word">
-<h2><a class="toc-backref" href="#id14">Ending Word</a></h2>
-<p>Have fun with LEEC!</p>
+<h2><a class="toc-backref" href="#id17">Ending Word</a></h2>
+<p>Have fun with LEEC! (not supposed to involve any memory leak)</p>
 <div class="figure align-center">
 <img alt="LEEC logo" src="leec-title.png" style="width: 35%;" />
 </div>
