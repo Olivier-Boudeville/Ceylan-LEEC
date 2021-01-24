@@ -29,7 +29,8 @@
 
   {registered, []},
 
-  % Shotgun used by default with OTP/rebar3 builds.
+  % Shotgun is used by default with OTP/rebar3 builds (whereas native httpc is
+  % used by default with our custom build).
   %
   % Regarding Myriad, see http://myriad.esperide.org/myriad.html#otp
   %
