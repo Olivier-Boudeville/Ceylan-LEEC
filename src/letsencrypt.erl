@@ -1675,9 +1675,21 @@ get_start_options( _Opts=[ { agent_key_file_path, KeyFilePath } | T ],
 			case file_utils:is_existing_file_or_link( AgentKeyFilePath ) of
 
 				true ->
-					get_start_options( T, LEState#le_state{
-						agent_key_file_info=
-							text_utils:string_to_binary( AgentKeyFilePath ) } );
+					case file_utils:is_user_readable( AgentKeyFilePath ) of
+
+						true ->
+							BinAgentKeyFilePath = text_utils:string_to_binary(
+									AgentKeyFilePath ),
+
+							get_start_options( T, LEState#le_state{
+								agent_key_file_info=BinAgentKeyFilePath } );
+
+						false ->
+							throw( { agent_key_file_not_user_readable,
+									 AgentKeyFilePath,
+									 system_utils:get_user_name_safe() } )
+
+					end;
 
 				false ->
 					throw( { non_existing_agent_key_file, AgentKeyFilePath } )
