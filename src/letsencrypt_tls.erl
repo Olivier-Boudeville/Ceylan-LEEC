@@ -234,11 +234,10 @@ obtain_dh_key( CertDir ) ->
 				% Not deserving a warning, as returning in case of success:
 				% "Generating DH parameters, 2048 bit long safe prime, [...]".
 				%
+				% Unconditionally emitted due to the longer duration:
 				{ _ReturnCode=0, CommandOutput } ->
-					cond_utils:if_defined( leec_debug_keys,
-						trace_bridge:info_fmt( "DH key creation successful; "
-						  "following output was made: ~s.", [ CommandOutput ] ),
-						basic_utils:ignore_unused( CommandOutput ) );
+					trace_bridge:info_fmt( "DH key creation successful; "
+						 "following output was made: ~s.", [ CommandOutput ] );
 
 				{ ErrorCode, CommandOutput } ->
 					trace_bridge:error_fmt( "Command for creating private key "
