@@ -169,3 +169,16 @@
 
 	% To re-use TCP connections, on a per FSM basis:
 	tcp_connection_cache :: letsencrypt:tcp_connection_cache() }).
+
+
+
+% To be able to be built also through rebar3, not only by Myriad's native build
+% system:
+
+-type void() :: basic_utils:void().
+-type maybe( T ) :: basic_utils:maybe( T ).
+
+-type table( K, V ) :: map_hashtable:map_hashtable( K, V ).
+
+% unused silencing:
+-export_type([ void/0, maybe/1, table/2 ]).
