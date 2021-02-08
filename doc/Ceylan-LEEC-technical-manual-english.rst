@@ -21,7 +21,7 @@
 
 :raw-html:`<a name="leec_top"></a>`
 
-:raw-html:`<div class="banner"><p><em>LEEC 0.6 documentation</em> <a href="http://leec.esperide.org">browse latest</a> <a href="https://olivier-boudeville.github.io/Ceylan-LEEC/leec.html">browse mirror</a> <a href="leec.pdf">get PDF</a> <a href="#leec_top">go to top</a> <a href="#leec_bottom">go to bottom</a> <a href="mailto:about(dash)leec(at)esperide(dot)com?subject=[Ceylan-LEEC%200.6]%20Remark">email us</a></p></div>`
+:raw-html:`<div class="banner"><p><em>LEEC 0.6 documentation</em> <a href="http://leec.esperide.org">browse latest</a> <a href="https://olivier-boudeville.github.io/Ceylan-LEEC/leec.html">browse mirror</a> <a href="leec.pdf">get PDF</a> <a href="#leec_top">go to top</a> <a href="#leec_bottom">go to bottom</a> <a href="https://github.com/Olivier-Boudeville/Ceylan-LEEC">go to project</a> <a href="mailto:about(dash)leec(at)esperide(dot)com?subject=[Ceylan-LEEC%200.6]%20Remark">email us</a></p></div>`
 
 
 
@@ -75,7 +75,9 @@ The latest version of this documentation is to be found at the `official LEEC we
 Overview
 ========
 
-The online documentation for LEEC is currently available mostly `here <https://github.com/Olivier-Boudeville/letsencrypt-erlang>`_.
+The online documentation for LEEC is currently available mostly `here <https://github.com/Olivier-Boudeville/Ceylan-LEEC>`_.
+
+The project repository is located `here <https://github.com/Olivier-Boudeville/Ceylan-LEEC>`_ (was previously `here <https://github.com/Olivier-Boudeville/letsencrypt-erlang>`_).
 
 
 
@@ -243,7 +245,7 @@ This allows embedding LEEC with only a dependency onto Myriad and a JSON parser 
 Support
 =======
 
-Bugs, questions, remarks, patches, requests for enhancements, etc. are to be sent through the `project interface <https://github.com/Olivier-Boudeville/letsencrypt-erlang>`_, or directly at the email address mentioned at the beginning of this document.
+Bugs, questions, remarks, patches, requests for enhancements, etc. are to be sent through the `project interface <https://github.com/Olivier-Boudeville/Ceylan-LEEC>`_, or directly at the email address mentioned at the beginning of this document.
 
 
 
