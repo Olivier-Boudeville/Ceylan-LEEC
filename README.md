@@ -1,3 +1,5 @@
+![Erlang CI](https://github.com/Olivier-Boudeville/Ceylan-LEEC/workflows/Erlang%20CI/badge.svg)
+
 # LEEC: Let's Encrypt Erlang with Ceylan
 
 This library is yet another fork of the Let's Encrypt client library for Erlang
