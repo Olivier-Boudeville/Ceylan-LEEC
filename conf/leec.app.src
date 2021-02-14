@@ -30,18 +30,30 @@
 
   {registered, []},
 
-  % Shotgun is used by default with OTP/rebar3 builds (whereas native httpc is
-  % used by default with our custom build).
+  % Shotgun was used by default with OTP/rebar3 builds, whereas native httpc was
+  % used by default with our custom build.
+  % Both are still supported, yet now in both cases we rely on native httpc.
   %
   % Regarding Myriad, see http://myriad.esperide.org/myriad.html#otp
   %
   % Elli is useful iff in standalone mode (i.e. if needing to run our own
-  % webserver).
+  % webserver); LEEC currently does not use it.
   %
   % Note that, to select the JSON parser to use, 'jsx' might be replaced by
-  % 'jiffy' here:
+  % 'jiffy' below.
   %
-  {applications, [kernel, stdlib, shotgun, jsx, elli, myriad]},
+  % Finally, this 'applications' entry must be consistent with
+  % conf/rebar.config.template (source of the actual rebar.config) and with the
+  % HTTPC_OPT variable (see GNUmakevars.inc).
+
+  % Complete with elli (default: jsx):
+  %{applications, [kernel, stdlib, shotgun, jsx, elli, myriad]},
+
+  % Complete with elli, if preferring jiffy:
+  %{applications, [kernel, stdlib, shotgun, jiffy, myriad]},
+
+  % jsx, no elli nor shotgun is our current default:
+  {applications, [kernel, stdlib, jsx, myriad]},
 
   {env,[]},
 

@@ -322,34 +322,50 @@ endif
 # runtime error:
 
 ifndef COWLIB_TOP
-	ifneq ($(wildcard $(SIBLING_ROOT)/cowlib/.),)
-		COWLIB_TOP = $(SIBLING_ROOT)/cowlib
+	ifneq ($(wildcard $(LEEC_TOP)/_checkouts/cowlib/.),)
+		COWLIB_TOP = $(LEEC_TOP)/_checkouts/cowlib
 	else
-		COWLIB_TOP = $(PREREQ_ROOT)/cowlib
+		ifneq ($(wildcard $(SIBLING_ROOT)/cowlib/.),)
+			COWLIB_TOP = $(SIBLING_ROOT)/cowlib
+		else
+			COWLIB_TOP = $(PREREQ_ROOT)/cowlib
+		endif
 	endif
 endif
 
 ifndef GUN_TOP
-	ifneq ($(wildcard $(SIBLING_ROOT)/gun/.),)
-		GUN_TOP = $(SIBLING_ROOT)/gun
+	ifneq ($(wildcard $(LEEC_TOP)/_checkouts/gun/.),)
+		GUN_TOP = $(LEEC_TOP)/_checkouts/gun
 	else
-		GUN_TOP = $(PREREQ_ROOT)/gun
+		ifneq ($(wildcard $(SIBLING_ROOT)/gun/.),)
+			GUN_TOP = $(SIBLING_ROOT)/gun
+		else
+			GUN_TOP = $(PREREQ_ROOT)/gun
+		endif
 	endif
 endif
 
 ifndef SHOTGUN_TOP
-	ifneq ($(wildcard $(SIBLING_ROOT)/shotgun/.),)
-		SHOTGUN_TOP = $(SIBLING_ROOT)/shotgun
+	ifneq ($(wildcard $(LEEC_TOP)/_checkouts/shotgun/.),)
+		SHOTGUN_TOP = $(LEEC_TOP)/_checkouts/shotgun
 	else
-		SHOTGUN_TOP = $(PREREQ_ROOT)/shotgun
+		ifneq ($(wildcard $(SIBLING_ROOT)/shotgun/.),)
+			SHOTGUN_TOP = $(SIBLING_ROOT)/shotgun
+		else
+			SHOTGUN_TOP = $(PREREQ_ROOT)/shotgun
+		endif
 	endif
 endif
 
 ifndef ELLI_TOP
-	ifneq ($(wildcard $(SIBLING_ROOT)/elli/.),)
-		ELLI_TOP = $(SIBLING_ROOT)/elli
+	ifneq ($(wildcard $(LEEC_TOP)/_checkouts/elli/.),)
+		ELLI_TOP = $(LEEC_TOP)/_checkouts/elli
 	else
-		ELLI_TOP = $(PREREQ_ROOT)/elli
+		ifneq ($(wildcard $(SIBLING_ROOT)/elli/.),)
+			ELLI_TOP = $(SIBLING_ROOT)/elli
+		else
+			ELLI_TOP = $(PREREQ_ROOT)/elli
+		endif
 	endif
 endif
 
@@ -362,34 +378,50 @@ ifndef ERLANG_COLOR_TOP
 endif
 
 ifndef YAMERL_TOP
-	ifneq ($(wildcard $(SIBLING_ROOT)/yamerl/.),)
-		YAMERL_TOP = $(SIBLING_ROOT)/yamerl
+	ifneq ($(wildcard $(LEEC_TOP)/_checkouts/yamerl/.),)
+		YAMERL_TOP = $(LEEC_TOP)/_checkouts/yamerl
 	else
-		YAMERL_TOP = $(PREREQ_ROOT)/yamerl
+		ifneq ($(wildcard $(SIBLING_ROOT)/yamerl/.),)
+			YAMERL_TOP = $(SIBLING_ROOT)/yamerl
+		else
+			YAMERL_TOP = $(PREREQ_ROOT)/yamerl
+		endif
 	endif
 endif
 
 ifndef GETOPT_TOP
-	ifneq ($(wildcard $(SIBLING_ROOT)/getopt/.),)
-		GETOPT_TOP = $(SIBLING_ROOT)/getopt
+	ifneq ($(wildcard $(LEEC_TOP)/_checkouts/getopt/.),)
+		GETOPT_TOP = $(LEEC_TOP)/_checkouts/getopt
 	else
-		GETOPT_TOP = $(PREREQ_ROOT)/getopt
+		ifneq ($(wildcard $(SIBLING_ROOT)/getopt/.),)
+			GETOPT_TOP = $(SIBLING_ROOT)/getopt
+		else
+			GETOPT_TOP = $(PREREQ_ROOT)/getopt
+		endif
 	endif
 endif
 
 ifndef JSX_TOP
-	ifneq ($(wildcard $(SIBLING_ROOT)/jsx/.),)
-		JSX_TOP = $(SIBLING_ROOT)/jsx
+	ifneq ($(wildcard $(LEEC_TOP)/_checkouts/jsx/.),)
+		JSX_TOP = $(LEEC_TOP)/_checkouts/jsx
 	else
-		JSX_TOP = $(PREREQ_ROOT)/jsx
+		ifneq ($(wildcard $(SIBLING_ROOT)/jsx/.),)
+			JSX_TOP = $(SIBLING_ROOT)/jsx
+		else
+			JSX_TOP = $(PREREQ_ROOT)/jsx
+		endif
 	endif
 endif
 
 ifndef JIFFY_TOP
-	ifneq ($(wildcard $(SIBLING_ROOT)/jiffy/.),)
-		JIFFY_TOP = $(SIBLING_ROOT)/jiffy
+	ifneq ($(wildcard $(LEEC_TOP)/_checkouts/jiffy/.),)
+		JIFFY_TOP = $(LEEC_TOP)/_checkouts/jiffy
 	else
-		JIFFY_TOP = $(PREREQ_ROOT)/jiffy
+		ifneq ($(wildcard $(SIBLING_ROOT)/jiffy/.),)
+			JIFFY_TOP = $(SIBLING_ROOT)/jiffy
+		else
+			JIFFY_TOP = $(PREREQ_ROOT)/jiffy
+		endif
 	endif
 endif
 

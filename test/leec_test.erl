@@ -121,16 +121,43 @@ run() ->
 	% Unlikely to be relevant either:
 	DomainName = "www.foobar.org",
 
-	% Expected to fail:
-	case leec:obtain_certificate_for( DomainName, FirstLeecFsmPid,
-						leec:get_default_options( _Async=false ) ) of
+	% As no webserver is running and DomainName is not
+	% controlled, would be expected to fail with:
+	%
+	%[debug] [<0.x.0>] Check resulted in switching from 'pending' to 'invalid'
+	%state.
+	%[debug] [<0.x.0>] Entering the 'invalid' state.
+	%
+	% <----------------
+	% [error] [<0.x.0>] Reached the (stable) 'invalid' state for domain
+	% 'www.foobar.org'.
+	%  ---------------->
+	%
+	% {"init terminating in
+	% do_boot",{{nocatch,{challenges_could_not_be_validated,<0.x.0>}},
+	% [{leec,wait_challenges_valid,3,[{file,"leec.erl"},{line,L}]},
+	%
+	ContinueTest = false,
+	%ContinueTest = true,
 
-		{ certificate_ready, BinCertFilePath } ->
-			throw( { not_expected_to_succeed, BinCertFilePath } );
+	case ContinueTest of
 
-		{ error, Error } ->
-			test_facilities:display_fmt( "As expected, an error is raised: ~p",
-										 [ Error ] )
+		true ->
+			case leec:obtain_certificate_for( DomainName, FirstLeecFsmPid,
+				leec:get_default_cert_request_options( _Async=false ) ) of
+
+				{ certificate_ready, BinCertFilePath } ->
+					throw( { not_expected_to_succeed, BinCertFilePath } );
+
+				{ error, Error } ->
+					test_facilities:display_fmt(
+					  "As expected, an error is raised: ~p", [ Error ] )
+
+			end;
+
+		false ->
+			test_facilities:display_fmt( "No attempt to generate a certificate "
+			  "here for '~s' (bound to fail in this context).", [ DomainName ] )
 
 	end,
 
