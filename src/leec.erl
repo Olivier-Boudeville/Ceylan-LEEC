@@ -12,13 +12,19 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
+% Copyright (C) 2020-2021 Olivier Boudeville
+%
+% This file is part of the Ceylan-LEEC library, a fork of the Guillaume Bour's
+% letsencrypt-erlang library, released under the same licence.
 
-% Main module for LEEC, the Ceylan Let's Encrypt Erlang fork.
+
+% Main module for LEEC, the Ceylan Let's Encrypt Erlang fork (see
+% http://leec.esperide.org).
 %
 % Original 'Let's Encrypt Erlang' application:
 % https://github.com/gbour/letsencrypt-erlang
 %
--module(letsencrypt).
+-module(leec).
 
 % Original work:
 -author("Guillaume Bour (guillaume at bour dot cc)").
@@ -250,7 +256,7 @@
 
 
 % For the records introduced:
--include("letsencrypt.hrl").
+-include("leec.hrl").
 
 -type tls_private_key() :: #tls_private_key{}.
 
@@ -732,7 +738,7 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 			% LEEC FSM (no domain known yet):
 			%
 			%UniqFilename = text_utils:format(
-			%  "letsencrypt-agent-private-~s.key",
+			%  "leec-agent-private-~s.key",
 			%  [ LEState#le_state.user_id ] ),
 
 			% A prior run might have left a file with the same name, it will be
@@ -753,10 +759,10 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 
 	end,
 
-	AgentPrivateKey = letsencrypt_tls:obtain_private_key( KeyFileInfo,
-														  BinCertDirPath ),
+	AgentPrivateKey = leec_tls:obtain_private_key( KeyFileInfo,
+												   BinCertDirPath ),
 
-	KeyJws = letsencrypt_jws:init( AgentPrivateKey ),
+	KeyJws = leec_jws:init( AgentPrivateKey ),
 
 	OptionMap = LEState#le_state.cert_req_option_map,
 
@@ -781,11 +787,11 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 	%   <<"revokeCert">> =>
 	%	  <<"ACME_BASE/acme/revoke-cert">>}
 
-	{ URLDirectoryMap, DirLEState } = letsencrypt_api:get_directory_map(
+	{ URLDirectoryMap, DirLEState } = leec_api:get_directory_map(
 		LEState#le_state.env, OptionMap, LEState ),
 
-	{ FirstNonce, NonceLEState } = letsencrypt_api:get_nonce( URLDirectoryMap,
-										OptionMap, DirLEState ),
+	{ FirstNonce, NonceLEState } = leec_api:get_nonce( URLDirectoryMap,
+													   OptionMap, DirLEState ),
 
 	cond_utils:if_defined( leec_debug_fsm,
 		trace_bridge:debug_fmt( "[~w][state] Switching initially to 'idle'.",
@@ -958,7 +964,7 @@ idle( _EventType={ call, From },
 	end,
 
 	{ { AccountDecodedJsonMap, AccountLocationUri, AccountNonce },
-	  CreateLEState } = letsencrypt_api:get_acme_account( DirMap, PrivKey,
+	  CreateLEState } = leec_api:get_acme_account( DirMap, PrivKey,
 							Jws#jws{ nonce=Nonce }, CertReqOptionMap, LEState ),
 
 	% Payload decoded from JSON in AccountDecodedJsonMap will be like:
@@ -988,7 +994,7 @@ idle( _EventType={ call, From },
 
 	AccountKeyAsMap = maps:get( <<"key">>, AccountDecodedJsonMap ),
 
-	AccountKey = letsencrypt_tls:map_to_key( AccountKeyAsMap ),
+	AccountKey = leec_tls:map_to_key( AccountKeyAsMap ),
 
 	cond_utils:if_defined( leec_debug_keys, trace_bridge:debug_fmt(
 		"[~w] The obtained ACME account key is:~n  ~p",
@@ -1010,7 +1016,7 @@ idle( _EventType={ call, From },
 
 	% Will transition to 'pending' to manage this request:
 	{ { OrderDecodedJsonMap, OrderLocationUri, OrderNonce }, ReqState } =
-		letsencrypt_api:request_new_certificate( DirMap, BinDomains, PrivKey,
+		leec_api:request_new_certificate( DirMap, BinDomains, PrivKey,
 								AccountJws, CertReqOptionMap, CreateLEState ),
 
 	case maps:get( <<"status">>, OrderDecodedJsonMap ) of
@@ -1118,8 +1124,8 @@ pending( _EventType={ call, From }, _EventContentMsg=get_ongoing_challenges,
 
 	% get_key_authorization/3 not returning a le_state():
 	ThumbprintMap = maps:from_list( [ { Token,
-		_Thumbprint=letsencrypt_jws:get_key_authorization( AccountKey, Token,
-														   LEState ) }
+		_Thumbprint=leec_jws:get_key_authorization( AccountKey, Token,
+													LEState ) }
 		  || #{ <<"token">> := Token } <- maps:values( TypeChallengeMap ) ] ),
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
@@ -1143,8 +1149,8 @@ pending( _EventType=cast,
 
 	% get_key_authorization/3 not returning a le_state():
 	ThumbprintMap = maps:from_list( [ { Token,
-		_Thumbprint=letsencrypt_jws:get_key_authorization( AccountKey, Token,
-														   LEState ) }
+		_Thumbprint=leec_jws:get_key_authorization( AccountKey, Token,
+													LEState ) }
 		  || #{ <<"token">> := Token } <- maps:values( TypeChallengeMap ) ] ),
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
@@ -1180,7 +1186,7 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 		fun( AuthUri, _Acc={ AccStateName, AccNonce, AccState } ) ->
 
 			{ { AuthJsonMap, _Location, NewNonce }, ReqState } =
-					letsencrypt_api:request_authorization( AuthUri, PrivKey,
+					leec_api:request_authorization( AuthUri, PrivKey,
 						Jws#jws{ nonce=AccNonce }, CertReqOptionMap, AccState ),
 
 			BinStatus = maps:get( <<"status">>, AuthJsonMap ),
@@ -1337,19 +1343,19 @@ valid( _EventType={ call, _ServerRef=From },
 	  file_utils:join( BinCertDirPath, KeyFilename ) ),
 
 	% KeyFilePath is required for CSR generation:
-	CreatedTLSPrivKey = letsencrypt_tls:obtain_private_key(
-							{ new, KeyFilename }, BinCertDirPath ),
+	CreatedTLSPrivKey = leec_tls:obtain_private_key( { new, KeyFilename },
+													 BinCertDirPath ),
 
-	Csr = letsencrypt_tls:get_cert_request( BinDomain, BinCertDirPath, SANs ),
+	Csr = leec_tls:get_cert_request( BinDomain, BinCertDirPath, SANs ),
 
 	{ { FinOrderDirMap, _BinLocUri, FinNonce }, FinLEState } =
-		letsencrypt_api:finalize_order( OrderDirMap, Csr, PrivKey,
+		leec_api:finalize_order( OrderDirMap, Csr, PrivKey,
 			Jws#jws{ nonce=Nonce }, CertReqOptionMap, DestroyLEState ),
 
 	BinStatus = maps:get( <<"status">>, FinOrderDirMap ),
 
 	% Expected to be 'finalize' sooner or later:
-	ReadStateName = letsencrypt_api:binary_to_status( BinStatus ),
+	ReadStateName = leec_api:binary_to_status( BinStatus ),
 
 	% Update location in finalized order:
 	LocOrderDirMap = FinOrderDirMap#{
@@ -1416,12 +1422,12 @@ finalize( _EventType={ call, _ServerRef=From },
 	Loc = maps:get( <<"location">>, OrderMap ),
 
 	{ { NewOrderMap, _NullLoc, OrderNonce }, OrderState } =
-		letsencrypt_api:get_order( Loc, PrivKey, Jws#jws{ nonce=Nonce },
-								   CertReqOptionMap, LEState ),
+		leec_api:get_order( Loc, PrivKey, Jws#jws{ nonce=Nonce },
+							CertReqOptionMap, LEState ),
 
 	BinStatus = maps:get( <<"status">>, NewOrderMap ),
 
-	ReadStatus = letsencrypt_api:binary_to_status( BinStatus ),
+	ReadStatus = leec_api:binary_to_status( BinStatus ),
 
 	{ { Reply, NewStateName, NewNonce, NewJws }, ReadLEState } =
 			case ReadStatus of
@@ -1449,12 +1455,12 @@ finalize( _EventType={ call, _ServerRef=From },
 			% Downloads certificate:
 
 			{ { BinCert, DownloadNonce }, CertLEState } =
-				letsencrypt_api:get_certificate( OrderMap, PrivKey,
+				leec_api:get_certificate( OrderMap, PrivKey,
 					Jws#jws{ nonce=OrderNonce }, CertReqOptionMap, OrderState ),
 
 			Domain = text_utils:binary_to_string( BinDomain ),
 
-			CertFilePath = letsencrypt_tls:write_certificate( Domain, BinCert,
+			CertFilePath = leec_tls:write_certificate( Domain, BinCert,
 															  BinCertDirPath ),
 
 			BinCertFilePath = text_utils:string_to_binary( CertFilePath ),
@@ -1470,12 +1476,12 @@ finalize( _EventType={ call, _ServerRef=From },
 			% creating a new account each time a new operation is performed (as
 			% ~90 days may elapse between two operations). So:
 			%
-			AgentKeyJws = letsencrypt_jws:init( PrivKey ),
+			AgentKeyJws = leec_jws:init( PrivKey ),
 
 			% Safer, not wasting idle connections, bound to fail after some time
 			% anyway:
 			%
-			letsencrypt_api:close_tcp_connections(
+			leec_api:close_tcp_connections(
 			  OrderState#le_state.tcp_connection_cache ),
 
 			CloseLEState = CertLEState#le_state{
@@ -1977,7 +1983,7 @@ perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 	%  "ACME_BASE/acme/authz-v3/133572032"
 
 	{ { AuthMap, _LocUri, NewNonce }, ReqLEState } =
-		letsencrypt_api:request_authorization( AuthUri, PrivKey,
+		leec_api:request_authorization( AuthUri, PrivKey,
 							Jws#jws{ nonce=Nonce }, CertReqOptionMap, LEState ),
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
@@ -2055,7 +2061,7 @@ perform_authorization_step2( _Pairs=[ { Uri, Challenge } | T ],
 						   jws=Jws, cert_req_option_map=CertReqOptionMap } ) ->
 
 	{ { Resp, _Location, NewNonce }, NotifLEState } =
-		letsencrypt_api:notify_ready_for_challenge( Challenge, AgentPrivKey,
+		leec_api:notify_ready_for_challenge( Challenge, AgentPrivKey,
 							Jws#jws{ nonce=Nonce }, CertReqOptionMap, LEState ),
 
 	case maps:get( <<"status">>, Resp ) of
@@ -2099,8 +2105,8 @@ init_for_challenge_type( _ChallengeType='http-01', _Mode=webroot,
 
 		ChlgWebPath = file_utils:join( ChlgWebDir, Token ),
 
-		Thumbprint = letsencrypt_jws:get_key_authorization( AccountKey, Token,
-															LEState ),
+		Thumbprint = leec_jws:get_key_authorization( AccountKey, Token,
+													 LEState ),
 
 		% Hopefully the default modes are fine:
 		file_utils:write_whole( ChlgWebPath, Thumbprint, _Modes=[] )
@@ -2138,14 +2144,14 @@ init_for_challenge_type( ChallengeType, _Mode=standalone,
 
 			% Iterating on values:
 			Thumbprints = maps:from_list(
-				[ { Token, letsencrypt_jws:get_key_authorization( AccntKey,
+				[ { Token, leec_jws:get_key_authorization( AccntKey,
 														Token, LEState ) }
 				  || #{ <<"token">> := Token }
 						 <- maps:values( UriChallengeMap ) ] ),
 
 			{ ok, _ } = elli:start_link([
-				{ name, { local, letsencrypt_elli_listener } },
-				{ callback, letsencrypt_elli_handler },
+				{ name, { local, leec_elli_listener } },
+				{ callback, leec_elli_handler },
 				{ callback_args, [ #{ Domain => Thumbprints } ] },
 				% If is not 80, a priori should not work as ACME to look for it:
 				{ port, Port } ] );
@@ -2188,7 +2194,7 @@ challenge_destroy( _Mode=webroot,
 
 challenge_destroy( _Mode=standalone, LEState ) ->
 	% Stop http server:
-	elli:stop( letsencrypt_elli_listener ),
+	elli:stop( leec_elli_listener ),
 	LEState#le_state{ challenges=#{} };
 
 

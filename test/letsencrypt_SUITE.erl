@@ -12,6 +12,8 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
+% Note: not integrated in Ceylan-LEEC, at least currently.
+
 -module(letsencrypt_SUITE).
 
 %-compile([export_all]).

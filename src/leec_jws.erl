@@ -12,20 +12,30 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
+% Copyright (C) 2020-2021 Olivier Boudeville
+%
+% This file is part of the Ceylan-LEEC library, a fork of the Guillaume Bour's
+% letsencrypt-erlang library, released under the same licence.
+
 
 % Manages JSON Web Signatures (JWS).
 %
 % See https://en.wikipedia.org/wiki/JSON_Web_Signature
 %
--module(letsencrypt_jws).
+-module(leec_jws).
 
--author("Guillaume Bour <guillaume@bour.cc>").
+% Original work:
+-author("Guillaume Bour (guillaume at bour dot cc)").
+
+% This fork:
+-author("Olivier Boudeville (olivier dot boudeville at esperide dot com").
+
 
 -export([ init/1, encode/4, get_key_authorization/3 ]).
 
 
 % For the records introduced:
--include("letsencrypt.hrl").
+-include("leec.hrl").
 
 
 % Known keys:
@@ -39,10 +49,10 @@
 
 % Shorthands:
 
--type jws() :: letsencrypt:jws().
--type le_state() :: letsencrypt:le_state().
+-type jws() :: leec:jws().
+-type le_state() :: leec:le_state().
 
--type tls_private_key() :: letsencrypt:tls_private_key().
+-type tls_private_key() :: leec:tls_private_key().
 
 
 
@@ -61,7 +71,7 @@ init( #tls_private_key{ b64_pair={ N, E } } ) ->
 % Content is the payload (if any).
 %
 -spec encode( tls_private_key(), jws(), content(), le_state() ) ->
-					letsencrypt:binary_b64().
+					leec:binary_b64().
 encode( PrivateKey, Jws, Content,
 		#le_state{ json_parser_state=ParserState } ) ->
 
@@ -69,8 +79,7 @@ encode( PrivateKey, Jws, Content,
 		"Encoding to JSON following JWS:~n  ~p~n with content: ~p",
 		[ Jws, Content ] ) ),
 
-	Protected = letsencrypt_utils:jsonb64encode( jws_to_map( Jws ),
-												 ParserState ),
+	Protected = leec_utils:jsonb64encode( jws_to_map( Jws ), ParserState ),
 
 	Payload = case Content of
 
@@ -79,14 +88,14 @@ encode( PrivateKey, Jws, Content,
 			<<>>;
 
 		_ ->
-			letsencrypt_utils:jsonb64encode( Content, ParserState )
+			leec_utils:jsonb64encode( Content, ParserState )
 
 	end,
 
 	Signed = crypto:sign( rsa, sha256, <<Protected/binary, $., Payload/binary>>,
 						  PrivateKey#tls_private_key.raw ),
 
-	EncSigned = letsencrypt_utils:b64encode( Signed ),
+	EncSigned = leec_utils:b64encode( Signed ),
 
 	json_utils:to_json( #{ <<"protected">> => Protected,
 						   <<"payload">> => Payload,
@@ -98,8 +107,8 @@ encode( PrivateKey, Jws, Content,
 %
 % See https://www.rfc-editor.org/rfc/rfc8555.html#section-8.1.
 %
--spec get_key_authorization( letsencrypt:key(), letsencrypt:token(),
-							 le_state() ) -> letsencrypt:key_auth().
+-spec get_key_authorization( leec:key(), leec:token(), le_state() ) ->
+								   leec:key_auth().
 get_key_authorization( #tls_public_key{ kty=Kty, n=N, e=E }, Token,
 					   #le_state{ json_parser_state=ParserState } ) ->
 
@@ -108,7 +117,7 @@ get_key_authorization( #tls_public_key{ kty=Kty, n=N, e=E }, Token,
 
 	ThumbprintHash = crypto:hash( sha256, Thumbprint ),
 
-	B64Hash = letsencrypt_utils:b64encode( ThumbprintHash ),
+	B64Hash = leec_utils:b64encode( ThumbprintHash ),
 
 	<<Token/binary, $., B64Hash/binary>>.
 
@@ -148,7 +157,7 @@ jws_to_map( #jws{ alg=Alg, url=MaybeUrl, kid=MaybeKid, jwk=MaybeJwk,
 			KidMap;
 
 		Jwk ->
-			KidMap#{ jwk => letsencrypt_tls:key_to_map( Jwk ) }
+			KidMap#{ jwk => leec_tls:key_to_map( Jwk ) }
 
 	end,
 

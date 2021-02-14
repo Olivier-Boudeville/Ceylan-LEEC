@@ -18,7 +18,7 @@
 % Creation date: Wednesday, October 28, 2020.
 
 
-% Very basic usage example for LEEC, based on irrelevant settings.
+% Very basic usage example for Ceylan-LEEC, based on irrelevant settings.
 %
 % Allows to check that LEEC can be used directly, out of a rebar3 context.
 %
@@ -72,7 +72,7 @@ run() ->
 	% Not agent private key specified, it will be generated (with a generated
 	% name); expected to succeed:
 	%
-	FirstLeecFsmPid = case letsencrypt:start( BaseLEECOpts ) of
+	FirstLeecFsmPid = case leec:start( BaseLEECOpts ) of
 
 		{ ok, FirstFsmPid } ->
 			FirstFsmPid;
@@ -82,7 +82,7 @@ run() ->
 
 	 end,
 
-	BinKeyPath = case letsencrypt:get_agent_key_path( FirstLeecFsmPid ) of
+	BinKeyPath = case leec:get_agent_key_path( FirstLeecFsmPid ) of
 
 		undefined ->
 			throw( { no_agent_key_path_obtained, FirstLeecFsmPid } );
@@ -107,7 +107,7 @@ run() ->
 	% For the second LEEC FSM, to rely on the same account:
 	SecondLEECOpts = [ { agent_key_file_path, BinKeyPath } | BaseLEECOpts ],
 
-	_SecondLeecFsmPid = case letsencrypt:start( SecondLEECOpts ) of
+	_SecondLeecFsmPid = case leec:start( SecondLEECOpts ) of
 
 		{ ok, SecondFsmPid }  ->
 			SecondFsmPid;
@@ -122,8 +122,8 @@ run() ->
 	DomainName = "www.foobar.org",
 
 	% Expected to fail:
-	case letsencrypt:obtain_certificate_for( DomainName, FirstLeecFsmPid,
-						letsencrypt:get_default_options( _Async=false ) ) of
+	case leec:obtain_certificate_for( DomainName, FirstLeecFsmPid,
+						leec:get_default_options( _Async=false ) ) of
 
 		{ certificate_ready, BinCertFilePath } ->
 			throw( { not_expected_to_succeed, BinCertFilePath } );

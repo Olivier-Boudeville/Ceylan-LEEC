@@ -12,8 +12,20 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
--module(letsencrypt_api).
--author("Guillaume Bour <guillaume@bour.cc>").
+% Copyright (C) 2020-2021 Olivier Boudeville
+%
+% This file is part of the Ceylan-LEEC library, a fork of the Guillaume Bour's
+% letsencrypt-erlang library, released under the same licence.
+
+
+-module(leec_api).
+
+% Original work:
+-author("Guillaume Bour (guillaume at bour dot cc)").
+
+% This fork:
+-author("Olivier Boudeville (olivier dot boudeville at esperide dot com").
+
 
 -export([ get_directory_map/3, get_nonce/3, get_acme_account/5,
 		  request_new_certificate/6, get_order/5, request_authorization/5,
@@ -41,13 +53,13 @@
 
 -type bin_content() :: binary().
 
--type cert_req_option_map() :: letsencrypt:cert_req_option_map().
+-type cert_req_option_map() :: leec:cert_req_option_map().
 
 % Not 'prod':
 -type environment() :: 'default' | 'staging'.
 
 % For the records introduced:
--include("letsencrypt.hrl").
+-include("leec.hrl").
 
 
 % Shorthands:
@@ -56,20 +68,20 @@
 -type nonce() :: web_utils:nonce().
 -type http_status_code() :: web_utils:http_status_code().
 
--type challenge() :: letsencrypt:challenge().
--type uri() :: letsencrypt:uri().
--type bin_uri() :: letsencrypt:bin_uri().
--type tls_private_key() :: letsencrypt:tls_private_key().
--type tcp_connection_cache() :: letsencrypt:tcp_connection_cache().
--type bin_domain() :: letsencrypt:bin_domain().
--type bin_key() :: letsencrypt:bin_key().
--type bin_csr_key() :: letsencrypt:bin_csr_key().
--type directory_map() :: letsencrypt:directory_map().
--type json_map_decoded() :: letsencrypt:json_map_decoded().
--type jws() :: letsencrypt:jws().
--type order_map() :: letsencrypt:order_map().
--type bin_certificate() :: letsencrypt:bin_certificate().
--type le_state() :: letsencrypt:le_state().
+-type challenge() :: leec:challenge().
+-type uri() :: leec:uri().
+-type bin_uri() :: leec:bin_uri().
+-type tls_private_key() :: leec:tls_private_key().
+-type tcp_connection_cache() :: leec:tcp_connection_cache().
+-type bin_domain() :: leec:bin_domain().
+-type bin_key() :: leec:bin_key().
+-type bin_csr_key() :: leec:bin_csr_key().
+-type directory_map() :: leec:directory_map().
+-type json_map_decoded() :: leec:json_map_decoded().
+-type jws() :: leec:jws().
+-type order_map() :: leec:order_map().
+-type bin_certificate() :: leec:bin_certificate().
+-type le_state() :: leec:le_state().
 
 
 -ifdef(TEST).
@@ -90,7 +102,7 @@
 
 
 % Returns the status corresponding to specified binary.
--spec binary_to_status( binary() ) -> letsencrypt:status().
+-spec binary_to_status( binary() ) -> leec:status().
 binary_to_status( <<"pending">> ) ->
 	pending;
 
@@ -546,7 +558,7 @@ on_failed_request( StatusCode, JsonMapBody, StepAtom ) ->
 % https://www.rfc-editor.org/rfc/rfc8555.html#section-7.1.1).
 %
 -spec get_directory_map( environment(), cert_req_option_map(), le_state() ) ->
-							{ letsencrypt:directory_map(), le_state() }.
+							{ leec:directory_map(), le_state() }.
 get_directory_map( Env, CertReqOptionMap, LEState ) ->
 
 	DirUri = case Env of
@@ -641,8 +653,7 @@ get_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 	%
 	Payload = #{ termsOfServiceAgreed => true, contact => [] },
 
-	ReqB64 = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri }, Payload,
-									 LEState ),
+	ReqB64 = leec_jws:encode( PrivKey, Jws#jws{ url=Uri }, Payload, LEState ),
 
 	{ #{ json := RespMap, location := LocationUri, nonce := NewNonce,
 	   status_code := StatusCode }, NewLEState } = request( _Method=post, Uri,
@@ -701,8 +712,8 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 
 	IdPayload = #{ identifiers => Idns },
 
-	Req = letsencrypt_jws:encode( PrivKey, AccountJws#jws{ url=OrderUri },
-								  _Content=IdPayload, LEState ),
+	Req = leec_jws:encode( PrivKey, AccountJws#jws{ url=OrderUri },
+						   _Content=IdPayload, LEState ),
 
 	{ #{ json := OrderJsonMap, location := LocationUri,
 		 nonce := Nonce, status_code := StatusCode }, NewLEState } =
@@ -754,8 +765,8 @@ get_order( Uri, Key, Jws, CertReqOptionMap, LEState ) ->
 
 	% POST-as-GET implies no payload:
 
-	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined,
-								  LEState ),
+	Req = leec_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined,
+						   LEState ),
 
 	{ #{ json := RespMap, location := Location, nonce := Nonce,
 		 status_code := StatusCode }, NewLEState } =
@@ -793,8 +804,8 @@ request_authorization( AuthUri, PrivKey, Jws, CertReqOptionMap, LEState ) ->
 		"[~w] Requesting authorization from ~s.", [ self(), AuthUri ] ) ),
 
 	% POST-as-GET implies no payload:
-	B64AuthReq = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=AuthUri },
-										 _Content=undefined, LEState ),
+	B64AuthReq = leec_jws:encode( PrivKey, Jws#jws{ url=AuthUri },
+								  _Content=undefined, LEState ),
 
 	{ #{ json := RespMap, location := LocationUri, nonce := Nonce,
 	   status_code := StatusCode }, NewLEState } = request( _Method=post,
@@ -834,8 +845,7 @@ notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
 		"ready for challenge validation at ~s.", [ self(), Uri ] ) ),
 
 	% POST-as-GET implies no payload:
-	Req = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=Uri }, _Content=#{},
-								  LEState ),
+	Req = leec_jws:encode( PrivKey, Jws#jws{ url=Uri }, _Content=#{}, LEState ),
 
 	{ #{ json := RespMap, location := Location, nonce := Nonce,
 	  status_code := StatusCode }, NewLEState } = request( _Method=post, Uri,
@@ -870,8 +880,8 @@ finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 
 	Payload = #{ csr => Csr },
 
-	JWSBody = letsencrypt_jws:encode( PrivKey, Jws#jws{ url=FinUri }, Payload,
-									  LEState ),
+	JWSBody = leec_jws:encode( PrivKey, Jws#jws{ url=FinUri }, Payload,
+							   LEState ),
 
 	{ #{ json := FinOrderDirMap, location := BinLocUri, nonce := Nonce,
 	   status_code := StatusCode }, NewLEState } = request( _Method=post,
@@ -913,8 +923,8 @@ get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, CertReqOptionMap,
 		"[~w] Downloading certificate at ~s.", [ self(), Uri ] ) ),
 
 	% POST-as-GET implies no payload:
-	Req = letsencrypt_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined,
-								  LEState ),
+	Req = leec_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined,
+						   LEState ),
 
 	{ #{ body := BinCert, nonce := NewNonce, status_code := StatusCode  },
 	  NewLEState } = request( _Method=post, Uri, _Headers=#{},

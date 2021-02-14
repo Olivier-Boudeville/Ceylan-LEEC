@@ -12,18 +12,22 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
--module(test_slave_handler).
--behaviour(elli_handler).
+% Note: not integrated in Ceylan-LEEC, at least currently.
 
--include_lib("elli/include/elli.hrl").
+-module(test_slave_handler).
+%-behaviour(elli_handler).
+
+%-include_lib("elli/include/elli.hrl").
 -export([handle/2, handle_event/3]).
 
 
 handle(Req, _Args) ->
 	[<<".well-known">>, <<"acme-challenge">>, Token] = elli_request:path(Req),
-	[Host|_] = binary:split(elli_request:get_header(<<"Host">>, Req, <<>>), <<":">>),
+	[Host|_] = binary:split(elli_request:get_header(<<"Host">>, Req, <<>>),
+							<<":">>),
 	Thumbprints = letsencrypt:get_challenge(),
-	io:format("SLAVE:handle: req=~p, host= ~p, thumbprints= ~p~n", [Req, Host, Thumbprints]),
+	io:format("SLAVE:handle: req=~p, host= ~p, thumbprints= ~p~n",
+			  [Req, Host, Thumbprints]),
 
 	case maps:get(Token, Thumbprints, nil) of
 		Thumbprint ->

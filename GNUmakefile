@@ -10,7 +10,7 @@ LEEC_TOP = .
 		info-paths info-compile info-conditionals info-deps
 
 
-MODULES_DIRS = src #doc test priv
+MODULES_DIRS = src doc test #priv
 
 
 # To override the 'all' default target with a parallel version:

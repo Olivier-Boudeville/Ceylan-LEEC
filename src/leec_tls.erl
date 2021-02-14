@@ -12,8 +12,20 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
--module(letsencrypt_tls).
--author("Guillaume Bour <guillaume@bour.cc>").
+% Copyright (C) 2020-2021 Olivier Boudeville
+%
+% This file is part of the Ceylan-LEEC library, a fork of the Guillaume Bour's
+% letsencrypt-erlang library, released under the same licence.
+
+
+-module(leec_tls).
+
+% Original work:
+-author("Guillaume Bour (guillaume at bour dot cc)").
+
+% This fork:
+-author("Olivier Boudeville (olivier dot boudeville at esperide dot com").
+
 
 -export([ obtain_private_key/2, obtain_dh_key/1,
 		  obtain_ca_cert_file/1, obtain_ca_cert_file/2,
@@ -25,7 +37,7 @@
 -include_lib("public_key/include/public_key.hrl").
 
 % For the records introduced:
--include_lib("letsencrypt.hrl").
+-include_lib("leec.hrl").
 
 
 % Shorthands:
@@ -37,14 +49,16 @@
 -type bin_directory_path() :: file_utils:bin_directory_path().
 -type any_directory_path() :: file_utils:any_directory_path().
 
--type key_file_info() :: letsencrypt:key_file_info().
--type san() :: letsencrypt:san().
--type bin_certificate() :: letsencrypt:bin_certificate().
+-type bin_fqdn() :: net_utils:bin_fqdn().
 
--type tls_private_key() :: letsencrypt:tls_private_key().
--type tls_public_key() :: letsencrypt:tls_public_key().
+-type key_file_info() :: leec:key_file_info().
+-type san() :: leec:san().
+-type bin_certificate() :: leec:bin_certificate().
 
--type certificate_provider() :: letsencrypt:certificate_provider().
+-type tls_private_key() :: leec:tls_private_key().
+-type tls_public_key() :: leec:tls_public_key().
+
+-type certificate_provider() :: leec:certificate_provider().
 
 
 
@@ -182,8 +196,8 @@ obtain_private_key( _KeyFileInfo=KeyFilePath, BinCertDirPath ) ->
 
 	PrivKey = #tls_private_key{
 	   raw=[ E, N, D ],
-	   b64_pair={ letsencrypt_utils:b64encode( binary:encode_unsigned( N ) ),
-				  letsencrypt_utils:b64encode( binary:encode_unsigned( E ) ) },
+	   b64_pair={ leec_utils:b64encode( binary:encode_unsigned( N ) ),
+				  leec_utils:b64encode( binary:encode_unsigned( E ) ) },
 	   file_path=text_utils:ensure_binary( FullKeyFilePath ) },
 
 	cond_utils:if_defined( leec_debug_keys,
@@ -305,8 +319,8 @@ obtain_ca_cert_file( TargetDir, _CertProvider=letsencrypt ) ->
 
 
 % Returns a CSR certificate request.
--spec get_cert_request( net_utils:bin_fqdn(), bin_directory_path(),
-						[ san() ] ) -> letsencrypt:tls_csr().
+-spec get_cert_request( bin_fqdn(), bin_directory_path(), [ san() ] ) ->
+							  leec:tls_csr().
 get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 
 	cond_utils:if_defined( leec_debug_keys,
@@ -334,15 +348,15 @@ get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 	%cond_utils:if_defined( leec_debug_keys,
 	%	trace_bridge:debug_fmt( "Decoded CSR:~n  ~p.", [ Csr ] ) ),
 
-	letsencrypt_utils:b64encode( Csr ).
+	leec_utils:b64encode( Csr ).
 
 
 
 % Generates the specified certificate with subjectAlternativeName, either an
 % actual one, or a temporary (1 day), autosigned one.
 %
--spec generate_certificate( 'request' | 'autosigned', net_utils:bin_fqdn(),
-						file_path(), file_path(), [ san() ] ) -> void().
+-spec generate_certificate( 'request' | 'autosigned', bin_fqdn(), file_path(),
+							file_path(), [ san() ] ) -> void().
 generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 
 	% First, generates a configuration file, in the same directory as the target
@@ -373,7 +387,7 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 	Domain = text_utils:binary_to_string( BinDomain ),
 
 	ConfFilePath = file_utils:join( ConfDir,
-						"letsencrypt_san_openssl." ++ Domain ++ ".cnf" ),
+						"leec_san_openssl." ++ Domain ++ ".cnf" ),
 
 	cond_utils:if_defined( leec_debug_keys,
 		trace_bridge:debug_fmt( "Generating a certificate from '~s', in '~s', "

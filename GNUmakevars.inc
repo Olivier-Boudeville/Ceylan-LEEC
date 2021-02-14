@@ -32,13 +32,26 @@ else ifeq ($(EXECUTION_TARGET),production)
 
 else
 
-	$(error Invalid Leec execution target '$(EXECUTION_TARGET)'; expecting either 'development' or 'production')
+	$(error Invalid LEEC execution target '$(EXECUTION_TARGET)'; expecting either 'development' or 'production')
 
 endif
 
 
-# Enforce default values:
+# One may define here:
+# EXECUTION_TARGET := production / development [the default]
+# ENABLE_DEBUG := false / true [the default]
 
+
+# Tells whether the debug mode will be activated for the next LEEC modules to be
+# built (maximum performance versus extended checkings).
+#
+ifeq ($(ENABLE_DEBUG),true)
+	LEEC_DEBUG_OPT := -DDEBUG_LEEC -DLEEC_ENABLE_LOG=1
+	ENABLE_LEEC_DEBUG_OPT = -Dleec_debug_mode
+else
+	LEEC_DEBUG_OPT := -DLEEC_ENABLE_LOG=0
+	ENABLE_LEEC_DEBUG_OPT =
+endif
 
 
 # Defining (optional) layer-specific flags, typically used by in-code
@@ -87,23 +100,20 @@ endif
 # PROJECT_NAME should be defined on a per-project basis.
 ifndef PROJECT_NAME
 	# Namely Let's Encrypt Erlang Ceylan:
-	PROJECT_NAME := leec
+	PROJECT_NAME := Ceylan-LEEC
 endif
 
 
 # REBAR3_PROJECT_NAME should be defined on a per-project basis.
-ifndef REBAR3_PROJECT_NAME
-	#REBAR3_PROJECT_NAME := letsencrypt
-	REBAR3_PROJECT_NAME := leec
+ifndef PROJECT_NAME_FOR_REBAR
+	PROJECT_NAME_FOR_REBAR := leec
 endif
 
 
 # The uniquely-defined version of this layer, for all uses (including rebar and
 # hex):
 #
-# (shall correspond to the one in src/leec.app.src and in the docs)
-#
-LEEC_VERSION := 0.6.0
+LEEC_VERSION := 0.7.0
 
 
 # PROJECT_VERSION should be defined on a per-project basis.
@@ -147,8 +157,6 @@ LEEC_BEAM := $(LEEC_SRC)
 LEEC_INC = -I$(LEEC_TOP)/include
 
 
-ERLANG_COMPILER_BASE_WARNING_OPT = -W2 +warn_export_all +warn_export_vars +warn_shadow_vars +warn_obsolete_guards +warn_unused_import +warnings_as_errors
-
 # In an OTP/rebar3-style application layout, at compilation time, libraries
 # making use of Myriad will expect its includes to be located in:
 #
@@ -163,7 +171,38 @@ LEEC_BEAM_DIRS := $(LEEC_BEAM)
 
 # For OTP releases and all:
 
-LEEC_REBAR_BUILD_BASE = $(REBAR_BUILD_DIR)/lib/letsencrypt
+LEEC_REBAR_BUILD_BASE = $(REBAR_BUILD_DIR)/lib/leec
+
+
+# When building LEEC in an OTP context from its usual (GIT) root (ex: with
+# 'make rebar3-application'), the BEAMs of Myriad are to be found in the OTP
+# build tree - rather than in a supposedly fully-built usual root for Myriad:
+#
+# (these information are useful only at compilation-time, in order to locate the
+# needed parse transforms and their dependencies; at runtime, the OTP rules
+# ensure that the relevant ebin directories are in the code path)
+#
+# Note that this implies that the BEAM files in all ebin directories should be
+# up to date with the ones in the build trees, otherwise hard-to-debug
+# discrepancies may happen (these OTP/rebar-related directories act as default
+# catch-alls, should no prior directory correspond in the BEAM paths).
+#
+MYRIAD_OTP_BEAM_DIR_FROM_USUAL = $(LAYER_TOP)/$(MYRIAD_REBAR_BUILD_BASE)/ebin
+
+
+# In an OTP/rebar3-style application layout (not speaking of sibling base
+# directories here), at compilation time as well, modules compiled (directly or
+# not) by the Myriad parse transform will expect its modules to be located in:
+#
+# (a third place could be considered, in the _build tree of Myriad itself, yet
+# it would not provide any additional chance)
+#
+MYRIAD_OTP_BEAM_DIR_FROM_OTP = $(LAYER_TOP)/../myriad/ebin/
+
+
+# To locate Myriad modules from all OTP contexts:
+MYRIAD_PARSE_TRANSFORMS_PZ_OPT = -pz $(MYRIAD_OTP_BEAM_DIR_FROM_USUAL) \
+								 -pz $(MYRIAD_OTP_BEAM_DIR_FROM_OTP)
 
 
 # See Myriad counterpart variable (MYRIAD_BEAM_DIRS) for explanations:
@@ -174,11 +213,9 @@ LEEC_BEAM_DIRS = $(LEEC_TOP)/src
 BEAM_DIRS += $(LEEC_BEAM_DIRS)
 
 
-
 ifndef VM_TEST_NAME
 	VM_NAME := leec_debug
 endif
-
 
 ifndef VM_TEST_NAME
 	VM_TEST_NAME := leec_test
@@ -186,16 +223,8 @@ endif
 
 
 
-# Overall settings section.
-
-# One may define here:
-# EXECUTION_TARGET := production / development [the default]
-# ENABLE_LEEC_DEBUG := false / true [the default]
-
-
 
 # Build section.
-
 
 
 # Compiler section.
@@ -229,7 +258,7 @@ LEEC_PLT_FILE := $(LEEC_TOP)/leec.plt
 
 
 # This is the merged PLT of the level just below in the software stack.
-# For 'Letsencrypt', it is the PLT of 'Myriad':
+# For 'LEEC', it is the PLT of 'Myriad':
 ifndef PREDECESSOR_PLT
 	PREDECESSOR_PLT = $(MYRIAD_PLT_FILE)
 endif
@@ -255,6 +284,9 @@ PREREQ_ROOT = $(LEEC_TOP)/_build/default/lib
 # them and if all the packages mentioned here are themselves dependencies (in
 # which case they are all sitting together in the _checkouts child directory).
 #
+# Note also we rely on the names of build roots (ex: myriad) as opposed to
+# project/repository names (ex: Ceylan-Myriad):
+#
 # This means that a Ceylan build will ignore the Myriad version in PREREQ_ROOT
 # and use instead one defined just below.
 #
@@ -262,18 +294,23 @@ PREREQ_ROOT = $(LEEC_TOP)/_build/default/lib
 # them and if all the packages mentioned here are themselves dependencies (in
 # which case they are all sitting together in the _checkouts child directory).
 #
-# Note also we rely on the names of build roots (ex: myriad) as opposed to
+# Note also that we rely on the names of build roots (ex: myriad) as opposed to
 # project/repository names (ex: Ceylan-Myriad):
 #
 # First priority is an existing checkout directory:
 ifneq ($(wildcard $(LEEC_TOP)/_checkouts/myriad/.),)
 	MYRIAD_TOP = $(LEEC_TOP)/_checkouts/myriad
 else
-	# Otherwise a sibling one is searched for:
+	# Second, a sibling one is searched for:
 	ifneq ($(wildcard $(LEEC_TOP)/../myriad/.),)
 		MYRIAD_TOP = $(LEEC_TOP)/../myriad
    else
-		FORCE_EVAL := $(error Unable to find the build root of Ceylan-Myriad)
+		# Otherwise most probably in a 'rebar3 compile' context:
+		ifneq ($(wildcard $(LEEC_TOP)/_build/default/lib/myriad/.),)
+			MYRIAD_TOP = $(LEEC_TOP)/_build/default/lib/myriad
+		else
+			FORCE_EVAL := $(error Unable to find the build root of Ceylan-Myriad from $(realpath .).)
+		endif
 	endif
 endif
 
@@ -368,8 +405,8 @@ INC += $(foreach dir,$(LEEC_EXTRA_DEPS),-I$(dir)/include) -I$(SIBLING_ROOT) -I$(
 
 # These directories are not added anymore here, as otp_utils will also add them
 # programatically in the code path; moreover these paths would be transformed
-# (in launch-erl.sh) through realpath, which would lead them to be added as
-# NATIVE_BASE/leec/_build/default/lib/X instead of
+# (in launch-erl.sh) through realpath, which would lead them to be added for
+# example as NATIVE_BASE/leec/_build/default/lib/X instead of
 # NATIVE_BASE/us_web/_checkouts/leec/_build/default/lib/X (ex: X being jsx),
 # leading in turn the erroneous detection of duplicated BEAM files in the code
 # path (ex: jsx.beam).

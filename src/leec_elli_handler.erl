@@ -12,8 +12,25 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
--module(letsencrypt_elli_handler).
--behaviour(elli_handler).
+
+% Copyright (C) 2020-2021 Olivier Boudeville
+%
+% This file is part of the Ceylan-LEEC library, a fork of the Guillaume Bour's
+% letsencrypt-erlang library, released under the same licence.
+%
+-module(leec_elli_handler).
+
+% Original work:
+-author("Guillaume Bour (guillaume at bour dot cc)").
+
+% This fork:
+-author("Olivier Boudeville (olivier dot boudeville at esperide dot com").
+
+
+% Note: not integrated in Ceylan-LEEC, at least currently.
+
+
+%-behaviour(elli_handler).
 
 % Apparently not necessary:
 %-include_lib("elli/include/elli.hrl").

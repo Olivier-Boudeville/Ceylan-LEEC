@@ -12,8 +12,19 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
--module(letsencrypt_utils).
--author("Guillaume Bour <guillaume@bour.cc>").
+% Copyright (C) 2020-2021 Olivier Boudeville
+%
+% This file is part of the Ceylan-LEEC library, a fork of the Guillaume Bour's
+% letsencrypt-erlang library, released under the same licence.
+
+-module(leec_utils).
+
+% Original work:
+-author("Guillaume Bour (guillaume at bour dot cc)").
+
+% This fork:
+-author("Olivier Boudeville (olivier dot boudeville at esperide dot com").
+
 
 -export([ b64encode/1, jsonb64encode/2, hexdigest/1, hashdigest/2 ]).
 
@@ -22,7 +33,7 @@
 
 % Shorthands:
 
--type binary_b64() :: letsencrypt:binary_b64().
+-type binary_b64() :: leec:binary_b64().
 -type json_parser_state() :: json_utils:json_parser_state().
 
 
