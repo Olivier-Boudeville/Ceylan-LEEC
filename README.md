@@ -6,7 +6,7 @@
 
 This repository corresponds to the part of the [Ceylan project](https://github.com/Olivier-Boudeville/Ceylan) gathering all LEEC-related elements.
 
-The purpose of Ceylan-LEEC is to enable Erlang applications such as webservers to obtain the X.509 certificates that they need from ACME servers like the Let's Encrypt ones.
+The purpose of Ceylan-LEEC is to enable Erlang applications such as webservers to obtain the X.509 certificates that they need from ACME servers like the [Let's Encrypt](https://letsencrypt.org) ones.
 
 LEEC is a fork of the [Let's Encrypt client library for Erlang](https://github.com/gbour/letsencrypt-erlang) authored by Guillaume Bour.
 
