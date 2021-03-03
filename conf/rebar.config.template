@@ -76,7 +76,7 @@
 %
 {relx, [
 
-  {release, {leec_release, "VERSION_FOR_REBAR3"},
+  {release, {leec_release, "VERSION_FOR_REBAR"},
 			% myriad thus implied:
 			[sasl, leec]},
 
