@@ -14,7 +14,7 @@ pre.code {
 
 
 .literal {
-  color: #836b53;
+  color: #832433;
   font-weight: bold;
 }
 
@@ -359,7 +359,7 @@ th {
 
 
 td {
-   background: #dfa3a3;
+   background: #e0c2c2;
    font-size: 15px;
 }
 
@@ -411,7 +411,7 @@ td a {
 
 
 a:link {
-  color:#bb3230;
+  color:#bb221d;
   background: transparent;
   font-weight: bold;
   text-decoration: none;
@@ -420,7 +420,7 @@ a:link {
 
 
 a:visited {
-  color: #cc555d;
+  color: #bb3230;
   background: transparent;
   font-weight: bold;
   text-decoration: none;

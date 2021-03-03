@@ -1,8 +1,7 @@
-
 .. _Top:
 
 
-.. title:: Welcome to the Ceylan-LEEC 0.6.0 documentation
+.. title:: Welcome to the Ceylan-LEEC 0.6.1 documentation
 
 .. comment stylesheet specified through GNUmakefile
 
@@ -21,7 +20,7 @@
 
 :raw-html:`<a name="leec_top"></a>`
 
-:raw-html:`<div class="banner"><p><em>LEEC 0.6 documentation</em> <a href="http://leec.esperide.org">browse latest</a> <a href="https://olivier-boudeville.github.io/Ceylan-LEEC/leec.html">browse mirror</a> <a href="leec.pdf">get PDF</a> <a href="#leec_top">go to top</a> <a href="#leec_bottom">go to bottom</a> <a href="https://github.com/Olivier-Boudeville/Ceylan-LEEC">go to project</a> <a href="mailto:about(dash)leec(at)esperide(dot)com?subject=[Ceylan-LEEC%200.6]%20Remark">email us</a></p></div>`
+:raw-html:`<div class="banner"><p><em>LEEC 0.6 documentation</em> <a href="http://leec.esperide.org">browse latest</a> <a href="https://olivier-boudeville.github.io/Ceylan-LEEC">browse mirror</a> <a href="Ceylan-LEEC-technical-manual-english.pdf">get PDF</a> <a href="#leec_top">go to top</a> <a href="#leec_bottom">go to bottom</a> <a href="https://github.com/Olivier-Boudeville/Ceylan-LEEC">go to project</a> <a href="mailto:about(dash)leec(at)esperide(dot)com?subject=[Ceylan-LEEC%200.6]%20Remark">email us</a></p></div>`
 
 
 
@@ -30,20 +29,20 @@
 
 
 
-
---------------------------------------
-LEEC: Let's Encrypt Erlang with Ceylan
---------------------------------------
+============================================================
+Technical Manual of LEEC: *Let's Encrypt Erlang with Ceylan*
+============================================================
 
 
 :Organisation: Copyright (C) 2020-2021 Olivier Boudeville
 :Contact: about (dash) leec (at) esperide (dot) com
 :Creation date: Wednesday, November 11, 2020
-:Lastly updated: Saturday, January 23, 2021
-:Dedication: Users and maintainers of the ``LEEC`` library, version 0.6.
+:Lastly updated: Sunday, February 21, 2021
+:Dedication: Users and maintainers of the ``LEEC`` library
+:Version: 0.6.1
 :Abstract:
 
-	The role of the ``LEEC`` library is to interact from Erlang/OTP with Let's Encrypt servers, mostly in order to generate X.509 certificates.
+	The role of the ``LEEC`` library is to interact from Erlang/OTP with servers implementing the ACME protocol - specifically *Let's Encrypt* servers, mostly in order to generate X.509 certificates.
 
 
 .. meta::
@@ -52,18 +51,16 @@ LEEC: Let's Encrypt Erlang with Ceylan
 
 The latest version of this documentation is to be found at the `official LEEC website <http://leec.esperide.org>`_ (``http://leec.esperide.org``).
 
-:raw-html:`This LEEC documentation is also available in the PDF format (see <a href="leec.pdf">leec.pdf</a>), and mirrored <a href="http://olivier-boudeville.github.io/Ceylan-LEEC/leec.html">here</a>.`
+:raw-html:`This LEEC documentation is also available in the PDF format (see <a href="Ceylan-LEEC-technical-manual-english.pdf">Ceylan-LEEC-technical-manual-english.pdf</a>), and mirrored <a href="http://olivier-boudeville.github.io/Ceylan-LEEC/">here</a>.`
 
-:raw-latex:`The documentation is also mirrored \href{https://olivier-boudeville.github.io/Ceylan-LEEC/leec.html}{here}.`
+:raw-latex:`The documentation is also mirrored \href{https://olivier-boudeville.github.io/Ceylan-LEEC/}{here}.`
+
 
 
 
 :raw-latex:`\pagebreak`
 
-
-
 .. _`table of contents`:
-
 
 .. contents:: Table of Contents
   :depth: 3
@@ -72,53 +69,210 @@ The latest version of this documentation is to be found at the `official LEEC we
 :raw-latex:`\pagebreak`
 
 
+
+--------
 Overview
-========
+--------
 
-The online documentation for LEEC is currently available mostly `here <https://github.com/Olivier-Boudeville/Ceylan-LEEC>`_.
+.. The online documentation for LEEC is currently available mostly `here <https://github.com/Olivier-Boudeville/Ceylan-LEEC>`_.
 
-The project repository is located `here <https://github.com/Olivier-Boudeville/Ceylan-LEEC>`_ (was previously `here <https://github.com/Olivier-Boudeville/letsencrypt-erlang>`_).
+.. The project repository is located `here <https://github.com/Olivier-Boudeville/Ceylan-LEEC>`_.
+
+.. (was previously `here <https://github.com/Olivier-Boudeville/letsencrypt-erlang>`_).
+
+
+The LEEC library is the Ceylan fork of the original and much appreciated `letsencrypt-erlang <https://github.com/gbour/letsencrypt-erlang>`_, which is a `Let's Encrypt <https://letsencrypt.org/>`_ client library for Erlang whose author is Guillaume Bour.
+
+LEEC's purpose is to obtain proper X.509 security certificates from ``Let's Encrypt`` - or more generally `ACME servers <https://en.wikipedia.org/wiki/Automated_Certificate_Management_Environment>`_ (version 2), typically in order to secure one's webservers so that they can offer a solid HTTPS connectivity, which is pretty much standard nowadays.
+
+LEEC is notably used in the context of `US-Web <http://us-web.esperide.org/>`_.
 
 
 
+-----------------------------------
+Differences Introduced by this Fork
+-----------------------------------
+
+Compared to the original ``letsencrypt-erlang`` library, the main differences introduced by LEEC are:
+
+- it is more specialised, in the sense that LEEC focuses on the "slave" use case (i.e. to be directly integrated within an Erlang webserver), as opposed to the "webroot" one (a third-party webserver is running separately with little possibilities of direct interactions) or the "standalone" one (where no specific prior webserver would be running, the certificate agent operating then its own one)
+- more comments, more spell-checking, much clarification
+- more typing, more runtime checking, extended traces supported
+- security increased (notably using 4096-bit RSA keys)
+- dependency onto `Ceylan-Myriad <https://github.com/Olivier-Boudeville/Ceylan-Myriad>`_ added, to benefit from its facilities
+- JSON parser can be JSX (the default), or Jiffy (refer to the ``JSON parsers`` section)
+- HTTP client can be either ``Shotgun`` or the Erlang-native ``httpc`` client, to avoid any extra dependencies on ``Gun`` and ``Cowlib`` (whose versions could potentially clash with the ones required by any ``Cowboy``-based integrating webserver)
+- porting done from `gen_fsm <https://erlang.org/documentation/doc-6.1/lib/stdlib-2.1/doc/html/gen_fsm.html>`_ (soon to be deprecated) to the newer `gen_statem <https://erlang.org/doc/man/gen_statem.html>`_
+- minor API changes and additions, for a clearer and more flexible mode of operation
+- fixed the compilation with Erlang version 23.0 and higher (ex: w.r.t. to ``http_uri``/``uri_string``, to updated dependencies such as Jiffy, and newer Cowboy for the examples)
+- allow for *concurrent* certificate requests (ex: if managing multiple domains with different keys, new certificates being requested for all of them at webserver start-up); so LEEC generates certificates in parallel and does not rely on a *registered* FSM (*Finite State Machine*) anymore
+- global, ETS-based TCP connection pool replaced by an (optional) per-FSM internal cache (if relying on Shotgun)
+- support for SAN (`Subject Alternative Name <https://en.wikipedia.org/wiki/Subject_Alternative_Name>`_) certificates, an extension to X.509 enabling a certificate to include a ``subjectAltName`` field to list, here, extra DNS names that are covered by this certificate
+- basic support for the management of:
+
+  - *Ephemeral Diffie-Helman* key, to ensure *Forward Secrecy* by relying on a set of keys that are never communicated
+  - `Intermediate Let's Encrypt Certificates <https://letsencrypt.org/certificates/>`_
+
+
+
+..	 - ``connect_timeout`` deprecated in favor of ``http_timeout``
+
+
+So, even if LEEC can be seen mostly as a "reckless" fork (in the sense that it became quickly obvious that retaining upstream compatibility could hardly be achieved) - with so many source-level differences (in terms of conventions, Myriad integration, whitespace cleanup) that a pull request can difficultly be considered - yet, in spite of the appearances, it remained quite close to the original (mainly differences of form) and followed the same structure.
+
+By some ways, this LEEC fork is safer and more robust than the original, by others not (ex: test coverage, autonomous use, continuous integration). A key goal was to make it easier to understand and maintain.
+
+Most of the elements of `this pull request <https://github.com/gbour/letsencrypt-erlang/pull/16/>`_ from Marc Worrell have also been integrated.
+
+
+-------------
+Prerequisites
+-------------
+
+
+Dependency Basics
+=================
+
+The general dependencies are:
+
+- ``openssl``, version  1.1.1 or higher (required to generate RSA key and certificate request)
+- ``Erlang/OTP`` (tested with 23.1 versions and upwards)
+
+The LEEC-specific ones, which are automatically managed by rebar3 if opting for a rebar-based build, are:
+
+- a JSON parser: either `jsx <https://github.com/talentdeficit/jsx>`_ (the default) or `jiffy <https://github.com/davisp/jiffy>`_
+- `Ceylan-Myriad <http://myriad.esperide.org/>`_, for the various facilities on which LEEC relies
+- optional: a more advanced HTTP client than the `httpc <https://erlang.org/doc/man/httpc.html>`_ Erlang-native one, namely `Shotgun <https://github.com/inaka/shotgun>`_, which should be more efficient (TCP connection re-used, recent HTTP, etc.) at the cost of an extra dependency (which may clash with any your application may introduce, refer to the `dependency issues`_ section)
+
+
+
+Switching JSON Parsers
+======================
+
+If wanting to switch from the default `jsx <https://github.com/talentdeficit/jsx>`_ to `jiffy <https://github.com/davisp/jiffy>`_, following files shall be updated:
+
+- `rebar.config <https://github.com/Olivier-Boudeville/letsencrypt-erlang/blob/master/rebar.config>`_ (knowing it is generated from `conf/leec.app.src <https://github.com/Olivier-Boudeville/Ceylan-LEEC/blob/master/conf/leec.app.src>`_)
+- `src/leec.app.src <https://github.com/Olivier-Boudeville/Ceylan-LEEC/blob/master/src/leec.app.src>`_ (knowing it is a mere symlink to ``ebin/leec.app``, which is itself generated from  `conf/leec.app.src <https://github.com/Olivier-Boudeville/Ceylan-LEEC/blob/master/conf/leec.app.src>`_)
+
+(none in Myriad)
+
+
+
+.. _`dependency issues`:
+
+Dependency Issues between Webservers and HTTP(s) Clients
+========================================================
+
+A potential dependency problem is that many Erlang-based webservers are powered by Cowboy (thus Cowlib) whereas LEEC used to rely necessarily on Shotgun, thus on Gun (and thus Cowlib) as well. Most of the time this implied different (potentially incompatible) versions of Cowlib, whereas only up to one should exist in the code path at any time.
+
+We prefer sticking to the Cowlib version that is induced by Cowboy. At the time of this writing, the latest Cowboy stable version (the one that webserver projects such as `US-Web <https://github.com/Olivier-Boudeville/us-web/>`_ want) is 2.8.0 and relies on Cowlib 2.9.1, whereas the latest Shotgun stable version, 0.5.0, is lagging behind, relying on Gun 1.3.1, itself relying on Cowlib 2.6.0 (too old).
+
+An attempt of solution was to remove the dependency of LEEC onto Shotgun (as it induced a dependency on an older Cowlib) but to use Gun instead, which is lower-level yet might be chosen in order to rely on the target Cowlib version. However we did not found a suitable Gun version for that (1.3 being too old, 2.0.* not ready).
+
+So a last-resort solution has been to rely instead on the even lower-level Erlang-native `httpc <https://erlang.org/doc/man/httpc.html>`_ client module (involving ``inets`` and ``ssl``). The result, although based only on HTTP/1.1 with no connection-reuse, proved satisfactory right from the start and thus is provided as an alternate way of using LEEC, without involving any extra dependency.
+
+This allows embedding LEEC with only one dependency onto Myriad and one onto a JSON parser (either jsx or jiffy) - and no other one (top-level or induced).
+
+
+
+--------
+Building
+--------
+
+Two build procedures can be used (from the root of LEEC), and are now mostly the same:.
+
+- either a rebar3-based one; then run ``make all-rebar3``, simply corresponding to:
+
+.. code:: bash
+
+ $ rebar3 upgrade
+ $ rebar3 compile
+
+- or one relying on Ceylan's native build system; once the relevant prerequisites have been setup (selected, downloaded, built), just run ``make all``
+
+This last procedure is the one that we prefer and use routinely (see the `US-Web native deployment script <https://github.com/Olivier-Boudeville/us-web/blob/master/priv/bin/deploy-us-web-native-build.sh>`_ as an example thereof).
+
+
+
+-------------
+Usage Example
+-------------
+
+The main example of LEEC in action can be found in link with `US-Web <https://us-web.esperide.org/>`_, whose sources can be found `here <https://github.com/Olivier-Boudeville/us-web/src>`_; see notably `class_USCertificateManager.erl <https://github.com/Olivier-Boudeville/us-web/blob/master/src/class_USCertificateManager.erl>`_ and `us_web_letsencrypt_handler.erl <https://github.com/Olivier-Boudeville/us-web/blob/master/src/us_web_letsencrypt_handler.erl>`_.
+
+This mode of operation, described `in this section <https://us-web.esperide.org/#managing-public-key-certificates>`_, is typical of the use case where an Erlang-based webserver (in this case based on `Cowboy <https://github.com/ninenines/cowboy>`_) has to renew certificates corresponding to the various virtual hosts (possibly dispatched under various domains) that it is making available.
+
+A first part is to create as many LEEC FSMs as domains of interest, which will connect to the target ACME servers (most probably Let's Encrypt ones). Each FSM is a LEEC agent that will generate its own (strong) RSA key, create automatically its throwaway ACME account on the server, secure properly the communication (with TLS signatures, nonces, etc.), and wait for further user request regarding its domain of interest (ex: ``foobar.org``).
+
+Such a request is bound to ask the ACME server to generate (as a Certificate Authority) a X.509 certificate covering, thanks to SAN, a set of subdomains (FQDN) to secure (ex: ``hello.foobar.org``, ``hurricane.foobar.org``) - knowing that no wildcard certificate can be obtained with the ``http-01`` challenge being used here. The ACME server will send challenges to LEEC so that it can prove that it controls indeed all these subdomains.
+
+A second part of the LEEC action is to ensure that these answers are available indeed, as tokens. In practice the ACME server will attempt to read them at specific URLs (prefixed with ``.well-known/acme-challenge/``) expected to be served for these subdomains (most probably thanks to virtual hosting). If the ACME server is able to query and read, directly from a domain, the right tokens corresponding to the challenges it sent for this domain, then the proof of actual control by the requester is established, and the ACME server can thus issue a corresponding certificate and transmit it appropriately to LEEC.
+
+The overall webserver of the user shall thus track the transitions of these FSMs until (hopefully) they successfully complete their procedure and obtain from their ACME server the corresponding certificate. Then only the user webserver will be able to fire its https support with these brand new certificates [#]_.
+
+.. [#] Before, even if suitable certificates were pre-existing, at least the ACME URL prefix was to remain over http instead of being automatically promoted to https as all others.
+
+
+Finally, a task scheduler may be used to trigger renewals on time (not too soon, not too late, as ACME rules apply and, of course, each FQDN shall be covered by a valid certificate at any time), and a task ring may be used to (paradoxically) ensure that the webserver as a whole does not interact too much in parallel (through its various LEEC FSMs) with the ACME server (despite hosting potentially a large number of FQDNs), knowing that severe rate limits (example in `production <https://letsencrypt.org/docs/rate-limits/>`_) apply.
+
+LEEC does its best to go through this procedure, validating as much as possible each of these steps for a better reliability/control, and reporting outcome for tracability and error management.
+
+In practice, the user code is expected:
+
+(A) to initialise first LEEC, with ``leec:start/{1,2}`` and proper options (see `leec.erl <https://github.com/Olivier-Boudeville/Ceylan-LEEC/blob/master/src/leec.erl>`_); the PID of the corresponding LEEC FSM is then returned
+(B) to request, thanks to this PID, a certificate to be generated for a domain, with ``leec:obtain_certificate_for/{2,3}``
+(C) to answer properly to the corresponding challenges for each (sub)domain, by delivering the right LEEC-computed tokens; see ``leec:send_ongoing_challenges/2``
+(D) to poll this FSM to establish if/when the targeted certificate is available; actually it is more convenient to define in (2) a callback to be triggered by LEEC when appropriate
+
+
+For US-Web, (1), (2) and (4) are managed by `class_USCertificateManager.erl <https://github.com/Olivier-Boudeville/us-web/blob/master/src/class_USCertificateManager.erl>`_ (see respectively ``init_leec/5``, ``request_certificate/1`` and the ``onCertificateRequestOutcome/2`` callback). (3) is taken in charge by `us_web_letsencrypt_handler.erl <https://github.com/Olivier-Boudeville/us-web/blob/master/src/us_web_letsencrypt_handler.erl>`_ (see ``init/2``).
+
+
+
+------------
 Design Notes
-============
+------------
+
 
 
 Multiple Domains Having Each Multiple Hostnames
------------------------------------------------
+===============================================
 
-At least the ACME servers from Let's Encrypt enforce various fairly low `rate limits <https://letsencrypt.org/docs/rate-limits/>`_, which leads to preferring requesting certificates only on a per-domain basis (ex: for ``foobar.org``) rather than on a per-hostname one (ex: for ``baz.foobar.org``, ``hurrican.foobar.org``, etc., these hosts being virtual ones or not), as such requests would quickly become too numerous to respect these rate thresholds.
+At least the ACME servers from Let's Encrypt enforce various rate limits (both in `production environment <https://letsencrypt.org/docs/rate-limits/>`_ and in `staging <https://letsencrypt.org/docs/staging-environment/>`_ one) that are fairly low, which leads to preferring requesting certificates only on a per-domain basis (ex: globally for ``foobar.org``) rather than on a per-hostname host basis (ex: one for ``baz.foobar.org``, another one for ``hurrican.foobar.org``, etc., these hosts being virtual ones or not), as such requests would quickly become too numerous to respect these rate thresholds.
 
 A per-domain certificate should then include directly its various hostnames as *Subject Alternative Names* (SAN entries).
 
-With the ``http-01`` challenge type, no wildcard for such SAN hosts (ex: ``*.foobar.org``) cannot be specified), so all the wanted ones have to be explicitly listed [#]_.
+With the ``http-01`` challenge type, no wildcard for such SAN hosts (ex: ``*.foobar.org``) can be specified, so all the wanted ones have to be explicitly listed [#]_.
 
-.. [#] As a result, the certificate may disclose virtual hosts that would be otherwise invisible from the Internet (as not even declared in the DNS entries for that domain).
+.. [#] As a result, the certificate may disclose virtual hosts that would be otherwise invisible from the Internet (as not even declared in the DNS entries for that domain that would act as wildcard name resolvers).
 
-So for example, with LEEC, the certificate for ``foobar.org`` should list following SAN entries: ``baz.foobar.org``, ``hurrican.foobar.org``, etc.
+So for example, with LEEC, the certificate for ``foobar.org`` (that would be managed by a dedicated LEEC agent) should list following SAN entries: ``baz.foobar.org``, ``hurrican.foobar.org``, etc.
 
 
 
 Concurrent Certificate Operations
----------------------------------
+=================================
 
-LEEC implemented independent (``gen_statem``) FSMs to allow typically for concurrent certificate renewals to be triggered. A drawback of the aforementioned Let's Encrypt rate limits is that, while a given FSM is to remain below said thresholds, a set of parallel ones may not.
+LEEC implemented independent (``gen_statem``) FSMs to allow typically for concurrent certificate renewals to be triggered (thanks to autonomous LEEC agents, per-FSM connection pools, separate keys, etc.).
 
-If a `task ring <https://olivier-boudeville.github.io/us-common/#facilities-provided-by-this-layer>`_ may be used to avoid by design such FSMs to overlap, another option is to use a single FSM and to trigger certificate requests in turn.
+A drawback of the aforementioned Let's Encrypt rate limits is that, while a given FSM is to remain below said thresholds, a set of parallel ones may not.
+
+Should this issue arise, an option is to use a single FSM and to trigger certificate requests in turn. Another one is to rely on a `task ring <https://olivier-boudeville.github.io/us-common/#facilities-provided-by-this-layer>`_ in order to avoid by design that such FSMs overlap.
+
 
 
 .. _CAA:
 
 Let's Encrypt Accounts
-----------------------
+======================
 
 Currently LEEC creates automatically throwaway ACME accounts, which is convenient yet may prevent the use if `CAA <https://letsencrypt.org/docs/caa/>`_ (*Certificate Authority Authorization*).
 
 
 
+----------------------------------------------------
 Getting Information about the Generated Certificates
-====================================================
+----------------------------------------------------
 
 If using LEEC to generate a certificate for a ``baz.foobar.org`` host, the following three files shall be obtained from the Let's Encrypt ACME server:
 
@@ -190,18 +344,20 @@ To get information about this certificate::
 	[...]
 
 
+-----------------------
 Other Files of Interest
-=======================
+-----------------------
 
-A ``*.key`` (ex: ``my-foobar-leec-agent-private.key``) file is (PEM, strong enough) RSA private key generated by LEEC so that its agent can safely authenticate to the ACME servers it is interacting with.
+A ``*.key`` (ex: ``my-foobar-leec-agent-private.key``) file is a (PEM, strong enough) RSA private key generated by LEEC so that its agent can safely authenticate to the ACME servers it is interacting with.
 
 ``lets-encrypt-r3-cross-signed.pem`` is the (PEM) certificate associated to the *Certificate Authority* (Let's Encrypt here). It is automatically downloaded by LEEC if not already available.
 
-The ``dh-params.pem`` file contains the parameters generated by LEEC in order to allow for safer *Ephemeral Diffie-Helman key exchanges* that is used to provide Forward Secrecy with TLS (see `this article <https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange>`_ for further information).
+The ``dh-params.pem`` file contains the parameters generated by LEEC in order to allow for safer *Ephemeral Diffie-Helman key exchanges* that is used to provide Forward Secrecy with TLS (see `this article <https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange>`_ for further information). Its generation may take quite some time.
 
 
+------------------------------------------------
 Troubleshooting HTTPS Certificate-related Issues
-================================================
+------------------------------------------------
 
 In order to understand why a given host (typically a webserver) does not seem to handle properly certificates, one may experiment with these commands from a client computer:
 
@@ -221,44 +377,51 @@ From the server itself:
  $ netstat -ltpn | grep ':443'
 
 
-Using third-party solutions:
-
-- test your server with `SSL Labs <https://www.ssllabs.com/ssltest/analyze.html>`_
+Third-party solutions might also be used, like testing your server with `SSL Labs <https://www.ssllabs.com/ssltest/analyze.html>`_; thanks to LEEC, `US-Web can be ranked "grade A" <https://us-web.esperide.org/#usage-recommendations>`_ there.
 
 
+-------
+Licence
+-------
+
+Ceylan-LEEC is distributed under the APACHE 2.0 licence, like the original work that it derives from.
 
 
-Dependency Issues between Webservers and HTTP(s) Clients
-========================================================
-
-A potential dependency problem is that many Erlang-based webservers are powered by Cowboy (thus Cowlib) whereas LEEC used to rely necessarily on Shotgun, thus on Gun (and thus Cowlib) as well. Most of the time this implied different (potentially incompatible) versions of Cowlib, whereas only up to one should exist in the code path at any time.
-
-We prefer sticking to the Cowlib version that is induced by Cowboy. At the time of this writing, the latest Cowboy stable version (the one that webserver projects such as `US-Web <https://github.com/Olivier-Boudeville/us-web/>`_ want) is 2.8.0 and relies on Cowlib 2.9.1, whereas the latest Shotgun stable version, 0.5.0, is lagging behind, relying on Gun 1.3.1, itself relying on Cowlib 2.6.0 (too old).
-
-An attempt of solution was to remove the dependency of LEEC onto Shotgun (as it induced a dependency on an older Cowlib) but to use Gun instead, which is lower-level yet might be chosen in order to rely on the target Cowlib version. However we did not found a suitable Gun version for that (1.3 being too old, 2.0.* not ready).
-
-So a last-resort solution has been to rely instead on the even lower-level Erlang-native `httpc <https://erlang.org/doc/man/httpc.html>`_ client module (involving ``inets`` and ``ssl``). The result, although based only on HTTP/1.1 with no connection-reuse, proved satisfactory right from the start and thus is provided as an alternate way of using LEEC, without any extra dependency.
-
-This allows embedding LEEC with only a dependency onto Myriad and a JSON parser (either JSX or Jiffy), and no other one (top-level or induced).
-
-
+-------
 Support
-=======
+-------
 
-Bugs, questions, remarks, patches, requests for enhancements, etc. are to be sent through the `project interface <https://github.com/Olivier-Boudeville/Ceylan-LEEC>`_, or directly at the email address mentioned at the beginning of this document.
+Bugs, questions, remarks, patches, requests for enhancements, etc. are to be sent through the `project interface <https://github.com/Olivier-Boudeville/Ceylan-LEEC>`_ (typically `issues <https://github.com/Olivier-Boudeville/Ceylan-LEEC/issues>`_), or directly at the email address mentioned at the beginning of this document.
 
 
 
+---------------------
+Possible Enhancements
+---------------------
+
+- re-using ACME accounts: not creating throwaway, anonymous accounts but (possibly) reusing them by registering the ACME client with its email, etc.
+- supporting certificate revocation
+- supporting Elliptic Curve cryptography
+- reintroducing elements brought by the upstream project yet not updated by the current fork: unit testing, standalone testing, hex package, various escripts and yml files involved
+- besides the slave mode (main use case of interest with LEEC), better integrating/testing the other modes (webroot and standalone)
+- supporting extra validation challenges, besides ``http-01``, like ``dns-01`` (necessary to obtain wildcard certificates, i.e. applying to all subdomains of a given domain) and ``proof-of-possession-01``
+- supporting directly other ACME services besides ``Let's Encrypt`` (like ``ZeroSSL``)
+
+
+
+-------------
 Please React!
-=============
+-------------
 
 If you have information more detailed or more recent than those presented in this document, if you noticed errors, neglects or points insufficiently discussed, drop us a line! (for that, follow the Support_ guidelines).
 
 
+-----------
 Ending Word
-===========
+-----------
 
-Have fun with LEEC! (not supposed to involve any memory leak)
+Have fun with LEEC!
+(not supposed to involve any memory leak)
 
 .. comment Mostly added to ensure there is at least one figure directive,
 .. otherwise the LateX graphic support will not be included:
