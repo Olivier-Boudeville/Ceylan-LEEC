@@ -29,8 +29,8 @@ all:
 
 
 all-rebar3:
-	@$(REBAR3_EXEC) upgrade
-	@$(REBAR3_EXEC) compile
+	@$(MYRIAD_REBAR_EXEC) upgrade
+	@$(MYRIAD_REBAR_EXEC) compile
 
 
 # First target for default:
@@ -46,22 +46,23 @@ help-leec:
 
 
 register-version-in-header:
-	@if [ -z "$(VERSION_FILE)" ] ; then \
-	echo "Error, no version file defined." 1>&2 ; exit 51 ; else \
-	$(MAKE) register-leec ; fi
+	@if [ -z "$(VERSION_FILE)" ]; then \
+	echo "Error, no version file defined." 1>&2; exit 51; else \
+	$(MAKE) register-leec; fi
 
 
 register-leec:
 	@echo "-define( leec_version, \"$(LEEC_VERSION)\" )." >> $(VERSION_FILE)
 
 
-test-leec:
-	@bin/eletsencrypt --config etc/leec-test.yml
+# Maybe one day:
+#test-leec:
+#	@bin/eleec --config etc/leec-test.yml
 
 
 # Useful to extract internal layout for re-use in upper layers:
 list-beam-dirs:
-	@for d in $(LEEC_BEAM_DIRS) ; do echo $$(readlink -f $$d) ; done
+	@for d in $(LEEC_BEAM_DIRS); do echo $$(readlink -f $$d); done
 
 
 add-prerequisite-plts: link-plt
@@ -119,11 +120,11 @@ clean-archive:
 
 
 check-types:
-	@$(REBAR3_EXEC) dialyzer
+	@$(MYRIAD_REBAR_EXEC) dialyzer
 
 
 check-cross-references:
-	@$(REBAR3_EXEC) xref
+	@$(MYRIAD_REBAR_EXEC) xref
 
 
 info-paths:
