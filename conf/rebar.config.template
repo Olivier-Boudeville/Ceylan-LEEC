@@ -61,10 +61,20 @@
 {erl_opts, [ {d,myriad_debug_mode}, {d,leec_debug_mode}, debug_info, {debug_info_key,"DEBUG_KEY_FOR_REBAR"}, report_warnings, warn_export_all, warn_export_vars, warn_shadow_vars, warn_obsolete_guards, warn_unused_import, warnings_as_errors, INCS_FOR_REBAR, {d,myriad_httpc_backend,native_httpc} ]}.
 
 
-% Could not set REBAR_PROFILE=$(REBAR_PROFILE):
+% (hooks needed, for example to create the include symlinks and for the build
+% itself)
+%
+% Previously 'MYRIAD_REBAR_PROFILE=${REBAR_PROFILE}' was added, yet
+% REBAR_PROFILE is actually not set, so we rely on our default value instead.
+%
 {pre_hooks,  [ {compile, "make -s rebar3-compile-pre-hook"} ]}.
 {post_hooks, [ {compile, "make -s rebar3-compile-post-hook"} ]}.
 
+% Possibly useful sooner or later, should spurious, ill-configured compilations
+% may be wrongly attempted by rebar3, when used as a dependency:
+%
+%{pre_hooks,  [ {compile, "make -s rebar3-bulletproof-compile-pre-hook"} ]}.
+%{post_hooks, [ {compile, "make -s rebar3-bulletproof-compile-post-hook"} ]}.
 
 
 % For release generation:
