@@ -113,7 +113,7 @@ endif
 # The uniquely-defined version of this layer, for all uses (including rebar and
 # hex):
 #
-LEEC_VERSION := 0.7.0
+LEEC_VERSION := 0.7.1
 
 
 # PROJECT_VERSION should be defined on a per-project basis.

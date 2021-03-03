@@ -26,7 +26,7 @@
 
   {description, "Ceylan-LEEC, a letsencrypt.org client library for Erlang, the Ceylan fork of letsencrypt-erlang, as an OTP library application here (see http://leec.esperide.org)"},
 
-  {vsn, "0.7.03"},
+  {vsn, "0.7.1"},
 
   {registered, []},
 
@@ -58,7 +58,7 @@
   {env,[]},
 
   % Flat hierarchy in ebin here:
-  {modules, [leec, leec_api, leec_elli_handler, leec_jws, leec_tls, leec_utils3]},
+  {modules, [leec, leec_api, leec_elli_handler, leec_jws, leec_tls, leec_utils]},
 
   {maintainers, ["Olivier Boudeville (original author of letsencrypt-erlang: Guillaume Bour)"]},
 
@@ -70,9 +70,9 @@
   {links, [ {"Official website", "http://leec.esperide.org" },
 			{"Github", "https://github.com/Olivier-Boudeville/Ceylan-LEEC"} ]},
 
-  {build_tools, ["rebar"]},
+  %{build_tools, ["rebar"]},
 
-   % Include escript & configuration into hex package:
-  {include_files, ["bin/eletsencrypt", "etc/eletsencrypt.yml"]}
+  % Include escript & configuration into hex package:
+  %{include_files, ["bin/eletsencrypt", "etc/eletsencrypt.yml"]}
 
  ]}.
