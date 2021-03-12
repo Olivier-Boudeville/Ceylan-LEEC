@@ -12,11 +12,6 @@
 .. role:: raw-latex(raw)
    :format: latex
 
-.. comment Would appear too late, can only be an be used only in preamble:
-.. comment :raw-latex:`\usepackage{graphicx}`
-.. comment As a result, in this document at least a '.. figure:: XXXX' must
-.. exist, otherwise: 'Undefined control sequence \includegraphics.'.
-
 
 :raw-html:`<a name="leec_top"></a>`
 
@@ -24,8 +19,8 @@
 
 
 
-:raw-html:`<center><img src="leec-title.png" width="50%"></img></center>`
-:raw-latex:`\includegraphics[scale=0.40]{leec-title.png}`
+:raw-html:`<center><img src="leec-title.png" width="25%"></img></center>`
+:raw-latex:`\centering \includegraphics[scale=0.55]{leec-title.png}`
 
 
 
@@ -37,7 +32,7 @@ Technical Manual of LEEC: *Let's Encrypt Erlang with Ceylan*
 :Organisation: Copyright (C) 2020-2021 Olivier Boudeville
 :Contact: about (dash) leec (at) esperide (dot) com
 :Creation date: Wednesday, November 11, 2020
-:Lastly updated: Sunday, February 21, 2021
+:Lastly updated: Friday, March 12, 2021
 :Dedication: Users and maintainers of the ``LEEC`` library
 :Version: 0.6.1
 :Abstract:
@@ -420,15 +415,10 @@ If you have information more detailed or more recent than those presented in thi
 Ending Word
 -----------
 
-Have fun with LEEC!
+Have fun with Ceylan-LEEC!
 (not supposed to involve any memory leak)
 
-.. comment Mostly added to ensure there is at least one figure directive,
-.. otherwise the LateX graphic support will not be included:
-
-.. figure:: leec-title.png
-   :alt: LEEC logo
-   :width: 35%
-   :align: center
+:raw-html:`<center><img src="leec-title.png" width="15%"></img></center>`
+:raw-latex:`\begin{figure}[h] \centering \includegraphics[scale=0.3]{leec-title.png} \end{figure}`
 
 :raw-html:`<a name="leec_bottom"></a>`
