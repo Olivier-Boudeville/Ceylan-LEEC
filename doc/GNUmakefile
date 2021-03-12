@@ -35,7 +35,7 @@ GITHUB_PAGES_BASE := $(shell basename "$(LEEC_WEB_MIRROR_BRANCH)")
 
 .PHONY: doc all full-doc html pdf clone-mirror           \
 		export-doc export-to-official export-to-mirror   \
-		clean clean-doc info info-web
+		clean clean-doc clean-links info info-web
 
 
 
@@ -89,8 +89,13 @@ export-to-mirror: $(DOC_GENERATED_FILES)
 clean: clean-doc
 
 
-clean-doc:
+clean-doc: clean-links
+	@echo "     Cleaning documentation"
 	-@/bin/rm -f *.aux *.log *.maf *.mtc* *.stc* *.tex *.toc $(DOC_GENERATED_FILES)
+
+
+clean-links:
+	-@/bin/rm -f index.html
 
 
 info: info-doc info-web
