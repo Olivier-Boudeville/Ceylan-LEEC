@@ -88,7 +88,7 @@ run() ->
 			throw( { no_agent_key_path_obtained, FirstLeecFsmPid } );
 
 		BinKPath ->
-			trace_utils:info_fmt( "Obtained agent key path '~s'.",
+			trace_utils:info_fmt( "Obtained agent key path '~ts'.",
 								  [ BinKPath ] ),
 			BinKPath
 
@@ -157,7 +157,8 @@ run() ->
 
 		false ->
 			test_facilities:display_fmt( "No attempt to generate a certificate "
-			  "here for '~s' (bound to fail in this context).", [ DomainName ] )
+				"here for '~ts' (bound to fail in this context).",
+				[ DomainName ] )
 
 	end,
 

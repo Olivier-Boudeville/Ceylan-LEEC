@@ -99,7 +99,7 @@ obtain_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 
 	cond_utils:if_defined( leec_debug_keys,
 		trace_bridge:debug_fmt( "[~w] Generated filename for the LEEC agent "
-			"private key: '~s'.", [ self(), UniqBinFilename ] ) ),
+			"private key: '~ts'.", [ self(), UniqBinFilename ] ) ),
 
 	obtain_private_key( { new, UniqBinFilename }, BinCertDirPath );
 
@@ -109,7 +109,7 @@ obtain_private_key( _KeyFileInfo={ new, BinKeyFilename }, BinCertDirPath ) ->
 	KeyFilePath = file_utils:join( BinCertDirPath, BinKeyFilename ),
 
 	cond_utils:if_defined( leec_debug_keys,
-		trace_bridge:debug_fmt( "[~w] A private key is to be created in '~s'.",
+		trace_bridge:debug_fmt( "[~w] A private key is to be created in '~ts'.",
 								[ self(), KeyFilePath ] ) ),
 
 	case file_utils:is_existing_file( KeyFilePath ) of
@@ -118,7 +118,7 @@ obtain_private_key( _KeyFileInfo={ new, BinKeyFilename }, BinCertDirPath ) ->
 			% The user code shall remove any prior key first if wanting to avoid
 			% this warning:
 			%
-			trace_bridge:warning_fmt( "A '~s' key file was already existing, "
+			trace_bridge:warning_fmt( "A '~ts' key file was already existing, "
 				"overwriting it.", [ KeyFilePath ] );
 
 		false ->
@@ -140,12 +140,12 @@ obtain_private_key( _KeyFileInfo={ new, BinKeyFilename }, BinCertDirPath ) ->
 		{ _ReturnCode=0, CommandOutput } ->
 			cond_utils:if_defined( leec_debug_keys,
 				trace_bridge:debug_fmt( "Private key creation successful; "
-					"following output was made: ~s.", [ CommandOutput ] ),
+					"following output was made: ~ts.", [ CommandOutput ] ),
 				basic_utils:ignore_unused( CommandOutput ) );
 
 		{ ErrorCode, CommandOutput } ->
 			trace_bridge:error_fmt(
-			  "Command for creating private key failed (error code: ~B): ~s.",
+			  "Command for creating private key failed (error code: ~B): ~ts.",
 			  [ ErrorCode, CommandOutput ] ),
 			throw( { private_key_generation_failed, ErrorCode, CommandOutput,
 					 KeyFilePath } )
@@ -163,7 +163,7 @@ obtain_private_key( _KeyFileInfo={ new, BinKeyFilename }, BinCertDirPath ) ->
 	end,
 
 	cond_utils:if_defined( leec_debug_keys,
-		trace_bridge:debug_fmt( "[~w] Creation of private key in '~s' "
+		trace_bridge:debug_fmt( "[~w] Creation of private key in '~ts' "
 			"succeeded.", [ self(), KeyFilePath ] ) ),
 
 	% Now load it (next clause), and return it as a tls_private_key():
@@ -228,12 +228,12 @@ obtain_dh_key( CertDir ) ->
 
 		true ->
 			trace_bridge:info_fmt(
-				"A DH file was found already existing (as '~s'), not "
+				"A DH file was found already existing (as '~ts'), not "
 				"recreating it.", [ DhFilePath ] ),
 			BinDhFilePath;
 
 		false ->
-			trace_bridge:warning_fmt( "No DH file found (no '~s'), "
+			trace_bridge:warning_fmt( "No DH file found (no '~ts'), "
 				"creating it; note that it is a longer operation.",
 				[ DhFilePath ] ),
 
@@ -251,11 +251,11 @@ obtain_dh_key( CertDir ) ->
 				% Unconditionally emitted due to the longer duration:
 				{ _ReturnCode=0, CommandOutput } ->
 					trace_bridge:info_fmt( "DH key creation successful; "
-						 "following output was made: ~s.", [ CommandOutput ] );
+						"following output was made: ~ts.", [ CommandOutput ] );
 
 				{ ErrorCode, CommandOutput } ->
 					trace_bridge:error_fmt( "Command for creating private key "
-						"failed (error code: ~B): ~s.",
+						"failed (error code: ~B): ~ts.",
 						[ ErrorCode, CommandOutput ] ),
 					throw( { dh_key_generation_failed, ErrorCode, CommandOutput,
 							 DhFilePath } )
@@ -299,14 +299,14 @@ obtain_ca_cert_file( TargetDir, _CertProvider=letsencrypt ) ->
 
 			trace_bridge:info_fmt(
 				"Certificate authority certificate file was found already "
-				"existing (as '~s'), not downloading it.", [ FilePath ] ),
+				"existing (as '~ts'), not downloading it.", [ FilePath ] ),
 
 			text_utils:string_to_binary( FilePath );
 
 		false ->
 
 			trace_bridge:info_fmt( "No certificate authority certificate "
-				"file found (no '~s'), downloading it from ~s.",
+				"file found (no '~ts'), downloading it from ~ts.",
 				[ FilePath, CAUrl ] ),
 
 			% Expected to be equal to FilePath:
@@ -324,8 +324,8 @@ obtain_ca_cert_file( TargetDir, _CertProvider=letsencrypt ) ->
 get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 
 	cond_utils:if_defined( leec_debug_keys,
-		trace_bridge:debug_fmt( "[~w] Generating certificate request for '~s', "
-			"with SANs: ~s",
+		trace_bridge:debug_fmt( "[~w] Generating certificate request for "
+			"'~ts', with SANs: ~ts",
 			[ self(), BinDomain, text_utils:strings_to_string( SANs ) ] ) ),
 
 	Domain = text_utils:binary_to_string( BinDomain ),
@@ -335,7 +335,7 @@ get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 	CertFilePath = file_utils:join( BinCertDirPath, Domain ++ ".csr" ),
 
 	cond_utils:if_defined( leec_debug_keys,
-		trace_bridge:debug_fmt( "CSR file path: '~s'.", [ CertFilePath ] ) ),
+		trace_bridge:debug_fmt( "CSR file path: '~ts'.", [ CertFilePath ] ) ),
 
 	generate_certificate( request, BinDomain, CertFilePath, KeyFilePath, SANs ),
 
@@ -390,9 +390,10 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 						"leec_san_openssl." ++ Domain ++ ".cnf" ),
 
 	cond_utils:if_defined( leec_debug_keys,
-		trace_bridge:debug_fmt( "Generating a certificate from '~s', in '~s', "
-			"based on following SAN names: ~s", [ ConfFilePath, OutCertPath,
-				text_utils:strings_to_string( AllNames ) ] ) ),
+		trace_bridge:debug_fmt( "Generating a certificate from '~ts', "
+			"in '~ts', based on following SAN names: ~ts",
+			[ ConfFilePath, OutCertPath,
+			  text_utils:strings_to_string( AllNames ) ] ) ),
 
 	file_utils:write_whole( ConfFilePath, ConfDataStr ),
 
@@ -407,7 +408,7 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 	end,
 
 	Cmd = text_utils:format(
-			"~s req -new -key '~s' -sha256 -out '~s' -config '~s'",
+			"~ts req -new -key '~ts' -sha256 -out '~ts' -config '~ts'",
 			[ executable_utils:get_default_openssl_executable_path(),
 			  KeyfilePath, OutCertPath, ConfFilePath ] ) ++ CertTypeOptStr,
 
@@ -418,12 +419,12 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 
 		{ _ReturnCode=0, CommandOutput } ->
 			trace_bridge:warning_fmt(
-			  "Command output when generating certificate: ~s",
+			  "Command output when generating certificate: ~ts",
 			  [ CommandOutput ] );
 
 		{ ErrorCode, CommandOutput } ->
 			trace_bridge:error_fmt(
-			  "Command for generating certificate failed (error code: ~B): ~s",
+			  "Command for generating certificate failed (error code: ~B): ~ts",
 			  [ ErrorCode, CommandOutput ] ),
 			throw( { certificate_generation_failed, ErrorCode, CommandOutput } )
 
@@ -444,8 +445,8 @@ write_certificate( Domain, BinDomainCert, BinCertDirPath ) ->
 	CertFilePath = file_utils:join( BinCertDirPath, Domain ++ ".crt" ),
 
 	cond_utils:if_defined( leec_debug_keys,
-		trace_bridge:debug_fmt( "Writing certificate for domain '~s' "
-			"in '~s':~n  ~p.", [ Domain, CertFilePath, BinDomainCert ] ) ),
+		trace_bridge:debug_fmt( "Writing certificate for domain '~ts' "
+			"in '~ts':~n  ~p.", [ Domain, CertFilePath, BinDomainCert ] ) ),
 
 	% For example in case of renewal:
 	file_utils:remove_file_if_existing( CertFilePath ),
@@ -472,6 +473,6 @@ map_to_key( Map ) ->
 
 	% Ensures all keys are extracted (using one of our map primitives):
 	{ [ Kty, N, E ], _RemainingTable=#{} } = map_hashtable:extract_entries(
-							   [ <<"kty">>, <<"n">>, <<"e">> ], Map ),
+								[ <<"kty">>, <<"n">>, <<"e">> ], Map ),
 
 	#tls_public_key{ kty=Kty, n=N, e=E }.

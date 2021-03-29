@@ -64,6 +64,8 @@
 
 % Shorthands:
 
+-type bin_string() :: text_utils:bin_string().
+
 -type body() :: web_utils:body().
 -type nonce() :: web_utils:nonce().
 -type http_status_code() :: web_utils:http_status_code().
@@ -101,8 +103,8 @@
 
 
 
-% Returns the status corresponding to specified binary.
--spec binary_to_status( binary() ) -> leec:status().
+% Returns the status corresponding to specified binary string.
+-spec binary_to_status( bin_string() ) -> leec:status().
 binary_to_status( <<"pending">> ) ->
 	pending;
 
@@ -151,8 +153,8 @@ get_tcp_connection( Proto, Host, Port, TCPCache ) ->
 		key_not_found ->
 
 			cond_utils:if_defined( leec_debug_network,
-			  trace_bridge:debug_fmt( "[~w] Opening a connection to ~s:~B, "
-				"with the '~s' scheme.", [ self(), Host, Port, Proto ] ) ),
+			  trace_bridge:debug_fmt( "[~w] Opening a connection to ~ts:~B, "
+				"with the '~ts' scheme.", [ self(), Host, Port, Proto ] ) ),
 
 			Conn = case shotgun:open( Host, Port, Proto ) of
 
@@ -160,14 +162,14 @@ get_tcp_connection( Proto, Host, Port, TCPCache ) ->
 					Connection;
 
 				{ error, gun_open_failed } ->
-					trace_bridge:error_fmt( "[~w] Connection to ~s:~B, "
-						"with the '~s' scheme, failed.",
+					trace_bridge:error_fmt( "[~w] Connection to ~ts:~B, "
+						"with the '~ts' scheme, failed.",
 						[ self(), Host, Port, Proto ] ),
 				   throw( { gun_open_failed, Host, Port, Proto } );
 
 				{ error, Error } ->
-					trace_bridge:error_fmt( "[~w] Connection to ~s:~B, "
-						"with the '~s' scheme, failed: ~p.",
+					trace_bridge:error_fmt( "[~w] Connection to ~ts:~B, "
+						"with the '~ts' scheme, failed: ~p.",
 						[ self(), Host, Port, Proto, Error ] ),
 				   throw( { gun_open_failed, Error, Host, Port, Proto } )
 
@@ -182,8 +184,8 @@ get_tcp_connection( Proto, Host, Port, TCPCache ) ->
 
 		{ value, Conn } ->
 			cond_utils:if_defined( leec_debug_network,
-			  trace_bridge:debug_fmt( "[~w] Reusing connection to ~s:~B, "
-				  "with the '~s' scheme: ~w.",
+			  trace_bridge:debug_fmt( "[~w] Reusing connection to ~ts:~B, "
+				  "with the '~ts' scheme: ~w.",
 				  [ self(), Host, Port, Proto, Conn ] ) ),
 			{ Conn, TCPCache }
 
@@ -278,8 +280,8 @@ request( Method, Uri, Headers, MaybeBinContent, CertReqOptionMap, LEState ) ->
 				maybe( bin_content() ), cert_req_option_map(), le_state() ) ->
 						{ http_body(), le_state() }.
 request_via_shotgun( Method, Uri, Headers, MaybeBinContent,
-		 CertReqOptionMap=#{ netopts := Netopts },
-		 LEState=#le_state{ tcp_connection_cache=TCPCache } ) ->
+		CertReqOptionMap=#{ netopts := Netopts },
+		LEState=#le_state{ tcp_connection_cache=TCPCache } ) ->
 
 	UriStr = text_utils:ensure_string( Uri ),
 
@@ -306,10 +308,10 @@ request_via_shotgun( Method, Uri, Headers, MaybeBinContent,
 
 	cond_utils:if_defined( leec_debug_exchanges,
 		trace_bridge:debug_fmt( "[~w] Preparing a (shotgun-based) ~p request "
-								"to '~s'.", [ self(), Method, Uri ] ) ),
+								"to '~ts'.", [ self(), Method, Uri ] ) ),
 
 	ContentHeaders = Headers#{ <<"content-type">> =>
-								   <<"application/jose+json">> },
+									<<"application/jose+json">> },
 
 
 	% We want to reuse connection if it already exists:
@@ -321,7 +323,7 @@ request_via_shotgun( Method, Uri, Headers, MaybeBinContent,
 		get ->
 			cond_utils:if_defined( leec_debug_exchanges,
 				trace_bridge:debug_fmt( "[~w][client] GET request to URI "
-					"'~s', with following content headers:~n  ~p~n and "
+					"'~ts', with following content headers:~n  ~p~n and "
 					"network options ~p.",
 					[ self(), UriStr, ContentHeaders, Netopts ] ) ),
 
@@ -340,7 +342,7 @@ request_via_shotgun( Method, Uri, Headers, MaybeBinContent,
 
 			cond_utils:if_defined( leec_debug_exchanges,
 				trace_bridge:debug_fmt( "[~w][client] POST request to URI "
-					"'~s', with following content headers:~n  ~p~n and "
+					"'~ts', with following content headers:~n  ~p~n and "
 					"content ~p, with network options ~p.",
 					[ self(), UriStr, ContentHeaders, NillableContent,
 					  Netopts ] ) ),
@@ -355,8 +357,8 @@ request_via_shotgun( Method, Uri, Headers, MaybeBinContent,
 
 	% Very useful yet quite verbose:
 	cond_utils:if_defined( leec_debug_codec,
-		trace_bridge:debug_fmt( "[~w][client] The '~s' request to ~s resulted "
-			"in:~n  ~p", [ self(), Method, UriStr, ReqRes ] ) ),
+		trace_bridge:debug_fmt( "[~w][client] The '~ts' request to ~ts "
+			"resulted in:~n  ~p", [ self(), Method, UriStr, ReqRes ] ) ),
 
 	% Typically success results in ReqRes like:
 
@@ -407,7 +409,7 @@ request_via_native_httpc( Method, Uri, Headers, MaybeBinContent,
 
 	cond_utils:if_defined( leec_debug_exchanges,
 		trace_bridge:debug_fmt( "[~w] Preparing a (httpc-based) ~p request "
-								"to '~s'.", [ self(), Method, Uri ] ) ),
+								"to '~ts'.", [ self(), Method, Uri ] ) ),
 
 	% Readily compliant:
 	HttpOpts = Netopts,
@@ -417,7 +419,7 @@ request_via_native_httpc( Method, Uri, Headers, MaybeBinContent,
 		get ->
 			cond_utils:if_defined( leec_debug_exchanges,
 				trace_bridge:debug_fmt( "[~w][client] GET request to URI "
-					"'~s', with following headers:~n  ~p~nand "
+					"'~ts', with following headers:~n  ~p~nand "
 					"HTTP options: ~p.",
 					[ self(), Uri, Headers, Netopts ] ) ),
 
@@ -437,8 +439,8 @@ request_via_native_httpc( Method, Uri, Headers, MaybeBinContent,
 
 			cond_utils:if_defined( leec_debug_exchanges,
 				trace_bridge:debug_fmt( "[~w][client] POST request to URI "
-					"'~s', with following headers:~n  ~p~n"
-					"HTTP options: ~p~nContent: ~p~nContent-type: ~s.",
+					"'~ts', with following headers:~n  ~p~n"
+					"HTTP options: ~p~nContent: ~p~nContent-type: ~ts.",
 					[ self(), Uri, Headers, HttpOpts, MaybeBinContent,
 					  MaybeContentType ] ) ),
 
@@ -449,8 +451,8 @@ request_via_native_httpc( Method, Uri, Headers, MaybeBinContent,
 
 	% Very useful yet quite verbose:
 	cond_utils:if_defined( leec_debug_codec,
-		trace_bridge:debug_fmt( "[~w][client] The '~s' request to ~s resulted "
-			"in:~n  ~p", [ self(), Method, Uri, ReqRes ] ) ),
+		trace_bridge:debug_fmt( "[~w][client] The '~ts' request to ~ts "
+			"resulted in:~n  ~p", [ self(), Method, Uri, ReqRes ] ) ),
 
 	% Typically success results in ReqRes like:
 
@@ -506,7 +508,7 @@ on_failed_request( StatusCode, StepAtom ) ->
 
 	StatusStr = web_utils:interpret_http_status_code( StatusCode ),
 
-	trace_bridge:critical_fmt( "An ACME request failed at the '~s' step: ~s.",
+	trace_bridge:critical_fmt( "An ACME request failed at the '~ts' step: ~ts.",
 							   [ StepAtom, StatusStr ] ),
 
 	throw( { request_failed, { status_code, StatusCode }, { reason, StatusStr },
@@ -528,8 +530,8 @@ on_failed_request( StatusCode, JsonMapBody, StepAtom ) ->
 
 	Detail = maps:get( <<"detail">>, JsonMapBody, unknown ),
 
-	trace_bridge:critical_fmt( "An ACME request failed at the '~s' step: ~s, "
-		"for the following reason: ~s (error type: ~s).",
+	trace_bridge:critical_fmt( "An ACME request failed at the '~ts' step: ~ts, "
+		"for the following reason: ~ts (error type: ~ts).",
 		[ StepAtom, StatusStr, Detail, Type ] ),
 
 	Reason = case Detail of
@@ -572,7 +574,7 @@ get_directory_map( Env, CertReqOptionMap, LEState ) ->
 	end,
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
-		"[~w] Getting directory map at ~s.", [ self(), DirUri ] ) ),
+		"[~w] Getting directory map at ~ts.", [ self(), DirUri ] ) ),
 
 	{ #{ json := DirectoryMap, status_code := StatusCode }, NewLEState } =
 		request( _Method=get, DirUri, _Headers=#{}, _MaybeBinContent=undefined,
@@ -603,7 +605,7 @@ get_directory_map( Env, CertReqOptionMap, LEState ) ->
 get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges,
-		trace_bridge:debug_fmt( "[~w] Getting new nonce from ~s.",
+		trace_bridge:debug_fmt( "[~w] Getting new nonce from ~ts.",
 								[ self(), Uri ] ) ),
 
 	{ #{ nonce := Nonce, status_code := StatusCode }, NewLEState }  =
@@ -644,7 +646,7 @@ get_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 				  CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges,
-		trace_bridge:debug_fmt( "[~w] Requesting a new account from ~s.",
+		trace_bridge:debug_fmt( "[~w] Requesting a new account from ~ts.",
 								[ self(), Uri ] ) ),
 
 	% Terms of service should not be automatically agreed.
@@ -683,7 +685,7 @@ get_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 	end,
 
 	cond_utils:if_defined( leec_debug_exchanges,
-		trace_bridge:debug_fmt( "[~w] Account location URI is '~s', "
+		trace_bridge:debug_fmt( "[~w] Account location URI is '~ts', "
 			"JSON response is :~n  ~p", [ self(), LocationUri, RespMap ] ) ),
 
 	{ { RespMap, LocationUri, NewNonce }, NewLEState }.
@@ -705,7 +707,7 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 						 PrivKey, AccountJws, CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
-		"[~w] Requesting a new certificate from ~s for:~n  ~p",
+		"[~w] Requesting a new certificate from ~ts for:~n  ~p",
 		[ self(), OrderUri, BinDomains ] ) ),
 
 	Idns = [ #{ type => dns, value => BinDomain } || BinDomain <- BinDomains ],
@@ -732,12 +734,12 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 	end,
 
 	cond_utils:if_defined( leec_debug_codec, trace_bridge:debug_fmt(
-		"[~w] Obtained from order URI '~s' the "
-		"location '~s' and following JSON:~n  ~p",
+		"[~w] Obtained from order URI '~ts' the "
+		"location '~ts' and following JSON:~n  ~p",
 		[ self(), OrderUri, LocationUri, OrderJsonMap ] ) ),
 
-	%trace_bridge:debug_fmt( "[~w] Obtained from order URI '~s' the "
-	%	"location '~s'.", [ self(), OrderUri, LocationUri ] ),
+	%trace_bridge:debug_fmt( "[~w] Obtained from order URI '~ts' the "
+	%	"location '~ts'.", [ self(), OrderUri, LocationUri ] ),
 
 	% OrderJsonMap like:
 	%
@@ -761,7 +763,7 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 get_order( Uri, Key, Jws, CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
-		"[~w] Getting order at ~s.", [ self(), Uri ] ) ),
+		"[~w] Getting order at ~ts.", [ self(), Uri ] ) ),
 
 	% POST-as-GET implies no payload:
 
@@ -801,7 +803,7 @@ get_order( Uri, Key, Jws, CertReqOptionMap, LEState ) ->
 request_authorization( AuthUri, PrivKey, Jws, CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
-		"[~w] Requesting authorization from ~s.", [ self(), AuthUri ] ) ),
+		"[~w] Requesting authorization from ~ts.", [ self(), AuthUri ] ) ),
 
 	% POST-as-GET implies no payload:
 	B64AuthReq = leec_jws:encode( PrivKey, Jws#jws{ url=AuthUri },
@@ -842,7 +844,7 @@ notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
 		"[~w] Notifying the ACME server that our agent is "
-		"ready for challenge validation at ~s.", [ self(), Uri ] ) ),
+		"ready for challenge validation at ~ts.", [ self(), Uri ] ) ),
 
 	% POST-as-GET implies no payload:
 	Req = leec_jws:encode( PrivKey, Jws#jws{ url=Uri }, _Content=#{}, LEState ),
@@ -876,7 +878,7 @@ finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 				CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
-		"[~w] Finalizing order at ~s.", [ self(), FinUri ] ) ),
+		"[~w] Finalizing order at ~ts.", [ self(), FinUri ] ) ),
 
 	Payload = #{ csr => Csr },
 
@@ -895,7 +897,7 @@ finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 
 		% If trying to progress whereas a past operation failed:
 		Forbidden=403 ->
-			trace_bridge:error_fmt( "Unable to finalize order (~s). "
+			trace_bridge:error_fmt( "Unable to finalize order (~ts). "
 				"Possibly a past operation failed.",
 				[ web_utils:interpret_http_status_code( Forbidden ) ] ),
 			throw( { forbidden_status_code, StatusCode, finalize_order } );
@@ -920,7 +922,7 @@ get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, CertReqOptionMap,
 				 LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
-		"[~w] Downloading certificate at ~s.", [ self(), Uri ] ) ),
+		"[~w] Downloading certificate at ~ts.", [ self(), Uri ] ) ),
 
 	% POST-as-GET implies no payload:
 	Req = leec_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined,
