@@ -28,17 +28,20 @@
 
 -export([ b64encode/1, jsonb64encode/2, hexdigest/1, hashdigest/2 ]).
 
--type character() :: integer().
-
 
 % Shorthands:
 
--type binary_b64() :: leec:binary_b64().
+-type any_string() :: text_utils:any_string().
+
 -type json_parser_state() :: json_utils:json_parser_state().
+
+-type binary_b64() :: leec:binary_b64().
+
+
 
 
 % Encodes specified content in b64.
--spec b64encode( string() | binary() ) -> binary_b64().
+-spec b64encode( any_string() ) -> binary_b64().
 b64encode( X ) ->
 	Base64 = base64:encode( X ),
 	<< <<(encode_byte( B )):8>> || <<B:8>> <= Base64, B =/= $= >>.
@@ -46,7 +49,7 @@ b64encode( X ) ->
 
 
 % Encodes specified content first in JSON, then in b64.
-%-spec jsonb64encode( string() | binary() ) -> binary_b64().
+%-spec jsonb64encode( any_string() ) -> binary_b64().
 -spec jsonb64encode( map(), json_parser_state() ) -> binary_b64().
 jsonb64encode( X, ParserState ) when is_map( X ) ->
 
@@ -62,7 +65,7 @@ jsonb64encode( X, _ParserState ) ->
 
 
 % (helper)
--spec encode_byte( character() ) -> character().
+-spec encode_byte( byte() ) -> byte().
 encode_byte( $+ ) ->
 	$-;
 
@@ -75,7 +78,7 @@ encode_byte( B ) ->
 
 
 % Returns the hex digest of specified argument.
--spec hexdigest( string() | binary() ) -> binary().
+-spec hexdigest( any_string() ) -> binary().
 hexdigest( X ) ->
 	<< <<( hex( H ) ),( hex(L) )>> || <<H:4,L:4>> <= X >>.
 
