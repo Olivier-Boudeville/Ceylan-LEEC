@@ -129,7 +129,7 @@ obtain_private_key( _KeyFileInfo={ new, BinKeyFilename }, BinCertDirPath ) ->
 	Cmd = executable_utils:get_default_openssl_executable_path()
 		++ " genrsa -out '" ++ KeyFilePath ++ "' 4096",
 
-	case system_utils:run_executable( Cmd ) of
+	case system_utils:run_command( Cmd ) of
 
 		{ _ReturnCode=0, _CommandOutput="" } ->
 			ok;
@@ -240,7 +240,7 @@ obtain_dh_key( CertDir ) ->
 			Cmd = executable_utils:get_default_openssl_executable_path()
 				++ " dhparam -out '" ++ DhFilePath ++ "' 3072",
 
-			case system_utils:run_executable( Cmd ) of
+			case system_utils:run_command( Cmd ) of
 
 				{ _ReturnCode=0, _CommandOutput="" } ->
 					 ok;
@@ -412,7 +412,7 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 			[ executable_utils:get_default_openssl_executable_path(),
 			  KeyfilePath, OutCertPath, ConfFilePath ] ) ++ CertTypeOptStr,
 
-	case system_utils:run_executable( Cmd ) of
+	case system_utils:run_command( Cmd ) of
 
 		{ _ReturnCode=0, _CommandOutput="" } ->
 			ok;
