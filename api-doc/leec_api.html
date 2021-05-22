@@ -1,0 +1,255 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Module leec_api</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css" title="EDoc">
+</head>
+<body bgcolor="white">
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<hr>
+
+<h1>Module leec_api</h1>
+<ul class="index"><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>This module centralises the main functions regarding the <b>API used to
+ interact with ACME servers</b>.
+
+
+<h2><a name="description">Description</a></h2>This module centralises the main functions regarding the <b>API used to
+ interact with ACME servers</b>.
+
+<h2><a name="types">Data Types</a></h2>
+
+<h3 class="typedecl"><a name="type-bin_certificate">bin_certificate()</a></h3>
+<p><tt>bin_certificate() = <a href="leec.html#type-bin_certificate">leec:bin_certificate()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-bin_csr_key">bin_csr_key()</a></h3>
+<p><tt>bin_csr_key() = <a href="leec.html#type-bin_csr_key">leec:bin_csr_key()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-bin_domain">bin_domain()</a></h3>
+<p><tt>bin_domain() = <a href="leec.html#type-bin_domain">leec:bin_domain()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-bin_key">bin_key()</a></h3>
+<p><tt>bin_key() = <a href="leec.html#type-bin_key">leec:bin_key()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-bin_string">bin_string()</a></h3>
+<p><tt>bin_string() = <a href="text_utils.html#type-bin_string">text_utils:bin_string()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-bin_uri">bin_uri()</a></h3>
+<p><tt>bin_uri() = <a href="leec.html#type-bin_uri">leec:bin_uri()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-cert_req_option_map">cert_req_option_map()</a></h3>
+<p><tt>cert_req_option_map() = <a href="leec.html#type-cert_req_option_map">leec:cert_req_option_map()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-challenge">challenge()</a></h3>
+<p><tt>challenge() = <a href="leec.html#type-challenge">leec:challenge()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-directory_map">directory_map()</a></h3>
+<p><tt>directory_map() = <a href="leec.html#type-directory_map">leec:directory_map()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-environment">environment()</a></h3>
+<p><tt>environment() = default | staging</tt></p>
+
+
+<h3 class="typedecl"><a name="type-json_map_decoded">json_map_decoded()</a></h3>
+<p><tt>json_map_decoded() = <a href="leec.html#type-json_map_decoded">leec:json_map_decoded()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-jws">jws()</a></h3>
+<p><tt>jws() = <a href="leec.html#type-jws">leec:jws()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-le_state">le_state()</a></h3>
+<p><tt>le_state() = <a href="leec.html#type-le_state">leec:le_state()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-maybe">maybe()</a></h3>
+<p><tt>maybe(T) = <a href="basic_utils.html#type-maybe">basic_utils:maybe</a>(T)</tt></p>
+
+
+<h3 class="typedecl"><a name="type-nonce">nonce()</a></h3>
+<p><tt>nonce() = <a href="web_utils.html#type-nonce">web_utils:nonce()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-order_map">order_map()</a></h3>
+<p><tt>order_map() = <a href="leec.html#type-order_map">leec:order_map()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-table">table()</a></h3>
+<p><tt>table(K, V) = <a href="map_hashtable.html#type-map_hashtable">map_hashtable:map_hashtable</a>(K, V)</tt></p>
+
+
+<h3 class="typedecl"><a name="type-tcp_connection_cache">tcp_connection_cache()</a></h3>
+<p><tt>tcp_connection_cache() = <a href="leec.html#type-tcp_connection_cache">leec:tcp_connection_cache()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-tls_private_key">tls_private_key()</a></h3>
+<p><tt>tls_private_key() = <a href="leec.html#type-tls_private_key">leec:tls_private_key()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-void">void()</a></h3>
+<p><tt>void() = <a href="basic_utils.html#type-void">basic_utils:void()</a></tt></p>
+
+
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#binary_to_status-1">binary_to_status/1</a></td><td>Returns the status corresponding to specified binary string.</td></tr>
+<tr><td valign="top"><a href="#close_tcp_connections-1">close_tcp_connections/1</a></td><td>Closes all pending (cached) TCP connections.</td></tr>
+<tr><td valign="top"><a href="#finalize_order-6">finalize_order/6</a></td><td>Finalizes the order once a challenge has been validated.</td></tr>
+<tr><td valign="top"><a href="#get_acme_account-5">get_acme_account/5</a></td><td>Requests an account obtained (indirectly) for specified private key.</td></tr>
+<tr><td valign="top"><a href="#get_certificate-5">get_certificate/5</a></td><td>Downloads certificate for finalized order and returns itself.</td></tr>
+<tr><td valign="top"><a href="#get_directory_map-3">get_directory_map/3</a></td><td>Returns a directory map listing all ACME protocol URLs.</td></tr>
+<tr><td valign="top"><a href="#get_nonce-3">get_nonce/3</a></td><td>Gets and returns a fresh nonce by using the corresponding URI.</td></tr>
+<tr><td valign="top"><a href="#get_order-5">get_order/5</a></td><td>Orders a new certificate from the ACME server.</td></tr>
+<tr><td valign="top"><a href="#get_tcp_connection-4">get_tcp_connection/4</a></td><td>Returns a suitable TCP connection.</td></tr>
+<tr><td valign="top"><a href="#notify_ready_for_challenge-5">notify_ready_for_challenge/5</a></td><td>Notifies the ACME server that we are ready for challenge validation.</td></tr>
+<tr><td valign="top"><a href="#request_authorization-5">request_authorization/5</a></td><td>Requests authorization for given identifier.</td></tr>
+<tr><td valign="top"><a href="#request_new_certificate-6">request_new_certificate/6</a></td><td>Requests (orders from ACME) a new certificate (of DNS type).</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="binary_to_status-1">binary_to_status/1</a></h3>
+<div class="spec">
+<p><tt>binary_to_status(InvalidBinStatus::<a href="#type-bin_string">bin_string()</a>) -&gt; <a href="leec.html#type-status">leec:status()</a></tt><br></p>
+<p> </p>
+</div><p>Returns the status corresponding to specified binary string.</p>
+
+<h3 class="function"><a name="close_tcp_connections-1">close_tcp_connections/1</a></h3>
+<div class="spec">
+<p><tt>close_tcp_connections(TCPCache::<a href="#type-tcp_connection_cache">tcp_connection_cache()</a>) -&gt; <a href="#type-void">void()</a></tt><br></p>
+<p> </p>
+</div><p>Closes all pending (cached) TCP connections.</p>
+
+<h3 class="function"><a name="finalize_order-6">finalize_order/6</a></h3>
+<div class="spec">
+<p><tt>finalize_order(OrderDirMap::<a href="#type-order_map">order_map()</a>, Csr::<a href="#type-bin_csr_key">bin_csr_key()</a>, PrivKey::<a href="#type-tls_private_key">tls_private_key()</a>, Jws::<a href="#type-jws">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LEState::<a href="#type-le_state">le_state()</a>) -&gt; {{<a href="#type-json_map_decoded">json_map_decoded()</a>, <a href="#type-bin_uri">bin_uri()</a>, <a href="#type-nonce">nonce()</a>}, <a href="#type-le_state">le_state()</a>}</tt><br></p>
+<p> </p>
+</div><p><p>Finalizes the order once a challenge has been validated.</p>
+
+ Refer to <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4" target="_top"><tt>https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4</tt></a>.
+</p>
+
+<h3 class="function"><a name="get_acme_account-5">get_acme_account/5</a></h3>
+<div class="spec">
+<p><tt>get_acme_account(DirMap::<a href="#type-directory_map">directory_map()</a>, PrivKey::<a href="#type-tls_private_key">tls_private_key()</a>, Jws::<a href="#type-jws">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LEState::<a href="#type-le_state">le_state()</a>) -&gt; {{<a href="#type-json_map_decoded">json_map_decoded()</a>, <a href="#type-bin_uri">bin_uri()</a>, <a href="#type-nonce">nonce()</a>}, <a href="#type-le_state">le_state()</a>}</tt><br></p>
+<p> </p>
+</div><p><p>Requests an account obtained (indirectly) for specified private key.</p>
+
+ <p>Refer to <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-7.3.1" target="_top"><tt>https://www.rfc-editor.org/rfc/rfc8555.html#section-7.3.1</tt></a>.</p>
+
+ <p>This is either a new account or one that was already created by this FSM.</p>
+
+ <p>Returns {Response, Location, Nonce}, where:</p>
+
+ <p>- Response is json (decoded as map)</p>
+
+ <p>- Location is the URL corresponding to the created ACME account</p>
+
+ - Nonce is a new valid replay-nonce
+</p>
+
+<h3 class="function"><a name="get_certificate-5">get_certificate/5</a></h3>
+<div class="spec">
+<p><tt>get_certificate(X1::<a href="#type-order_map">order_map()</a>, Key::<a href="#type-tls_private_key">tls_private_key()</a>, Jws::<a href="#type-jws">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LEState::<a href="#type-le_state">le_state()</a>) -&gt; {{<a href="#type-bin_certificate">bin_certificate()</a>, <a href="#type-nonce">nonce()</a>}, <a href="#type-le_state">le_state()</a>}</tt><br></p>
+<p> </p>
+</div><p><p>Downloads certificate for finalized order and returns itself.</p>
+
+ Refer to <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.2" target="_top"><tt>https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.2</tt></a>.
+</p>
+
+<h3 class="function"><a name="get_directory_map-3">get_directory_map/3</a></h3>
+<div class="spec">
+<p><tt>get_directory_map(Env::<a href="#type-environment">environment()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LEState::<a href="#type-le_state">le_state()</a>) -&gt; {<a href="leec.html#type-directory_map">leec:directory_map()</a>, <a href="#type-le_state">le_state()</a>}</tt><br></p>
+<p> </p>
+</div><p><p>Returns a directory map listing all ACME protocol URLs.</p>
+
+ Refer to <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-7.1.1" target="_top"><tt>https://www.rfc-editor.org/rfc/rfc8555.html#section-7.1.1</tt></a>.
+</p>
+
+<h3 class="function"><a name="get_nonce-3">get_nonce/3</a></h3>
+<div class="spec">
+<p><tt>get_nonce(DirMap::<a href="#type-directory_map">directory_map()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LEState::<a href="#type-le_state">le_state()</a>) -&gt; {<a href="#type-nonce">nonce()</a>, <a href="#type-le_state">le_state()</a>}</tt><br></p>
+<p> </p>
+</div><p><p>Gets and returns a fresh nonce by using the corresponding URI.</p>
+
+ Refer to <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-7.2" target="_top"><tt>https://www.rfc-editor.org/rfc/rfc8555.html#section-7.2</tt></a>.
+</p>
+
+<h3 class="function"><a name="get_order-5">get_order/5</a></h3>
+<div class="spec">
+<p><tt>get_order(Uri::<a href="#type-bin_uri">bin_uri()</a>, Key::<a href="#type-bin_key">bin_key()</a>, Jws::<a href="#type-jws">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LEState::<a href="#type-le_state">le_state()</a>) -&gt; {{<a href="#type-json_map_decoded">json_map_decoded()</a>, <a href="#type-bin_uri">bin_uri()</a>, <a href="#type-nonce">nonce()</a>}, <a href="#type-le_state">le_state()</a>}</tt><br></p>
+<p> </p>
+</div><p>Orders a new certificate from the ACME server.</p>
+
+<h3 class="function"><a name="get_tcp_connection-4">get_tcp_connection/4</a></h3>
+<div class="spec">
+<p><tt>get_tcp_connection(Proto::<a href="net_utils.html#type-protocol_type">net_utils:protocol_type()</a>, Host::<a href="net_utils.html#type-string_host_name">net_utils:string_host_name()</a>, Port::<a href="net_utils.html#type-tcp_port">net_utils:tcp_port()</a>, TCPCache::<a href="#type-tcp_connection_cache">tcp_connection_cache()</a>) -&gt; {<a href="shotgun.html#type-connection">shotgun:connection()</a>, <a href="#type-tcp_connection_cache">tcp_connection_cache()</a>}</tt><br></p>
+<p> </p>
+</div><p><p>Returns a suitable TCP connection.</p>
+
+ If a connection to the given Proto://Host:Port is already opened, returns it,
+ otherwise returns a newly opened connection.
+</p>
+
+<h3 class="function"><a name="notify_ready_for_challenge-5">notify_ready_for_challenge/5</a></h3>
+<div class="spec">
+<p><tt>notify_ready_for_challenge(Challenge::<a href="#type-challenge">challenge()</a>, PrivKey::<a href="#type-bin_key">bin_key()</a>, Jws::<a href="#type-jws">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LEState::<a href="#type-le_state">le_state()</a>) -&gt; {{<a href="#type-json_map_decoded">json_map_decoded()</a>, <a href="#type-bin_uri">bin_uri()</a>, <a href="#type-nonce">nonce()</a>}, <a href="#type-le_state">le_state()</a>}</tt><br></p>
+<p> </p>
+</div><p><p>Notifies the ACME server that we are ready for challenge validation.</p>
+
+ <p>Refer to <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-7.5.1" target="_top"><tt>https://www.rfc-editor.org/rfc/rfc8555.html#section-7.5.1</tt></a>.</p>
+
+ <p>Returns {Response, Location, Nonce}, where:</p>
+
+  <p>- Response is json (decoded as map)</p>
+
+  <p>- Location is create account url</p>
+
+  <p>- Nonce is a new valid replay-nonce</p>
+
+</p>
+
+<h3 class="function"><a name="request_authorization-5">request_authorization/5</a></h3>
+<div class="spec">
+<p><tt>request_authorization(AuthUri::<a href="#type-bin_uri">bin_uri()</a>, PrivKey::<a href="#type-tls_private_key">tls_private_key()</a>, Jws::<a href="#type-jws">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LEState::<a href="#type-le_state">le_state()</a>) -&gt; {{<a href="#type-json_map_decoded">json_map_decoded()</a>, <a href="#type-bin_uri">bin_uri()</a>, <a href="#type-nonce">nonce()</a>}, <a href="#type-le_state">le_state()</a>}</tt><br></p>
+<p> </p>
+</div><p><p>Requests authorization for given identifier.</p>
+
+ <p>Refer to <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.1" target="_top"><tt>https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.1</tt></a>.</p>
+
+ Returns {Response, Location, Nonce}, where:
+  - Response is json (decoded as map)
+  - Location is create account url
+  - Nonce is a new valid replay-nonce
+</p>
+
+<h3 class="function"><a name="request_new_certificate-6">request_new_certificate/6</a></h3>
+<div class="spec">
+<p><tt>request_new_certificate(DirMap::<a href="#type-directory_map">directory_map()</a>, BinDomains::[<a href="#type-bin_domain">bin_domain()</a>], PrivKey::<a href="#type-tls_private_key">tls_private_key()</a>, AccountJws::<a href="#type-jws">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LEState::<a href="#type-le_state">le_state()</a>) -&gt; {{<a href="#type-json_map_decoded">json_map_decoded()</a>, <a href="#type-bin_uri">bin_uri()</a>, <a href="#type-nonce">nonce()</a>}, <a href="#type-le_state">le_state()</a>}</tt><br></p>
+<p> </p>
+</div><p><p>Requests (orders from ACME) a new certificate (of DNS type).</p>
+
+ <p>Refer to <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4" target="_top"><tt>https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4</tt></a>.</p>
+
+ <p>Returns {Response, Location, Nonce}, where:</p>
+
+ <p>- Response is json (decoded as map)</p>
+
+ <p>- Location is the URL corresponding to the created ACME account</p>
+
+ - Nonce is a new valid replay-nonce
+</p>
+<hr>
+
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc</i></p>
+</body>
+</html>

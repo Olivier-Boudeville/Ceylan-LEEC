@@ -1,0 +1,174 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Module leec_tls</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css" title="EDoc">
+</head>
+<body bgcolor="white">
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<hr>
+
+<h1>Module leec_tls</h1>
+<ul class="index"><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>Module in charge of managing <b>TLS-related operations</b>.
+
+
+<h2><a name="description">Description</a></h2>Module in charge of managing <b>TLS-related operations</b>.
+<h2><a name="types">Data Types</a></h2>
+
+<h3 class="typedecl"><a name="type-any_directory_path">any_directory_path()</a></h3>
+<p><tt>any_directory_path() = <a href="file_utils.html#type-any_directory_path">file_utils:any_directory_path()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-bin_certificate">bin_certificate()</a></h3>
+<p><tt>bin_certificate() = <a href="leec.html#type-bin_certificate">leec:bin_certificate()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-bin_directory_path">bin_directory_path()</a></h3>
+<p><tt>bin_directory_path() = <a href="file_utils.html#type-bin_directory_path">file_utils:bin_directory_path()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-bin_file_path">bin_file_path()</a></h3>
+<p><tt>bin_file_path() = <a href="file_utils.html#type-bin_file_path">file_utils:bin_file_path()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-bin_fqdn">bin_fqdn()</a></h3>
+<p><tt>bin_fqdn() = <a href="net_utils.html#type-bin_fqdn">net_utils:bin_fqdn()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-certificate_provider">certificate_provider()</a></h3>
+<p><tt>certificate_provider() = <a href="leec.html#type-certificate_provider">leec:certificate_provider()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-directory_path">directory_path()</a></h3>
+<p><tt>directory_path() = <a href="file_utils.html#type-bin_directory_path">file_utils:bin_directory_path()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-file_path">file_path()</a></h3>
+<p><tt>file_path() = <a href="file_utils.html#type-file_path">file_utils:file_path()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-key_file_info">key_file_info()</a></h3>
+<p><tt>key_file_info() = <a href="leec.html#type-key_file_info">leec:key_file_info()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-maybe">maybe()</a></h3>
+<p><tt>maybe(T) = <a href="basic_utils.html#type-maybe">basic_utils:maybe</a>(T)</tt></p>
+
+
+<h3 class="typedecl"><a name="type-san">san()</a></h3>
+<p><tt>san() = <a href="leec.html#type-san">leec:san()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-table">table()</a></h3>
+<p><tt>table(K, V) = <a href="map_hashtable.html#type-map_hashtable">map_hashtable:map_hashtable</a>(K, V)</tt></p>
+
+
+<h3 class="typedecl"><a name="type-tls_private_key">tls_private_key()</a></h3>
+<p><tt>tls_private_key() = <a href="leec.html#type-tls_private_key">leec:tls_private_key()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-tls_public_key">tls_public_key()</a></h3>
+<p><tt>tls_public_key() = <a href="leec.html#type-tls_public_key">leec:tls_public_key()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-void">void()</a></h3>
+<p><tt>void() = <a href="basic_utils.html#type-void">basic_utils:void()</a></tt></p>
+
+
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#generate_certificate-5">generate_certificate/5</a></td><td>Generates the specified certificate with subjectAlternativeName, either
+ an actual one, or a temporary (1 day), autosigned one.</td></tr>
+<tr><td valign="top"><a href="#get_cert_request-3">get_cert_request/3</a></td><td>Returns a CSR certificate request.</td></tr>
+<tr><td valign="top"><a href="#key_to_map-1">key_to_map/1</a></td><td>Returns a map-based version of the specified public key record, typically
+ for encoding.</td></tr>
+<tr><td valign="top"><a href="#map_to_key-1">map_to_key/1</a></td><td>Returns the key record corresponding to the specified map, typically
+ obtained from a remote server.</td></tr>
+<tr><td valign="top"><a href="#obtain_ca_cert_file-1">obtain_ca_cert_file/1</a></td><td>Obtains the intermediate certificate of the default authority.</td></tr>
+<tr><td valign="top"><a href="#obtain_ca_cert_file-2">obtain_ca_cert_file/2</a></td><td>Obtains the intermediate certificate of the specified authority.</td></tr>
+<tr><td valign="top"><a href="#obtain_dh_key-1">obtain_dh_key/1</a></td><td>Secures a proper DH file for safer key exchange, creates it only if 
+necessary, returns its path.</td></tr>
+<tr><td valign="top"><a href="#obtain_private_key-2">obtain_private_key/2</a></td><td>Obtains a private key for the current LEEC agent, either by creating it
+ (in a specified filename or in a generated one) or by reading a pre-existing
+ one from file.</td></tr>
+<tr><td valign="top"><a href="#write_certificate-3">write_certificate/3</a></td><td>Writes specified certificate, overwriting any prior one.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="generate_certificate-5">generate_certificate/5</a></h3>
+<div class="spec">
+<p><tt>generate_certificate(CertType::request | autosigned, BinDomain::<a href="#type-bin_fqdn">bin_fqdn()</a>, OutCertPath::<a href="#type-file_path">file_path()</a>, KeyfilePath::<a href="#type-file_path">file_path()</a>, SANs::[<a href="#type-san">san()</a>]) -&gt; <a href="#type-void">void()</a></tt><br></p>
+<p> </p>
+</div><p>Generates the specified certificate with subjectAlternativeName, either
+ an actual one, or a temporary (1 day), autosigned one.
+</p>
+
+<h3 class="function"><a name="get_cert_request-3">get_cert_request/3</a></h3>
+<div class="spec">
+<p><tt>get_cert_request(BinDomain::<a href="#type-bin_fqdn">bin_fqdn()</a>, BinCertDirPath::<a href="#type-bin_directory_path">bin_directory_path()</a>, SANs::[<a href="#type-san">san()</a>]) -&gt; <a href="leec.html#type-tls_csr">leec:tls_csr()</a></tt><br></p>
+<p> </p>
+</div><p>Returns a CSR certificate request.</p>
+
+<h3 class="function"><a name="key_to_map-1">key_to_map/1</a></h3>
+<div class="spec">
+<p><tt>key_to_map(Tls_public_key::<a href="#type-tls_public_key">tls_public_key()</a>) -&gt; map()</tt><br></p>
+<p> </p>
+</div><p>Returns a map-based version of the specified public key record, typically
+ for encoding.
+</p>
+
+<h3 class="function"><a name="map_to_key-1">map_to_key/1</a></h3>
+<div class="spec">
+<p><tt>map_to_key(Map::map()) -&gt; <a href="#type-tls_public_key">tls_public_key()</a></tt><br></p>
+<p> </p>
+</div><p>Returns the key record corresponding to the specified map, typically
+ obtained from a remote server.
+</p>
+
+<h3 class="function"><a name="obtain_ca_cert_file-1">obtain_ca_cert_file/1</a></h3>
+<div class="spec">
+<p><tt>obtain_ca_cert_file(TargetDir::<a href="#type-any_directory_path">any_directory_path()</a>) -&gt; <a href="#type-bin_file_path">bin_file_path()</a></tt><br></p>
+<p> </p>
+</div><p>Obtains the intermediate certificate of the default authority.</p>
+
+<h3 class="function"><a name="obtain_ca_cert_file-2">obtain_ca_cert_file/2</a></h3>
+<div class="spec">
+<p><tt>obtain_ca_cert_file(TargetDir::<a href="#type-any_directory_path">any_directory_path()</a>, CertProvider::<a href="#type-certificate_provider">certificate_provider()</a>) -&gt; <a href="#type-file_path">file_path()</a></tt><br></p>
+<p> </p>
+</div><p>Obtains the intermediate certificate of the specified authority.</p>
+
+<h3 class="function"><a name="obtain_dh_key-1">obtain_dh_key/1</a></h3>
+<div class="spec">
+<p><tt>obtain_dh_key(CertDir::<a href="#type-directory_path">directory_path()</a>) -&gt; <a href="#type-bin_file_path">bin_file_path()</a></tt><br></p>
+<p> </p>
+</div><p><p>Secures a proper DH file for safer key exchange, creates it only if 
+necessary, returns its path.</p>
+
+ The Ephemeral Diffie-Helman key exchange is a very effective way of ensuring
+ Forward Secrecy by exchanging a set of keys that never hit the wire.
+</p>
+
+<h3 class="function"><a name="obtain_private_key-2">obtain_private_key/2</a></h3>
+<div class="spec">
+<p><tt>obtain_private_key(KeyFileInfo::<a href="#type-maybe">maybe</a>(<a href="#type-key_file_info">key_file_info()</a>), BinCertDirPath::<a href="#type-bin_directory_path">bin_directory_path()</a>) -&gt; <a href="#type-tls_private_key">tls_private_key()</a></tt><br></p>
+<p> </p>
+</div><p>Obtains a private key for the current LEEC agent, either by creating it
+ (in a specified filename or in a generated one) or by reading a pre-existing
+ one from file.
+</p>
+
+<h3 class="function"><a name="write_certificate-3">write_certificate/3</a></h3>
+<div class="spec">
+<p><tt>write_certificate(Domain::<a href="net_utils.html#type-string_fqdn">net_utils:string_fqdn()</a>, BinDomainCert::<a href="#type-bin_certificate">bin_certificate()</a>, BinCertDirPath::<a href="#type-bin_directory_path">bin_directory_path()</a>) -&gt; <a href="#type-file_path">file_path()</a></tt><br></p>
+<p> </p>
+</div><p><p>Writes specified certificate, overwriting any prior one.</p>
+
+ Domain certificate only.
+</p>
+<hr>
+
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc</i></p>
+</body>
+</html>
