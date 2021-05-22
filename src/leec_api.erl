@@ -18,6 +18,9 @@
 % letsencrypt-erlang library, released under the same licence.
 
 
+% @doc This module centralises the main functions regarding the <b>API used to
+% interact with ACME servers</b>.
+%
 -module(leec_api).
 
 % Original work:
@@ -37,17 +40,22 @@
 			[ request_via_shotgun/6, request_via_native_httpc/6 ] } ).
 
 
-% Key :: Value entries being typically:
-%  - body :: body()
-%  - headers :: headers()
-%  - location :: location()
-%  - nonce :: nonce()
-%  - status_code: http_status_code()
-%
 -type http_body() :: map().
+% Key :: Value entries being typically:
+%
+%  - body :: body()
+%
+%  - headers :: headers()
+%
+%  - location :: location()
+%
+%  - nonce :: nonce()
+%
+%  - status_code: http_status_code()
 
-% Additional 'json' key, whose value is the body once decoded from JSON:
+
 -type json_http_body() :: http_body().
+% Additional 'json' key, whose value is the body once decoded from JSON.
 
 -type header_map() :: map().
 
@@ -55,8 +63,9 @@
 
 -type cert_req_option_map() :: leec:cert_req_option_map().
 
-% Not 'prod':
 -type environment() :: 'default' | 'staging'.
+% Not 'prod'.
+
 
 % For the records introduced:
 -include("leec.hrl").
@@ -103,7 +112,7 @@
 
 
 
-% Returns the status corresponding to specified binary string.
+% @doc Returns the status corresponding to specified binary string.
 -spec binary_to_status( bin_string() ) -> leec:status().
 binary_to_status( <<"pending">> ) ->
 	pending;
@@ -126,10 +135,10 @@ binary_to_status( InvalidBinStatus ) ->
 
 
 
-%% PRIVATE
+%% Private section.
 
 
-% Returns a suitable TCP connection.
+% @doc Returns a suitable TCP connection.
 %
 % If a connection to the given Proto://Host:Port is already opened, returns it,
 % otherwise returns a newly opened connection.
@@ -193,7 +202,7 @@ get_tcp_connection( Proto, Host, Port, TCPCache ) ->
 
 
 
-% Closes all pending (cached) TCP connections.
+% @doc Closes all pending (cached) TCP connections.
 -spec close_tcp_connections( tcp_connection_cache() ) -> void().
 close_tcp_connections( TCPCache ) ->
 
@@ -207,7 +216,8 @@ close_tcp_connections( TCPCache ) ->
 
 
 
-% Decodes http body as JSON if requested in options, or returns it as is.
+% @doc Decodes the http body as JSON if requested in options, or returns it as
+% is.
 %
 % Returns that response, with added JSON structure if required.
 %
@@ -238,12 +248,12 @@ decode( _CertReqOptionMap, Response, _LEState ) ->
 
 
 
-% Queries the specified URI (GET or POST) and returns the corresponding result,
-% with an updated state.
+% @doc Queries the specified URI (GET or POST) and returns the corresponding
+% result, with an updated state.
 %
 % Returned result:
-%	{ok, #{status_code, body, headers}}: query succeeded
-%	{error, invalid_method}           : method must be either 'get' or 'post'
+%   {ok, #{status_code, body, headers}}: query succeeded
+%   {error, invalid_method}           : method must be either 'get' or 'post'
 %   {error, term()}                   : query failed
 %
 % TODO: is 'application/jose+json' content type always required?
@@ -273,8 +283,8 @@ request( Method, Uri, Headers, MaybeBinContent, CertReqOptionMap, LEState ) ->
 
 
 
-% Queries the specified URI (GET or POST) with the shotgun library, and returns
-% the corresponding result with an updated state.
+% @doc Queries the specified URI (GET or POST) with the shotgun library, and
+% returns the corresponding result with an updated state.
 %
 -spec request_via_shotgun( 'get' | 'post', uri(), header_map(),
 				maybe( bin_content() ), cert_req_option_map(), le_state() ) ->
@@ -397,9 +407,9 @@ request_via_shotgun( Method, Uri, Headers, MaybeBinContent,
 
 
 
-% Queries the specified URI (GET or POST) with the Erlang-native httpc module
-% (through Myriad support), and returns the corresponding result with an updated
-% state.
+% @doc Queries the specified URI (GET or POST) with the Erlang-native httpc
+% module (through Myriad support), and returns the corresponding result with an
+% updated state.
 %
 -spec request_via_native_httpc( 'get' | 'post', uri(), header_map(),
 				maybe( bin_content() ), cert_req_option_map(), le_state() ) ->
@@ -499,9 +509,9 @@ request_via_native_httpc( Method, Uri, Headers, MaybeBinContent,
 
 
 
-% Called whenever an (ACME) request failed, whereas no suitable JSON body is
-% available in the answer: reports error information and throws a corresponding
-% exception.
+% @doc Called whenever an (ACME) request failed, whereas no suitable JSON body
+% is available in the answer: reports error information and throws a
+% corresponding exception.
 %
 -spec on_failed_request( http_status_code(), atom() ) -> no_return().
 on_failed_request( StatusCode, StepAtom ) ->
@@ -516,7 +526,7 @@ on_failed_request( StatusCode, StepAtom ) ->
 
 
 
-% Called whenever an (ACME) request failed, whereas a suitable JSON body is
+% @doc Called whenever an (ACME) request failed, whereas a suitable JSON body is
 % available in the answer: reports error information and throws a corresponding
 % exception.
 %
@@ -556,8 +566,9 @@ on_failed_request( StatusCode, JsonMapBody, StepAtom ) ->
 %%
 
 
-% Returns a directory map listing all ACME protocol URLs (see
-% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.1.1).
+% @doc Returns a directory map listing all ACME protocol URLs.
+%
+% Refer to [https://www.rfc-editor.org/rfc/rfc8555.html#section-7.1.1].
 %
 -spec get_directory_map( environment(), cert_req_option_map(), le_state() ) ->
 							{ leec:directory_map(), le_state() }.
@@ -597,8 +608,9 @@ get_directory_map( Env, CertReqOptionMap, LEState ) ->
 
 
 
-% Gets and returns a fresh nonce by using the corresponding URI (see
-% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.2).
+% @doc Gets and returns a fresh nonce by using the corresponding URI.
+%
+% Refer to [https://www.rfc-editor.org/rfc/rfc8555.html#section-7.2].
 %
 -spec get_nonce( directory_map(), cert_req_option_map(), le_state() ) ->
 					{ nonce(), le_state() }.
@@ -629,14 +641,18 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, CertReqOptionMap, LEState ) ->
 
 
 
-% Requests an account obtained (indirectly) for specified private key, see
-% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.3.1.
+% @doc Requests an account obtained (indirectly) for specified private key.
+%
+% Refer to [https://www.rfc-editor.org/rfc/rfc8555.html#section-7.3.1].
 %
 % This is either a new account or one that was already created by this FSM.
 %
 % Returns {Response, Location, Nonce}, where:
+%
 % - Response is json (decoded as map)
+%
 % - Location is the URL corresponding to the created ACME account
+%
 % - Nonce is a new valid replay-nonce
 %
 -spec get_acme_account( directory_map(), tls_private_key(), jws(),
@@ -692,12 +708,16 @@ get_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 
 
 
-% Requests (orders from ACME) a new certificate (of DNS type), see
-% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.
+% @doc Requests (orders from ACME) a new certificate (of DNS type).
+%
+% Refer to [https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4].
 %
 % Returns {Response, Location, Nonce}, where:
+%
 % - Response is json (decoded as map)
+%
 % - Location is the URL corresponding to the created ACME account
+%
 % - Nonce is a new valid replay-nonce
 %
 -spec request_new_certificate( directory_map(), [ bin_domain() ],
@@ -756,7 +776,7 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 
 
 
-% Orders a new certificate from the ACME server.
+% @doc Orders a new certificate from the ACME server.
 -spec get_order( bin_uri(), bin_key(), jws(), cert_req_option_map(),
 				 le_state() ) ->
 		{ { json_map_decoded(), bin_uri(), nonce() }, le_state() }.
@@ -789,8 +809,9 @@ get_order( Uri, Key, Jws, CertReqOptionMap, LEState ) ->
 
 
 
-% Requests authorization for given identifier, see
-% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.1.
+% @doc Requests authorization for given identifier.
+%
+% Refer to [https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.1].
 %
 % Returns {Response, Location, Nonce}, where:
 %  - Response is json (decoded as map)
@@ -828,13 +849,18 @@ request_authorization( AuthUri, PrivKey, Jws, CertReqOptionMap, LEState ) ->
 
 
 
-% Notifies the ACME server that we are ready for challenge validation (see
-% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.5.1).
+% @doc Notifies the ACME server that we are ready for challenge validation.
+%
+% Refer to [https://www.rfc-editor.org/rfc/rfc8555.html#section-7.5.1].
 %
 % Returns {Response, Location, Nonce}, where:
+%
 %  - Response is json (decoded as map)
+%
 %  - Location is create account url
+%
 %  - Nonce is a new valid replay-nonce
+%
 %
 -spec notify_ready_for_challenge( challenge(), bin_key(), jws(),
 								  cert_req_option_map(), le_state() ) ->
@@ -868,8 +894,9 @@ notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
 
 
 
-% Finalizes order once a challenge has been validated, see
-% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.
+% @doc Finalizes the order once a challenge has been validated.
+%
+% Refer to [https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4].
 %
 -spec finalize_order( order_map(), bin_csr_key(), tls_private_key(), jws(),
 	cert_req_option_map(), le_state() ) ->
@@ -912,8 +939,9 @@ finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 
 
 
-% Downloads certificate for finalized order (see
-% https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.2) and returns it.
+% @doc Downloads certificate for finalized order and returns itself.
+%
+% Refer to [https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.2].
 %
 -spec get_certificate( order_map(), tls_private_key(), jws(),
 					   cert_req_option_map(), le_state() ) ->

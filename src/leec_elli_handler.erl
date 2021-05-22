@@ -17,6 +17,14 @@
 %
 % This file is part of the Ceylan-LEEC library, a fork of the Guillaume Bour's
 % letsencrypt-erlang library, released under the same licence.
+
+
+% @doc This module corresponds to an embedded webserver that may be used for the
+% ACME http-based interactions.
+%
+% Note: not integrated in Ceylan-LEEC, at least currently.
+%
+% @hidden
 %
 -module(leec_elli_handler).
 
@@ -27,7 +35,6 @@
 -author("Olivier Boudeville (olivier dot boudeville at esperide dot com").
 
 
-% Note: not integrated in Ceylan-LEEC, at least currently.
 
 
 %-behaviour(elli_handler).
@@ -38,13 +45,13 @@
 -export([ handle/2, handle_event/3 ]).
 
 
-% Handles specified requests, returns a reply with an http code.
+% @doc Handles specified request; returns a reply with an http code.
 handle( Req, Args ) ->
 	%trace_bridge:debug_fmt( "Elli: ~p~n~p", [ Req, Args ] ),
 	handle( elli_request:method( Req ), elli_request:path( Req ), Req, Args ).
 
 
-
+% (helper)
 handle( 'GET', [ <<".well-known">>, <<"acme-challenge">>, Token ], Req,
 		[ Thumbprints ] ) ->
 
@@ -76,7 +83,7 @@ handle( 'GET', [ <<".well-known">>, <<"acme-challenge">>, Token ], Req,
 	end.
 
 
-% Handles specified request events.
+% @doc Handles specified request events.
 %
 % Unused.
 %

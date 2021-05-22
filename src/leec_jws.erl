@@ -18,9 +18,9 @@
 % letsencrypt-erlang library, released under the same licence.
 
 
-% Manages JSON Web Signatures (JWS).
+% @doc This module manages <b>JSON Web Signatures</b> (JWS).
 %
-% See https://en.wikipedia.org/wiki/JSON_Web_Signature
+% See [https://en.wikipedia.org/wiki/JSON_Web_Signature].
 %
 -module(leec_jws).
 
@@ -38,11 +38,13 @@
 -include("leec.hrl").
 
 
-% Known keys:
-%  - termsOfServiceAgreed :: boolean()
-%  - contact :: ustring()
-%
 -type payload() :: table( atom(), term() ).
+% Known keys:
+%
+%  - termsOfServiceAgreed :: boolean()
+%
+%  - contact :: ustring()
+
 
 -type content() :: maybe( payload() ).
 
@@ -56,7 +58,7 @@
 
 
 
-% Initializes a RSA JWS with specified TLS private key.
+% @doc Initializes a RSA JWS with specified TLS private key.
 -spec init( tls_private_key() ) -> jws().
 init( #tls_private_key{ b64_pair={ N, E } } ) ->
 	#jws{ alg='RS256',
@@ -65,8 +67,9 @@ init( #tls_private_key{ b64_pair={ N, E } } ) ->
 
 
 
-% Builds and returns the JWS body, see ref:
-% https://www.rfc-editor.org/rfc/rfc8555.html#section-6.2.
+% @doc Builds and returns the JWS body.
+%
+% See [https://www.rfc-editor.org/rfc/rfc8555.html#section-6.2].
 %
 % Content is the payload (if any).
 %
@@ -103,9 +106,9 @@ encode( PrivateKey, Jws, Content,
 
 
 
-% Builds and returns the ACME key authorization.
+% @doc Builds and returns the ACME key authorization.
 %
-% See https://www.rfc-editor.org/rfc/rfc8555.html#section-8.1.
+% See [https://www.rfc-editor.org/rfc/rfc8555.html#section-8.1].
 %
 -spec get_key_authorization( leec:key(), leec:token(), le_state() ) ->
 								   leec:key_auth().
@@ -122,7 +125,8 @@ get_key_authorization( #tls_public_key{ kty=Kty, n=N, e=E }, Token,
 	<<Token/binary, $., B64Hash/binary>>.
 
 
-% Returns a map-based version of the specified JSON Web Signature record,
+
+% @doc Returns a map-based version of the specified JSON Web Signature record,
 % typically for encoding.
 %
 -spec jws_to_map( jws() ) -> map().

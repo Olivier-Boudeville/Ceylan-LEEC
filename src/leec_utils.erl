@@ -17,6 +17,8 @@
 % This file is part of the Ceylan-LEEC library, a fork of the Guillaume Bour's
 % letsencrypt-erlang library, released under the same licence.
 
+
+% @doc This module concentrates <b>utilities transverse to LEEC</b>.
 -module(leec_utils).
 
 % Original work:
@@ -40,7 +42,7 @@
 
 
 
-% Encodes specified content in b64.
+% @doc Encodes specified content in b64.
 -spec b64encode( any_string() ) -> binary_b64().
 b64encode( X ) ->
 	Base64 = base64:encode( X ),
@@ -48,8 +50,7 @@ b64encode( X ) ->
 
 
 
-% Encodes specified content first in JSON, then in b64.
-%-spec jsonb64encode( any_string() ) -> binary_b64().
+% @doc Encodes specified content first in JSON, then in b64.
 -spec jsonb64encode( map(), json_parser_state() ) -> binary_b64().
 jsonb64encode( X, ParserState ) when is_map( X ) ->
 
@@ -77,7 +78,7 @@ encode_byte( B ) ->
 
 
 
-% Returns the hex digest of specified argument.
+% @doc Returns the hex digest of the specified string argument.
 -spec hexdigest( any_string() ) -> binary().
 hexdigest( X ) ->
 	<< <<( hex( H ) ),( hex(L) )>> || <<H:4,L:4>> <= X >>.
@@ -91,7 +92,8 @@ hex( C ) ->
 	$a + C - 10.
 
 
-% Returns the hexadecimal digest of SHA256 hashed content.
+
+% @doc Returns the SHA256 hexadecimal digest of specified content.
 -spec hashdigest( sha256, binary() ) -> binary().
 hashdigest( sha256, Content ) ->
 	hexdigest( crypto:hash( sha256, Content ) ).

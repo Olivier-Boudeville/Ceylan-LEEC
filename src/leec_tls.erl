@@ -18,6 +18,7 @@
 % letsencrypt-erlang library, released under the same licence.
 
 
+% @doc Module in charge of managing <b>TLS-related operations</b>.
 -module(leec_tls).
 
 % Original work:
@@ -62,9 +63,9 @@
 
 
 
-% Obtains a private key for the current LEEC agent, either by creating it (in a
-% specified filename or in a generated one) or by reading a pre-existing one
-% from file.
+% @doc Obtains a private key for the current LEEC agent, either by creating it
+% (in a specified filename or in a generated one) or by reading a pre-existing
+% one from file.
 %
 -spec obtain_private_key( maybe( key_file_info() ), bin_directory_path() ) ->
 									tls_private_key().
@@ -208,8 +209,8 @@ obtain_private_key( _KeyFileInfo=KeyFilePath, BinCertDirPath ) ->
 
 
 
-% Secures a proper DH file for safer key exchange, creates it only if necessary,
-% returns its path.
+% @doc Secures a proper DH file for safer key exchange, creates it only if
+% necessary, returns its path.
 %
 % The Ephemeral Diffie-Helman key exchange is a very effective way of ensuring
 % Forward Secrecy by exchanging a set of keys that never hit the wire.
@@ -276,13 +277,13 @@ obtain_dh_key( CertDir ) ->
 
 
 
-% Obtains the intermediate certificate of the default authority.
+% @doc Obtains the intermediate certificate of the default authority.
 -spec obtain_ca_cert_file( any_directory_path() ) -> bin_file_path().
 obtain_ca_cert_file( TargetDir ) ->
 	obtain_ca_cert_file( TargetDir, _DefaultProvider=letsencrypt ).
 
 
-% Obtains the intermediate certificate of the specified authority.
+% @doc Obtains the intermediate certificate of the specified authority.
 -spec obtain_ca_cert_file( any_directory_path(), certificate_provider() ) ->
 			file_path().
 obtain_ca_cert_file( TargetDir, _CertProvider=letsencrypt ) ->
@@ -318,9 +319,9 @@ obtain_ca_cert_file( TargetDir, _CertProvider=letsencrypt ) ->
 
 
 
-% Returns a CSR certificate request.
+% @doc Returns a CSR certificate request.
 -spec get_cert_request( bin_fqdn(), bin_directory_path(), [ san() ] ) ->
-							  leec:tls_csr().
+								leec:tls_csr().
 get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 
 	cond_utils:if_defined( leec_debug_keys,
@@ -346,14 +347,14 @@ get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 
 	% Not relevant, an opaque binary:
 	%cond_utils:if_defined( leec_debug_keys,
-	%	trace_bridge:debug_fmt( "Decoded CSR:~n  ~p.", [ Csr ] ) ),
+	%   trace_bridge:debug_fmt( "Decoded CSR:~n  ~p.", [ Csr ] ) ),
 
 	leec_utils:b64encode( Csr ).
 
 
 
-% Generates the specified certificate with subjectAlternativeName, either an
-% actual one, or a temporary (1 day), autosigned one.
+% @doc Generates the specified certificate with subjectAlternativeName, either
+% an actual one, or a temporary (1 day), autosigned one.
 %
 -spec generate_certificate( 'request' | 'autosigned', bin_fqdn(), file_path(),
 							file_path(), [ san() ] ) -> void().
@@ -434,7 +435,7 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 
 
 
-% Writes specified certificate, overwriting any prior one.
+% @doc Writes specified certificate, overwriting any prior one.
 %
 % Domain certificate only.
 %
@@ -457,16 +458,16 @@ write_certificate( Domain, BinDomainCert, BinCertDirPath ) ->
 
 
 
-% Returns a map-based version of the specified public key record, typically for
-% encoding.
+% @doc Returns a map-based version of the specified public key record, typically
+% for encoding.
 %
 -spec key_to_map( tls_public_key() ) -> map().
 key_to_map( #tls_public_key{ kty=Kty, n=N, e=E } ) ->
 	#{ <<"kty">> => Kty, <<"n">> => N, <<"e">> => E }.
 
 
-% Return the key record corresponding to the specified map, typically obtained
-% from a remote server.
+% @doc Returns the key record corresponding to the specified map, typically
+% obtained from a remote server.
 %
 -spec map_to_key( map() ) -> tls_public_key().
 map_to_key( Map ) ->

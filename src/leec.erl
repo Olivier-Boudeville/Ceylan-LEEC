@@ -18,13 +18,14 @@
 % letsencrypt-erlang library, released under the same licence.
 
 
-% Main module for LEEC, the Ceylan Let's Encrypt Erlang fork (see
-% http://leec.esperide.org).
+% @doc <b>Main module of LEEC</b>, the Ceylan Let's Encrypt Erlang fork; see
+% [http://leec.esperide.org] for more information.
 %
 % Original 'Let's Encrypt Erlang' application:
-% https://github.com/gbour/letsencrypt-erlang
+% [https://github.com/gbour/letsencrypt-erlang].
 %
 -module(leec).
+
 
 % Original work:
 -author("Guillaume Bour (guillaume at bour dot cc)").
@@ -35,7 +36,9 @@
 
 % Replaces the deprecated gen_fsm; we use here the 'state_functions' callback
 % mode, so:
+%
 %  - events are handled by one callback function *per state*
+%
 %  - state names must be atom-only
 %
 -behaviour(gen_statem).
@@ -95,41 +98,43 @@
 -type domain() :: net_utils:string_fqdn() | bin_domain().
 
 
-% Three ways of interfacing LEEC with user code:
 -type le_mode() :: 'webroot' | 'slave' | 'standalone'.
+% Three ways of interfacing LEEC with user code.
 
 
-% The PID of a LEEC FSM:
 -type fsm_pid() :: pid().
+% The PID of a LEEC FSM.
 
 
-% Others may be added in the future:
 -type certificate_provider() :: 'letsencrypt'.
+% Others may be added in the future.
 
 
-% Note: only the 'http-01' challenge is supported currently.
 -type challenge_type() :: 'http-01'
 						| 'tls-sni-01'
 						| 'dns-01'.
+% Note: only the 'http-01' challenge type is supported currently.
 
 
-% Challenge type, as a binary string:
 -type bin_challenge_type() :: bin_string().
+% Challenge type, as a binary string.
 
 
 % Supposedly:
 -type token() :: ustring().
 
-% A JSON-encoded key:
 -type thumbprint() :: json().
+% A JSON-encoded key.
+
 
 -type thumbprint_map() :: table( token(), thumbprint() ).
+% Associating tokens with keys.
 
 
-% For the reuse of TCP connections to the ACME server:
 -type tcp_connection_cache() :: table( { net_utils:protocol_type(),
 		net_utils:string_host_name(), net_utils:tcp_port() },
 		shotgun:connection() ).
+% For the reuse of TCP connections to the ACME server.
 
 
 -type string_uri() :: ustring().
@@ -144,25 +149,26 @@
 % https://community.letsencrypt.org.
 
 
+-type challenge() :: table:table( bin_string(), bin_string() ).
 % All known information regarding a challenge.
 %
 % As Key => example of associated value:
-% - <<"status">> => <<"pending">>
-% - <<"token">> => <<"qVTx6gQWZO4Dt4gUmnaTQdwTRkpaSnMiRx8L7Grzhl8">>
-% - <<"type">> => <<"http-01">>,
-% - <<"url">> =>
-%     <<"ACME_BASE/acme/chall-v3/132509381/-Axkdw">>}}.
 %
--type challenge() :: table:table().
-
-
+% - `<<"status">> => <<"pending">>'
+%
+% - `<<"token">> => <<"qVTx6gQWZO4Dt4gUmnaTQdwTRkpaSnMiRx8L7Grzhl8">>'
+%
+% - `<<"type">> => <<"http-01">>'
+%
+% - `<<"url">> =>
+%     <<"ACME_BASE/acme/chall-v3/132509381/-Axkdw">>'
+%
 -type uri_challenge_map() :: table( bin_uri(), challenge() ).
 
 
 -type type_challenge_map() :: table( challenge_type(), challenge() ).
 
 
-% A user-specified LEEC start option:
 -type start_option() :: 'staging'
 					 | { 'mode', le_mode() }
 					 | { 'key_file_path', any_file_path() }
@@ -170,89 +176,100 @@
 					 | { 'webroot_dir_path', any_directory_path() }
 					 | { 'port', tcp_port() }
 					 | { 'http_timeout', unit_utils:milliseconds() }.
+% A user-specified LEEC start option.
 
 
-
-% Certificate request options.
 -type cert_req_option_id() :: 'async' | 'callback' | 'netopts' | 'challenge'
-							| 'sans' | 'json'.
+								| 'sans' | 'json'.
+% Certificate request options.
 
 
+-type cert_req_option_map() :: table( cert_req_option_id(), term() ).
 % Storing certificate request options.
 %
 % Known (atom) keys:
-%  - async :: boolean() [if not defined, supposed true]
-%  - callback :: fun/1
-%  - netopts :: map() => #{ timeout => unit_utils:milliseconds() }
-%  - challenge_type :: challenge_type(), default being 'http-01'
-%  - sans :: [ bin_san() ]
-%  - json :: boolean() (not to be set by the user)
 %
--type cert_req_option_map() :: table( cert_req_option_id(), term() ).
+%  - async :: boolean() [if not defined, supposed true]
+%
+%  - callback :: fun/1
+%
+%  - netopts :: map() => #{ timeout => unit_utils:milliseconds() }
+%
+%  - challenge_type :: challenge_type(), default being 'http-01'
+%
+%  - sans :: [ bin_san() ]
+%
+%  - json :: boolean() (not to be set by the user)
 
 
+-type acme_operation() :: bin_string().
 % ACME operations that may be triggered.
 %
 % Known operations:
-% - <<"newAccount">>
-% - <<"newNonce">>
-% - <<"newOrder">>
-% - <<"revokeCert">>
 %
--type acme_operation() :: bin_string().
+% - `<<"newAccount">>'
+%
+% - `<<"newNonce">>'
+%
+% - `<<"newOrder">>'
+%
+% - `<<"revokeCert">>'
 
 
+-type directory_map() :: table( acme_operation(), uri() ).
 % ACME directory, converting operations to trigger into the URIs to access for
 % them.
-%
--type directory_map() :: table( acme_operation(), uri() ).
+
 
 -type nonce() :: binary().
+% An arbitrary binary that can be used just once in a cryptographic
+% communication.
 
 
+-type san() :: ustring().
 % Subject Alternative Name, i.e. values to be associated with a security
 % certificate using a subjectAltName field.
 %
-% See https://en.wikipedia.org/wiki/Subject_Alternative_Name.
-%
--type san() :: ustring().
+% See [https://en.wikipedia.org/wiki/Subject_Alternative_Name].
 
 -type bin_san() :: bin_string().
 
 -type any_san() :: san() | bin_san().
 
 
-% JSON element decoded as a map:
 -type json_map_decoded() :: map().
+% JSON element decoded as a map.
 
 
-% Information regarding the private key of the LEEC agent:
+-type agent_key_file_info() :: { 'new', bin_file_path() } | bin_file_path().
+% Information regarding the private key of the LEEC agent.
 %
 % (if 'new' is used, the path is supposed to be either absolute, or relative to
 % the certificate directory)
-%
--type agent_key_file_info() :: { 'new', bin_file_path() } | bin_file_path().
 
 
-% A certificate, as a binary:
 -type bin_certificate() :: binary().
+% A certificate, as a binary.
 
-% A key, as a binary:
+
 -type bin_key() :: binary().
+% A key, as a binary.
 
-% A CSR key, as a binary:
+
 -type bin_csr_key() :: bin_key().
+% A CSR key, as a binary.
+
 
 -type jws_algorithm() :: 'RS256'.
 
-% A binary that is encoded in base 64:
+
 -type binary_b64() :: binary().
+% A binary that is encoded in base 64.
 
 
-% Key authorization, a binary made of a token and of the hash of a key
-% thumbprint, once b64-encoded:
-%
 -type key_auth() :: binary().
+% Key authorization, a binary made of a token and of the hash of a key
+% thumbprint, once b64-encoded.
 
 
 % For the records introduced:
@@ -267,8 +284,9 @@
 
 -type certificate() :: #certificate{}.
 
-% Need by other LEEC modules:
 -type le_state() :: #le_state{}.
+% Needed by other LEEC modules.
+
 
 -export_type([ bin_domain/0, domain/0, le_mode/0, fsm_pid/0,
 			   certificate_provider/0, challenge_type/0, bin_challenge_type/0,
@@ -296,17 +314,17 @@
 -define( base_timeout, 15000 ).
 
 
-
-
-% Typically fsm_pid():
 -type server_ref() :: gen_statem:server_ref().
+% Typically fsm_pid().
+
 
 -type state_callback_result() ::
 		gen_statem:state_callback_result( gen_statem:action() ).
 
 
-% FSM status (corresponding to state names):
 -type status() :: 'pending' | 'processing' | 'valid' | 'invalid' | 'revoked'.
+% FSM status (corresponding to state names).
+
 
 -type request() :: atom().
 
@@ -345,30 +363,32 @@
 % Public API.
 
 
-% Returns an (ordered) list of the LEEC prerequisite OTP applications, to be
-% started in that order.
+% @doc Returns an (ordered) list of the LEEC prerequisite OTP applications, to
+% be started in that order.
 %
 % Notes:
+%
 % - not listed here (not relevant for that use case): elli, getopt, yamerl,
 % erlang_color
+%
 % - jsx preferred over jiffy; yet neither needs to be initialised as an
 % application
+%
 % - no need to start myriad either
 %
 -spec get_ordered_prerequisites() -> [ application_name() ].
 get_ordered_prerequisites() ->
 	cond_utils:if_set_to( myriad_httpc_backend, shotgun,
-						  [ shotgun ],
-						  _ThenNativeHttpc=[] ).
+						  [ shotgun ], _ThenNativeHttpc=[] ).
 
 
-% Starts a (non-bridged) instance of the LEEC service FSM.
+% @doc Starts a (non-bridged) instance of the LEEC service FSM.
 -spec start( [ start_option() ] ) -> { 'ok', fsm_pid() } | error_term().
 start( StartOptions ) ->
 	start( StartOptions, _MaybeBridgeSpec=undefined ).
 
 
-% Starts an instance of the LEEC service FSM, possibly with a trace bridge.
+% @doc Starts an instance of the LEEC service FSM, possibly with a trace bridge.
 -spec start( [ start_option() ], maybe( trace_bridge:bridge_spec() ) ) ->
 				{ 'ok', fsm_pid() } | error_term().
 start( StartOptions, MaybeBridgeSpec ) ->
@@ -422,15 +442,15 @@ start( StartOptions, MaybeBridgeSpec ) ->
 
 
 
-% Returns the default options for certificate requests, here enabling the async
-% (non-blocking) mode.
+% @doc Returns the default options for certificate requests, here enabling the
+% async (non-blocking) mode.
 %
 -spec get_default_cert_request_options() -> cert_req_option_map().
 get_default_cert_request_options() ->
 	get_default_cert_request_options( _Async=true ).
 
 
-% Returns the default optionsfor certificate requests, with specified async
+% @doc Returns the default optionsfor certificate requests, with specified async
 % mode.
 %
 -spec get_default_cert_request_options( boolean() ) -> cert_req_option_map().
@@ -439,15 +459,19 @@ get_default_cert_request_options( Async ) when is_boolean( Async ) ->
 
 
 
-% Generates, once started, asynchronously (in a non-blocking manner), a new
+% @doc Generates, once started, asynchronously (in a non-blocking manner), a new
 % certificate for the specified domain (FQDN).
 %
 % Parameters:
+%
 % - Domain is the domain name to generate an ACME certificate for
+%
 % - FsmPid is the PID of the FSM to rely on
 %
 % Returns:
+%
 % - 'async' if async is set (the default being sync)
+%
 % - {error, Err} if a failure happens
 %
 % Belongs to the user-facing API; requires the LEEC service to be already
@@ -460,29 +484,39 @@ obtain_certificate_for( Domain, FsmPid ) ->
 
 
 
-% Generates, once started, synchronously (in a blocking manner) or not, a new
-% certificate for the specified domain (FQDN).
+% @doc Generates, once started, synchronously (in a blocking manner) or not, a
+% new certificate for the specified domain (FQDN).
 %
 % Parameters:
+%
 %	- Domain is the domain name to generate an ACME certificate for
+%
 %   - FsmPid is the PID of the FSM to rely on
+%
 %	- CertReqOptionMap is a map listing the options applying to this certificate
 %		request, whose key (as atom)/value pairs (all optional except 'async'
 %		and 'netopts') are:
-%			* 'async' / boolean(): if true, blocks until complete and returns
-%				generated certificate filename
-%								 if false, immediately returns
-%			* 'callback' / fun/1: function executed when Async is true, once
-%				domain certificate has been successfully generated
-%           * 'netopts' / map(): mostly to specify an HTTP timeout
-%           * 'challenge_type' / challenge_type() is the type of challenge to
-%               rely on when interacting with the ACME server
-%           * 'sans' / [ any_san() ]: a list of the Subject Alternative Names
+%
+%		- 'async' / boolean(): if true, blocks until complete and returns
+%			generated certificate filename
+%							   if false, immediately returns
+%
+%		- 'callback' / fun/1: function executed when Async is true, once domain
+%			certificate has been successfully generated
+%
+%       - 'netopts' / map(): mostly to specify an HTTP timeout
+%
+%       - 'challenge_type' / challenge_type() is the type of challenge to
+%           rely on when interacting with the ACME server
+%
+%       - 'sans' / [ any_san() ]: a list of the Subject Alternative Names
 %           for that certificate
 %
 % Returns:
+%
 %   - if synchronous (the default): either {certificate_ready, BinFilePath} if
 %   successful, otherwise {error, Err}
+%
 %	- otherwise (asynchronous), 'async'
 %
 % Belongs to the user-facing API; requires the LEEC service to be already
@@ -539,8 +573,10 @@ obtain_certificate_for( _Domain, FsmPid, _CertReqOptionMap ) ->
 
 
 
-% (spawn helper, to be called either from a dedicated process or not, depending
-% on being async or not)
+% @doc Spawn helper, to be called either from a dedicated process or not,
+% depending on being async or not.
+%
+% @hidden
 %
 -spec obtain_cert_helper( Domain :: domain(), fsm_pid(),
 						  cert_req_option_map() ) ->
@@ -553,10 +589,12 @@ obtain_cert_helper( Domain, FsmPid,
 
 	BinDomain = text_utils:ensure_binary( Domain ),
 
+	ServerRef = FsmPid,
+
 	% Expected to be in the 'idle' state, hence to trigger idle({create,
 	% BinDomain, Opts}, _, LEState):
 	%
-	CreationRes = case gen_statem:call( _ServerRef=FsmPid,
+	CreationRes = case gen_statem:call( ServerRef,
 				_Request={ create, BinDomain, CertReqOptionMap }, Timeout ) of
 
 		% State of FSM shall thus be 'idle' now:
@@ -581,7 +619,7 @@ obtain_cert_helper( Domain, FsmPid,
 					% 'pending' to 'valid'. Then:
 
 					% Most probably 'valid':
-					_LastReadStatus = gen_statem:call( _ServerRef=FsmPid,
+					_LastReadStatus = gen_statem:call( ServerRef,
 											_Req=switchTofinalize, Timeout ),
 
 					case wait_creation_completed( FsmPid, _Count=20 ) of
@@ -646,9 +684,10 @@ obtain_cert_helper( Domain, FsmPid,
 
 
 
-
-% (spawn, bridged helper, to be called either from a dedicated process or not,
-% depending on being async or not)
+% @doc Spawn, bridged helper, to be called either from a dedicated process or
+% not, depending on being async or not.
+%
+% @hidden
 %
 -spec obtain_cert_helper( Domain :: domain(), fsm_pid(), cert_req_option_map(),
 						  maybe( trace_bridge:bridge_info() ) ) ->
@@ -663,7 +702,7 @@ obtain_cert_helper( Domain, FsmPid, CertReqOptionMap, MaybeBridgeInfo ) ->
 
 
 
-% Stops the specified instance of LEEC service.
+% @doc Stops the specified instance of LEEC service.
 -spec stop( fsm_pid() ) -> void().
 stop( FsmPid ) ->
 
@@ -691,9 +730,14 @@ stop( FsmPid ) ->
 % FSM internal API.
 
 
-% Initializes the LEEC state machine:
+% @doc Initializes the LEEC state machine.
+%
+% Parameters:
+%
 % - init TLS private key and its JWS
+%
 % - fetch ACME directory
+%
 % - get valid nonce
 %
 % Will make use of any trace bridge transmitted.
@@ -790,8 +834,8 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 	{ URLDirectoryMap, DirLEState } = leec_api:get_directory_map(
 		LEState#le_state.env, OptionMap, LEState ),
 
-	{ FirstNonce, NonceLEState } = leec_api:get_nonce( URLDirectoryMap,
-													   OptionMap, DirLEState ),
+	{ FirstNonce, NonceLEState } =
+		leec_api:get_nonce( URLDirectoryMap, OptionMap, DirLEState ),
 
 	cond_utils:if_defined( leec_debug_fsm,
 		trace_bridge:debug_fmt( "[~w][state] Switching initially to 'idle'.",
@@ -808,7 +852,9 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 
 
 
-% One callback function per state, akin to gen_fsm:
+% @doc Tells about the retained mode regarding callback. Here, one callback
+% function per state, akin to gen_fsm.
+%
 -spec callback_mode() -> gen_statem:callback_mode().
 callback_mode() ->
 	% state_enter useful to trigger code once, when entering the 'finalize'
@@ -818,8 +864,8 @@ callback_mode() ->
 
 
 
-% Returns the (absolute, binary) path of the current private key of the LEEC
-% agent.
+% @doc Returns the (absolute, binary) path of the current private key of the
+% LEEC agent.
 %
 % Useful so that the same key can be used for multiple ACME orders (possibly in
 % parallel) rather than multiplying the keys.
@@ -845,8 +891,9 @@ get_agent_key_path( FsmPid ) ->
 
 
 
-% Returns the ongoing challenges with pre-computed thumbprints:
-% #{Challenge => Thumbrint} if ok, 'error' if fails.
+% @doc Returns the ongoing challenges with pre-computed thumbprints.
+%
+% Returns #{Challenge => Thumbrint} if ok, 'error' if fails.
 %
 % (exported API helper)
 %
@@ -874,7 +921,7 @@ get_ongoing_challenges( FsmPid ) ->
 
 
 
-% Sends the ongoing challenges to the specified process.
+% @doc Sends the ongoing challenges to the specified process.
 %
 % Typically useful in a slave operation mode, when the web handler cannot access
 % directly the PID of the LEEC FSM: this code is then called by a third-party
@@ -911,8 +958,8 @@ send_ongoing_challenges( FsmPid, TargetPid ) ->
 
 
 
-% State 'idle', the initial state, typically used when awaiting for certificate
-% requests to be triggered.
+% @doc Manages the 'idle' state, the initial state, typically used when awaiting
+% for certificate requests to be triggered.
 %
 % idle(get_ongoing_challenges | send_ongoing_challenges): nothing done
 %
@@ -1101,7 +1148,7 @@ idle( EventType, EventContentMsg, _LEState ) ->
 
 
 
-% Management of the 'pending' state, when challenges are on-the-go, i.e. being
+% @doc Manages the 'pending' state, when challenges are on-the-go, that is being
 % processed with the ACME server.
 %
 pending( _EventType=enter, _PreviousState, _Data ) ->
@@ -1132,7 +1179,7 @@ pending( _EventType={ call, From }, _EventContentMsg=get_ongoing_challenges,
 		"[~w] Returning (get) from pending state challenge "
 		"thumbprint map ~p.", [ self(), ThumbprintMap ] ) ),
 
-	{ next_state, _SameState=pending, _Data=LEState,
+	{ next_state, _SameState=pending, LEState,
 	  _Action={ reply, From, _RetValue=ThumbprintMap } };
 
 
@@ -1168,8 +1215,8 @@ pending( _EventType=cast,
 % Switches to the 'valid' state iff all challenges are validated.
 %
 % Transitions to:
-%	- 'pending' if at least one challenge is not completed yet
-%	- 'valid' if all challenges are complete
+%   - 'pending' if at least one challenge is not completed yet
+%   - 'valid' if all challenges are complete
 %
 pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 		 _Data=LEState=#le_state{
@@ -1309,7 +1356,7 @@ pending( EventType, EventContentMsg, _LEState ) ->
 
 
 
-% Management of the 'valid' state.
+% @doc Manages the 'valid' state.
 %
 % When challenges have been successfully completed, finalizes the ACME order and
 % generates TLS certificate.
@@ -1386,7 +1433,7 @@ valid( EventType, EventContentMsg, _LEState ) ->
 
 
 
-% Management of the 'finalize' state.
+% @doc Manages the 'finalize' state.
 %
 % When order is being finalized, and certificate generation is ongoing.
 %
@@ -1462,7 +1509,7 @@ finalize( _EventType={ call, _ServerRef=From },
 
 			Domain = text_utils:binary_to_string( BinDomain ),
 
-			CertFilePath = 
+			CertFilePath =
 				leec_tls:write_certificate( Domain, BinCert, BinCertDirPath ),
 
 			BinCertFilePath = text_utils:string_to_binary( CertFilePath ),
@@ -1526,7 +1573,7 @@ finalize( UnexpectedEventType, EventContentMsg, _LEState ) ->
 
 
 
-% Management of the 'invalid' state.
+% @doc Manages the 'invalid' state.
 %
 % When order is being finalized, and certificate generation is ongoing.
 %
@@ -1554,7 +1601,7 @@ invalid( _EventType=enter, _PreviousState, _Data=LEState ) ->
 % Callback section.
 
 
-% Handles the specified call in the same way for all states.
+% @doc Handles the specified call in the same way for all states.
 %
 % (helper)
 %
@@ -1620,10 +1667,12 @@ handle_call_for_all_states( ServerRef, Request, StateName, _LEState ) ->
 
 % Standard callbacks:
 
+% @doc Standard termination callback.
 terminate( _, _, _ ) ->
 	ok.
 
 
+% @doc Standard "code change" callback.
 code_change( _, StateName, LEState, _ ) ->
 	{ ok, StateName, LEState }.
 
@@ -1633,18 +1682,25 @@ code_change( _, StateName, LEState, _ ) ->
 % Helpers.
 
 
-% Parses the start/1 options.
+% @doc Parses the start/1 options.
 %
 % Available options are:
+%
 %  - staging: runs in staging environment (otherwise running in production one)
+%
 %  - mode: webroot, slave or standalone
+%
 %  - agent_key_file_path: to reuse an existing agent TLS key
+%
 %  - cert_dir_path: path to read/save TLS certificates, keys and CSR requests
+%
 %  - webroot_dir_path: the webroot directory, in a conventional subdirectory of
 %  which challenge answers shall be written so that the ACME server can download
 %  them
+%
 %  - port: the TCP port at which the corresponding webserver shall be available,
 %  in standalone mode
+%
 %  - http_timeout: timeout for ACME API requests (in milliseconds)
 %
 % Returns LEState (type record 'le_state') filled with corresponding, checked
@@ -1772,7 +1828,7 @@ get_start_options( _Opts=[ Unexpected | _T ], _LEState ) ->
 
 
 
-% Setups the context of chosen mode.
+% @doc Setups the context of chosen mode.
 -spec setup_mode( le_state() ) -> le_state().
 setup_mode( #le_state{ mode=webroot, webroot_dir_path=undefined } ) ->
 	trace_bridge:error( "Missing 'webroot_dir_path' parameter." ),
@@ -1806,13 +1862,16 @@ setup_mode( #le_state{ mode=Mode } ) ->
 
 
 
-% Loops a few times on authorization check until challenges are all validated
-% (with increasing waiting times after each attempt); if successful, the FSM
-% should be in 'valid' state when returning.
+% @doc Loops a few times on authorization check until challenges are all
+% validated (with increasing waiting times after each attempt); if successful,
+% the FSM should be in 'valid' state when returning.
 %
 % Returns:
+%
 %  - {error, timeout} if failed after X loops
+%
 %  - {error, Err} if another error
+%
 %  - 'ok' if succeed
 %
 -spec wait_challenges_valid( fsm_pid() ) -> base_status().
@@ -1863,11 +1922,14 @@ wait_challenges_valid( FsmPid, Count, MaxCount ) ->
 
 
 
-% Waits until the certification creation is reported as completed.
+% @doc Waits until the certification creation is reported as completed.
 %
 % Returns:
+%
 %  - {error, timeout} if failed after X loops
+%
 %  - {error, Err} if another error
+%
 %  - {'ok', Response} if succeed
 %
 -spec wait_creation_completed( fsm_pid(), count() ) ->
@@ -1918,7 +1980,7 @@ wait_creation_completed( FsmPid, Count, Max ) ->
 	end.
 
 
-% Performs ACME authorization based on selected challenge initialization.
+% @doc Performs ACME authorization based on selected challenge initialization.
 -spec perform_authorization( challenge_type(), [ bin_uri() ], le_state() ) ->
 						{ { uri_challenge_map(), nonce() }, le_state() }.
 perform_authorization( ChallengeType, AuthUris,
@@ -1957,16 +2019,17 @@ perform_authorization( ChallengeType, AuthUris,
 
 
 
-% Requests authorizations based on specified challenge type and URIs: for each
-% challenge type (ex: http-01, dns-01, etc.), a challenge is proposed.
+% @doc Requests authorizations based on specified challenge type and URIs: for
+% each challenge type (ex: http-01, dns-01, etc.), a challenge is proposed.
 %
 % At least in some cases, a single authorization URI is actually listed.
 %
 % Returns:
 %   {ok, Challenges, Nonce} where:
-
+%
 %	- Challenges is map of Uri -> Challenge, where Challenge is of
 %	 ChallengeType type
+%
 %	- Nonce is a new valid replay-nonce
 %
 -spec perform_authorization_step1( [ bin_uri() ], bin_challenge_type(),
@@ -2047,7 +2110,7 @@ perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 
 
 
-% Second step of the authorization process, executed after challenge
+% @doc Second step of the authorization process, executed after challenge
 % initialization.
 %
 % Notifies the ACME server the challenges are good to proceed, returns an
@@ -2085,7 +2148,8 @@ perform_authorization_step2( _Pairs=[ { Uri, Challenge } | T ],
 
 
 
-% Initializes the local configuration to serve the specified challenge type.
+% @doc Initializes the local configuration to serve the specified challenge
+% type.
 %
 % Depends on challenge type and mode.
 %
@@ -2171,10 +2235,13 @@ init_for_challenge_type( ChallengeType, _Mode=standalone,
 
 
 
-% Cleans up challenge context after it has been fullfilled (with success or
+% @doc Cleans up challenge context after it has been fullfilled (with success or
 % not); in:
+%
 % - 'webroot' mode: delete token file
+%
 % - 'standalone' mode: stop internal webserver
+%
 % - 'slave' mode: nothing to do
 %
 -spec challenge_destroy( le_mode(), le_state() ) -> le_state().
