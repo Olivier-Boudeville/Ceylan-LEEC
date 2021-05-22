@@ -15,7 +15,7 @@
 
 :raw-html:`<a name="leec_top"></a>`
 
-:raw-html:`<div class="banner"><p><em>LEEC 0.6 documentation</em> <a href="http://leec.esperide.org">browse latest</a> <a href="https://olivier-boudeville.github.io/Ceylan-LEEC">browse mirror</a> <a href="Ceylan-LEEC-technical-manual-english.pdf">get PDF</a> <a href="#leec_top">go to top</a> <a href="#leec_bottom">go to bottom</a> <a href="https://github.com/Olivier-Boudeville/Ceylan-LEEC">go to project</a> <a href="mailto:about(dash)leec(at)esperide(dot)com?subject=[Ceylan-LEEC%200.6]%20Remark">email us</a></p></div>`
+:raw-html:`<div class="banner"><p><em>LEEC 0.6 documentation</em> <a href="http://leec.esperide.org">browse latest</a> <a href="https://olivier-boudeville.github.io/Ceylan-LEEC">browse mirror</a> <a href="Ceylan-LEEC-technical-manual-english.pdf">get PDF</a> <a href="#leec_top">go to top</a> <a href="#leec_toc">go to toc</a> <a href="#leec_bottom">go to bottom</a> <a href="api-doc/index.html">browse API</a> <a href="https://github.com/Olivier-Boudeville/Ceylan-LEEC">go to project</a> <a href="mailto:about(dash)leec(at)esperide(dot)com?subject=[Ceylan-LEEC%200.6]%20Remark">email us</a></p></div>`
 
 
 
@@ -32,9 +32,9 @@ Technical Manual of LEEC: *Let's Encrypt Erlang with Ceylan*
 :Organisation: Copyright (C) 2020-2021 Olivier Boudeville
 :Contact: about (dash) leec (at) esperide (dot) com
 :Creation date: Wednesday, November 11, 2020
-:Lastly updated: Friday, March 12, 2021
+:Lastly updated: Saturday, May 22, 2021
 :Dedication: Users and maintainers of the ``LEEC`` library
-:Version: 0.6.1
+:Version: 0.6.2
 :Abstract:
 
 	The role of the ``LEEC`` library is to interact from Erlang/OTP with servers implementing the ACME protocol - specifically *Let's Encrypt* servers, mostly in order to generate X.509 certificates.
@@ -55,9 +55,12 @@ The latest version of this documentation is to be found at the `official LEEC we
 
 :raw-latex:`\pagebreak`
 
+
+:raw-html:`<a name="leec_toc"></a>`
+
 .. _`table of contents`:
 
-.. contents:: Table of Contents
+.. contents:: **Table of Contents**
   :depth: 3
 
 
