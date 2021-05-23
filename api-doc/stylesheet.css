@@ -20,7 +20,7 @@ body {
   color: #000000;
   background-color: #ffffff;
   font-family: Verdana, Arial, Helvetica, sans-serif;
-  font-size: 14px;
+  font-size: 15px;
   margin-left: 3%;
 }
 
@@ -284,7 +284,7 @@ a.module:hover {
 }
 
 a:link {
-  color:#bb221d;
+  color:#a21000;
   background: transparent;
   text-decoration: none;
   /*font-size: 110%;  */
@@ -292,7 +292,7 @@ a:link {
 
 
 a:visited {
-  color: #bb3230;
+  color: #d55454;
   background: transparent;
   text-decoration: none;
 }

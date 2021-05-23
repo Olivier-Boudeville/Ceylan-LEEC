@@ -4,7 +4,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="Docutils 0.16: http://docutils.sourceforge.net/" />
-<title>Welcome to the Ceylan-LEEC 0.6.1 documentation</title>
+<title>Welcome to the Ceylan-LEEC documentation</title>
 <meta content="LEEC, X509, certificate, SSL, https, Erlang" name="keywords" />
 <link rel="stylesheet" href="pygments-default.css" type="text/css" />
 <link rel="stylesheet" href="leec.css" type="text/css" />
@@ -16,7 +16,7 @@
 
 
 <span class="target" id="top"></span><p><span class="raw-html"><a name="leec_top"></a></span></p>
-<p><span class="raw-html"><div class="banner"><p><em>LEEC 0.6 documentation</em> <a href="http://leec.esperide.org">browse latest</a> <a href="https://olivier-boudeville.github.io/Ceylan-LEEC">browse mirror</a> <a href="Ceylan-LEEC-technical-manual-english.pdf">get PDF</a> <a href="#leec_top">go to top</a> <a href="#wooper_toc">go to toc</a> <a href="#leec_bottom">go to bottom</a> <a href="api-doc/index.html">browse API</a> <a href="https://github.com/Olivier-Boudeville/Ceylan-LEEC">go to project</a> <a href="mailto:about(dash)leec(at)esperide(dot)com?subject=[Ceylan-LEEC%200.6]%20Remark">email us</a></p></div></span></p>
+<p><span class="raw-html"><div class="banner"><p><em>LEEC documentation</em> <a href="http://leec.esperide.org">browse latest</a> <a href="https://olivier-boudeville.github.io/Ceylan-LEEC">browse mirror</a> <a href="Ceylan-LEEC-technical-manual-english.pdf">get PDF</a> <a href="#leec_top">go to top</a> <a href="#leec_toc">go to toc</a> <a href="#leec_bottom">go to bottom</a> <a href="api-doc/index.html">browse API</a> <a href="https://github.com/Olivier-Boudeville/Ceylan-LEEC">go to project</a> <a href="mailto:about(dash)leec(at)esperide(dot)com?subject=[Ceylan-LEEC]%20Remark">email us</a></p></div></span></p>
 <p><span class="raw-html"><center><img src="leec-title.png" width="25%"></img></center></span>
 </p>
 <div class="section" id="technical-manual-of-leec-let-s-encrypt-erlang-with-ceylan">
@@ -31,11 +31,15 @@
 </tr>
 <tr class="field"><th class="field-name">Creation date:</th><td class="field-body">Wednesday, November 11, 2020</td>
 </tr>
+<tr class="field"><th class="field-name">Lastly updated:</th><td class="field-body">Sunday, May 23, 2021</td>
+</tr>
+<tr class="field"><th class="field-name">Version:</th><td class="field-body">1.1.1</td>
+</tr>
+<tr class="field"><th class="field-name">Status:</th><td class="field-body">Stable</td>
+</tr>
 <tr class="field"><th class="field-name">Lastly updated:</th><td class="field-body">Saturday, May 22, 2021</td>
 </tr>
 <tr class="field"><th class="field-name">Dedication:</th><td class="field-body">Users and maintainers of the <tt class="docutils literal">LEEC</tt> library</td>
-</tr>
-<tr class="field"><th class="field-name">Version:</th><td class="field-body">0.6.2</td>
 </tr>
 <tr class="field"><th class="field-name">Abstract:</th><td class="field-body">The role of the <tt class="docutils literal">LEEC</tt> library is to interact from Erlang/OTP with servers implementing the ACME protocol - specifically <em>Let's Encrypt</em> servers, mostly in order to generate X.509 certificates.</td>
 </tr>
@@ -45,7 +49,7 @@
 <p><span class="raw-html">This LEEC documentation is also available in the PDF format (see <a href="Ceylan-LEEC-technical-manual-english.pdf">Ceylan-LEEC-technical-manual-english.pdf</a>), and mirrored <a href="http://olivier-boudeville.github.io/Ceylan-LEEC/">here</a>.</span></p>
 <p></p>
 <p></p>
-<p><span class="raw-html"><a name="wooper_toc"></a></span></p>
+<p><span class="raw-html"><a name="leec_toc"></a></span></p>
 <div class="contents topic" id="id1">
 <span id="table-of-contents"></span><p class="topic-title"><strong>Table of Contents</strong></p>
 <ul class="simple">
@@ -98,7 +102,7 @@
 <li>HTTP client can be either <tt class="docutils literal">Shotgun</tt> or the Erlang-native <tt class="docutils literal">httpc</tt> client, to avoid any extra dependencies on <tt class="docutils literal">Gun</tt> and <tt class="docutils literal">Cowlib</tt> (whose versions could potentially clash with the ones required by any <tt class="docutils literal">Cowboy</tt>-based integrating webserver)</li>
 <li>porting done from <a class="reference external" href="https://erlang.org/documentation/doc-6.1/lib/stdlib-2.1/doc/html/gen_fsm.html">gen_fsm</a> (soon to be deprecated) to the newer <a class="reference external" href="https://erlang.org/doc/man/gen_statem.html">gen_statem</a></li>
 <li>minor API changes and additions, for a clearer and more flexible mode of operation</li>
-<li>fixed the compilation with Erlang version 23.0 and higher (ex: w.r.t. to <tt class="docutils literal">http_uri</tt>/<tt class="docutils literal">uri_string</tt>, to updated dependencies such as Jiffy, and newer Cowboy for the examples)</li>
+<li>fixed the compilation with Erlang version 24.0 and higher (ex: w.r.t. to <tt class="docutils literal">http_uri</tt>/<tt class="docutils literal">uri_string</tt>, to updated dependencies such as Jiffy, and newer Cowboy for the examples)</li>
 <li>allow for <em>concurrent</em> certificate requests (ex: if managing multiple domains with different keys, new certificates being requested for all of them at webserver start-up); so LEEC generates certificates in parallel and does not rely on a <em>registered</em> FSM (<em>Finite State Machine</em>) anymore</li>
 <li>global, ETS-based TCP connection pool replaced by an (optional) per-FSM internal cache (if relying on Shotgun)</li>
 <li>support for SAN (<a class="reference external" href="https://en.wikipedia.org/wiki/Subject_Alternative_Name">Subject Alternative Name</a>) certificates, an extension to X.509 enabling a certificate to include a <tt class="docutils literal">subjectAltName</tt> field to list, here, extra DNS names that are covered by this certificate</li>
@@ -119,7 +123,7 @@
 <p>The general dependencies are:</p>
 <ul class="simple">
 <li><tt class="docutils literal">openssl</tt>, version  1.1.1 or higher (required to generate RSA key and certificate request)</li>
-<li><tt class="docutils literal">Erlang/OTP</tt> (tested with 23.1 versions and upwards)</li>
+<li><tt class="docutils literal">Erlang/OTP</tt> (refer to the <a class="reference external" href="http://myriad.esperide.org#prerequisites">Myriad prerequisite section</a>  section for the supported versions)</li>
 </ul>
 <p>The LEEC-specific ones, which are automatically managed by rebar3 if opting for a rebar-based build, are:</p>
 <ul class="simple">
