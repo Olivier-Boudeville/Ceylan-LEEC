@@ -34,7 +34,7 @@ GITHUB_PAGES_BASE := $(shell basename "$(LEEC_WEB_MIRROR_BRANCH)")
 
 
 
-.PHONY: doc all full-doc create-links html pdf clone-mirror           \
+.PHONY: doc all full-doc create-links html pdf api clone-mirror        \
 		export-doc export-doc-to-official export-doc-to-mirror         \
 		clean clean-doc clean-links info info-web
 
@@ -64,6 +64,9 @@ pdf: clean-doc $(PDF_TARGET)
 api:
 	@cd $(LAYER_TOP) && $(MAKE) -s generate-api-doc
 
+
+# To generate the actual API documentation tree:
+api-doc: api
 
 
 # Creates a separate repository for the GitHub pages branch:

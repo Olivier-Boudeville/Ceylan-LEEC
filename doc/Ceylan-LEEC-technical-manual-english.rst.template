@@ -1,7 +1,7 @@
 .. _Top:
 
 
-.. title:: Welcome to the Ceylan-LEEC 0.6.1 documentation
+.. title:: Welcome to the Ceylan-LEEC documentation
 
 .. comment stylesheet specified through GNUmakefile
 
@@ -15,7 +15,7 @@
 
 :raw-html:`<a name="leec_top"></a>`
 
-:raw-html:`<div class="banner"><p><em>LEEC 0.6 documentation</em> <a href="http://leec.esperide.org">browse latest</a> <a href="https://olivier-boudeville.github.io/Ceylan-LEEC">browse mirror</a> <a href="Ceylan-LEEC-technical-manual-english.pdf">get PDF</a> <a href="#leec_top">go to top</a> <a href="#leec_toc">go to toc</a> <a href="#leec_bottom">go to bottom</a> <a href="api-doc/index.html">browse API</a> <a href="https://github.com/Olivier-Boudeville/Ceylan-LEEC">go to project</a> <a href="mailto:about(dash)leec(at)esperide(dot)com?subject=[Ceylan-LEEC%200.6]%20Remark">email us</a></p></div>`
+:raw-html:`<div class="banner"><p><em>LEEC documentation</em> <a href="http://leec.esperide.org">browse latest</a> <a href="https://olivier-boudeville.github.io/Ceylan-LEEC">browse mirror</a> <a href="Ceylan-LEEC-technical-manual-english.pdf">get PDF</a> <a href="#leec_top">go to top</a> <a href="#leec_toc">go to toc</a> <a href="#leec_bottom">go to bottom</a> <a href="api-doc/index.html">browse API</a> <a href="https://github.com/Olivier-Boudeville/Ceylan-LEEC">go to project</a> <a href="mailto:about(dash)leec(at)esperide(dot)com?subject=[Ceylan-LEEC]%20Remark">email us</a></p></div>`
 
 
 
@@ -32,9 +32,11 @@ Technical Manual of LEEC: *Let's Encrypt Erlang with Ceylan*
 :Organisation: Copyright (C) 2020-2021 Olivier Boudeville
 :Contact: about (dash) leec (at) esperide (dot) com
 :Creation date: Wednesday, November 11, 2020
+:Lastly updated: GENERATION_DATE
+:Version: PROJECT_VERSION
+:Status: Stable
 :Lastly updated: Saturday, May 22, 2021
 :Dedication: Users and maintainers of the ``LEEC`` library
-:Version: 0.6.2
 :Abstract:
 
 	The role of the ``LEEC`` library is to interact from Erlang/OTP with servers implementing the ACME protocol - specifically *Let's Encrypt* servers, mostly in order to generate X.509 certificates.
@@ -102,7 +104,7 @@ Compared to the original ``letsencrypt-erlang`` library, the main differences in
 - HTTP client can be either ``Shotgun`` or the Erlang-native ``httpc`` client, to avoid any extra dependencies on ``Gun`` and ``Cowlib`` (whose versions could potentially clash with the ones required by any ``Cowboy``-based integrating webserver)
 - porting done from `gen_fsm <https://erlang.org/documentation/doc-6.1/lib/stdlib-2.1/doc/html/gen_fsm.html>`_ (soon to be deprecated) to the newer `gen_statem <https://erlang.org/doc/man/gen_statem.html>`_
 - minor API changes and additions, for a clearer and more flexible mode of operation
-- fixed the compilation with Erlang version 23.0 and higher (ex: w.r.t. to ``http_uri``/``uri_string``, to updated dependencies such as Jiffy, and newer Cowboy for the examples)
+- fixed the compilation with Erlang version 24.0 and higher (ex: w.r.t. to ``http_uri``/``uri_string``, to updated dependencies such as Jiffy, and newer Cowboy for the examples)
 - allow for *concurrent* certificate requests (ex: if managing multiple domains with different keys, new certificates being requested for all of them at webserver start-up); so LEEC generates certificates in parallel and does not rely on a *registered* FSM (*Finite State Machine*) anymore
 - global, ETS-based TCP connection pool replaced by an (optional) per-FSM internal cache (if relying on Shotgun)
 - support for SAN (`Subject Alternative Name <https://en.wikipedia.org/wiki/Subject_Alternative_Name>`_) certificates, an extension to X.509 enabling a certificate to include a ``subjectAltName`` field to list, here, extra DNS names that are covered by this certificate
@@ -134,7 +136,7 @@ Dependency Basics
 The general dependencies are:
 
 - ``openssl``, version  1.1.1 or higher (required to generate RSA key and certificate request)
-- ``Erlang/OTP`` (tested with 23.1 versions and upwards)
+- ``Erlang/OTP`` (refer to the `Myriad prerequisite section <http://myriad.esperide.org#prerequisites>`_  section for the supported versions)
 
 The LEEC-specific ones, which are automatically managed by rebar3 if opting for a rebar-based build, are:
 
