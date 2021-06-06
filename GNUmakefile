@@ -7,7 +7,8 @@ LEEC_TOP = .
 		send-release release release-zip release-bz2 release-xz          \
 		prepare-release clean-release clean-archive                      \
 		check-types check-cross-references                               \
-		info-paths info-compile info-conditionals info-deps
+		info-paths info-compile info-conditionals                        \
+		info-context info-versions info-deps
 
 
 MODULES_DIRS = src doc test #priv
@@ -149,18 +150,27 @@ info-conditionals:
 	@echo "LEEC_CHECK_FLAGS = $(LEEC_CHECK_FLAGS)"
 
 
+
+# Typically useful to know the software context for continuous integration:
+info-context: info-platform info-versions info-source-layout
+
+
+info-versions:
+	@echo "MYRIAD_VERSION    = $(MYRIAD_VERSION)"
+
+
 info-deps:
-	@echo "COWLIB_TOP = $(COWLIB_TOP)"
-	@echo "GUN_TOP = $(GUN_TOP)"
-	@echo "USE_SHOTGUN = $(USE_SHOTGUN)"
-	@echo "HTTPC_OPT = $(HTTPC_OPT)"
-	@echo "SHOTGUN_TOP = $(SHOTGUN_TOP)"
-	@echo "ELLI_TOP = $(ELLI_TOP)"
-	@echo "ERLANG_COLOR_TOP = $(ERLANG_COLOR_TOP)"
-	@echo "YAMERL_TOP = $(YAMERL_TOP)"
-	@echo "GETOPT_TOP = $(GETOPT_TOP)"
-	@echo "JSX_TOP = $(JSX_TOP)"
-	@echo "JIFFY_TOP = $(JIFFY_TOP)"
+	@echo "COWLIB_TOP = $(COWLIB_TOP) (i.e. $$(realpath $(COWLIB_TOP)))"
+	@echo "GUN_TOP = $(GUN_TOP) (i.e. $$(realpath $(GUN_TOP)))"
+	@echo "USE_SHOTGUN = $(USE_SHOTGUN) (i.e. $$(realpath $(USE_SHOTGUN)))"
+	@echo "HTTPC_OPT = $(HTTPC_OPT) (i.e. $$(realpath $(HTTPC_OPT)))"
+	@echo "SHOTGUN_TOP = $(SHOTGUN_TOP) (i.e. $$(realpath $(SHOTGUN_TOP)))"
+	@echo "ELLI_TOP = $(ELLI_TOP) (i.e. $$(realpath $(ELLI_TOP)))"
+	@echo "ERLANG_COLOR_TOP = $(ERLANG_COLOR_TOP) (i.e. $$(realpath $(ERLANG_COLOR_TOP)))"
+	@echo "YAMERL_TOP = $(YAMERL_TOP) (i.e. $$(realpath $(YAMERL_TOP)))"
+	@echo "GETOPT_TOP = $(GETOPT_TOP) (i.e. $$(realpath $(GETOPT_TOP)))"
+	@echo "JSX_TOP = $(JSX_TOP) (i.e. $$(realpath $(JSX_TOP)))"
+	@echo "JIFFY_TOP = $(JIFFY_TOP) (i.e. $$(realpath $(JIFFY_TOP)))"
 
 
 include $(LEEC_TOP)/GNUmakesettings.inc
