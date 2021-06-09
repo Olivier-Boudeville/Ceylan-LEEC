@@ -7,7 +7,7 @@ LEEC_TOP = .
 		send-release release release-zip release-bz2 release-xz          \
 		prepare-release clean-release clean-archive                      \
 		check-types check-cross-references                               \
-		info-paths info-compile info-conditionals                        \
+		info-paths info-conditionals                                     \
 		info-context info-versions info-deps
 
 
@@ -130,19 +130,6 @@ check-cross-references:
 
 info-paths:
 	@echo "BEAM_PATH_OPT = $(BEAM_PATH_OPT)"
-
-
-info-compile:
-	@echo "ERLANG_COMPILER_BASE_OPT = $(ERLANG_COMPILER_BASE_OPT)"
-	@echo "BEAM_DIRS = $(BEAM_DIRS)"
-	@echo "INC = $(INC)"
-	@echo "ERLANG_COMPILER_EXEC_TARGET_OPT = $(ERLANG_COMPILER_EXEC_TARGET_OPT)"
-	@echo "ERLANG_COMPILER_DEBUG_OPT = $(ERLANG_COMPILER_DEBUG_OPT)"
-	@echo "ERLANG_COMPILER_NATIVE_COMPILATION_OPT = $(ERLANG_COMPILER_NATIVE_COMPILATION_OPT)"
-	@echo "ERLANG_COMPILER_WARNING_OPT = $(ERLANG_COMPILER_WARNING_OPT)"
-	@echo "ERLANG_COMPILER_OPT_BASE = $(ERLANG_COMPILER_OPT_BASE)"
-	@echo "OVERALL_PZ_OPT = $(OVERALL_PZ_OPT)"
-	@echo "ERLANG_COMPILER_OPT_FOR_STANDARD_MODULES = $(ERLANG_COMPILER_OPT_FOR_STANDARD_MODULES)"
 
 
 info-conditionals:
