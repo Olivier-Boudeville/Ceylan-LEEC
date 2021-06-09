@@ -157,22 +157,16 @@ LEEC_RELEASE_ARCHIVE_XZ  := $(LEEC_RELEASE_BASE).tar.xz
 LEEC_SRC := $(LEEC_TOP)/src
 
 # BEAM path section.
-LEEC_BEAM := $(LEEC_SRC)
+LEEC_BEAM_DIR := $(LEEC_SRC)
 
 # Include path section.
 LEEC_INC = -I$(LEEC_TOP)/include
 
-
-# In an OTP/rebar3-style application layout, at compilation time, libraries
-# making use of Myriad will expect its includes to be located in:
-#
-MYRIAD_OTP_INC := -I$(LEEC_TOP)/../myriad/include/
-
-INC += $(LEEC_INC) $(MYRIAD_OTP_INC)
+INC += $(LEEC_INC)
 
 
 # See Myriad counterpart variable (MYRIAD_BEAM_DIRS) for explanations:
-LEEC_BEAM_DIRS := $(LEEC_BEAM)
+LEEC_BEAM_DIRS := $(LEEC_BEAM_DIR) $(LEEC_TOP)/..
 
 
 # For OTP releases and all:
