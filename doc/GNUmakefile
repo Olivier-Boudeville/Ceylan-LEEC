@@ -25,29 +25,29 @@ PROJECT_CSS := pygments-default.css,leec.css
 
 PROJECT_ICON := leec-icon.png
 
-WEB_CONTENT = *.html *.css *.png *.pdf api-doc
-
 
 # Read from the user's environment:
 GITHUB_PAGES_BASE := $(shell basename "$(LEEC_WEB_MIRROR_BRANCH)")
 
 
 
-
-.PHONY: doc all full-doc create-links html pdf api clone-mirror        \
+.PHONY: all doc html pdf create-links clone-mirror                     \
 		export-doc export-doc-to-official export-doc-to-mirror         \
-		clean clean-doc clean-links info info-web
+		clean-links-local info info-web
+
 
 
 # Default do-nothing target:
 all:
-	@echo "  Run 'make full-doc' to generate the manual of the 'Traces' layer."
+	@echo "  Run 'make doc' to generate the documentation of the 'LEEC' layer."
 
 
-doc:
+doc: html pdf api-doc
 
 
-full-doc: $(DOC_GENERATED_FILES) api-doc
+html: local-html
+
+pdf: local-pdf
 
 
 # These links do not need to be in version control:
@@ -57,17 +57,6 @@ create-links:
 	@/bin/ln -sf $(CURRENT_LEEC_PDF) leec.pdf
 
 
-html: clean-doc $(HTML_TARGET)
-
-pdf: clean-doc $(PDF_TARGET)
-
-api:
-	@cd $(LAYER_TOP) && $(MAKE) -s generate-api-doc
-
-
-# To generate the actual API documentation tree:
-api-doc: api
-
 
 # Creates a separate repository for the GitHub pages branch:
 clone-mirror:
@@ -76,7 +65,7 @@ clone-mirror:
 	@echo "Please remove all initial content in that selected 'gh-pages' branch."
 
 
-export-doc: clean-doc full-doc export-doc-to-official export-doc-to-mirror
+export-doc: clean-doc doc export-doc-to-official export-doc-to-mirror
 
 
 # Drawback: scp will not preserve symlinks, it will duplicate files instead.
@@ -85,28 +74,21 @@ export-doc: clean-doc full-doc export-doc-to-official export-doc-to-mirror
 # not a set of files), so currently not used:
 # rsync -avze "ssh $(SP)" $(SOME_WEB_TREE) $(WEB_SRV):$(WEB_ROOT)/LEEC/
 #
-export-doc-to-official: create-links $(DOC_GENERATED_FILES)
+export-doc-to-official: clean-doc create-links doc
 	@echo "   Exporting LEEC documentation to official website"
 	@/bin/scp $(SP) -r $(WEB_CONTENT) $(WEB_SRV):$(WEB_ROOT)/LEEC/
 
 
-export-doc-to-mirror: create-links $(DOC_GENERATED_FILES)
+export-doc-to-mirror: clean-doc create-links doc
 	@echo "   Exporting LEEC documentation to mirror website in $(LEEC_WEB_MIRROR_BRANCH)"
 	@/bin/cp -rf $(WEB_CONTENT) $(LEEC_WEB_MIRROR_BRANCH) && cd $(LEEC_WEB_MIRROR_BRANCH) && git add . && git merge -s ours && git commit -m "LEEC doc updated." && git push && git pull --ff-only
 
 
+clean-links: clean-links-local
 
-clean: clean-doc
+clean-links-local:
+	-@/bin/rm -f leec.html leec.pdf
 
-
-clean-doc: clean-links
-	@echo "     Cleaning documentation"
-	-@/bin/rm -f *.aux *.log *.maf *.mtc* *.stc* *.tex *.toc $(DOC_GENERATED_FILES)
-	-@/bin/rm -rf api-doc
-
-
-clean-links:
-	-@/bin/rm -f index.html
 
 
 info: info-doc info-web

@@ -19,7 +19,7 @@
 
 
 
-:raw-html:`<center><img src="leec-title.png" width="25%"></img></center>`
+:raw-html:`<center><img src="leec-title.png" id="responsive-image-small"></img></center>`
 :raw-latex:`\centering \includegraphics[scale=0.55]{leec-title.png}`
 
 
@@ -423,7 +423,7 @@ Ending Word
 Have fun with Ceylan-LEEC!
 (not supposed to involve any memory leak)
 
-:raw-html:`<center><img src="leec-title.png" width="15%"></img></center>`
+:raw-html:`<center><img src="leec-title.png" id="responsive-image-small"</img></center>`
 :raw-latex:`\begin{figure}[h] \centering \includegraphics[scale=0.3]{leec-title.png} \end{figure}`
 
 :raw-html:`<a name="leec_bottom"></a>`
