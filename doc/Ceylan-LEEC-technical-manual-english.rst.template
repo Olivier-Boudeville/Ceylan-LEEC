@@ -29,11 +29,11 @@ Technical Manual of LEEC: *Let's Encrypt Erlang with Ceylan*
 ============================================================
 
 
-:Organisation: Copyright (C) 2020-2021 Olivier Boudeville
+:Organisation: Copyright (C) 2020-GENERATION_YEAR_TAG Olivier Boudeville
 :Contact: about (dash) leec (at) esperide (dot) com
 :Creation date: Wednesday, November 11, 2020
-:Lastly updated: GENERATION_DATE
-:Version: PROJECT_VERSION
+:Lastly updated: GENERATION_DATE_TAG
+:Version: PROJECT_VERSION_TAG
 :Status: Stable
 :Lastly updated: Saturday, May 22, 2021
 :Dedication: Users and maintainers of the ``LEEC`` library
