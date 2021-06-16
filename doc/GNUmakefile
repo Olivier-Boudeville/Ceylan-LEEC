@@ -75,7 +75,7 @@ export-doc: clean-doc doc export-doc-to-official export-doc-to-mirror
 # rsync -avze "ssh $(SP)" $(SOME_WEB_TREE) $(WEB_SRV):$(WEB_ROOT)/LEEC/
 #
 export-doc-to-official: clean-doc create-links doc
-	@echo "   Exporting LEEC documentation to official website"
+	@echo "   Exporting LEEC documentation to official website ($(WEB_SRV))"
 	@/bin/scp $(SP) -r $(WEB_CONTENT) $(WEB_SRV):$(WEB_ROOT)/LEEC/
 
 
