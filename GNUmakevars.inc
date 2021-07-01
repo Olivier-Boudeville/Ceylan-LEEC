@@ -259,17 +259,6 @@ ifndef EDOC_OPTS
 endif
 
 
-# LEEC may not be correctly built by rebar if hiding build files (precisely:
-# "*** No rule to make target '../myriad/src/utils/basic_utils.erl', needed by
-# '../myriad/src/utils/basic_utils.beam'.  Stop." in a spurious rebuild of
-#  Myriad when building LEEC for a top-level application).
-#
-# See the 'rebar3-bulletproof-compile-pre-hook' for details.
-#
-REBAR_HOOK_EXTRA_OPTS := --no-hiding-for-rebar --verbose
-
-
-
 # Checking section.
 
 # For later reuse in the next layer of the software stack:
