@@ -6,6 +6,12 @@
 .. comment stylesheet specified through GNUmakefile
 
 
+
+============================================================
+Technical Manual of LEEC: *Let's Encrypt Erlang with Ceylan*
+============================================================
+
+
 .. role:: raw-html(raw)
    :format: html
 
@@ -19,14 +25,10 @@
 
 
 
-:raw-html:`<center><img src="leec-title.png" id="responsive-image-small"></img></center>`
+:raw-html:`<center><img src="leec-title.png" id="responsive-image-small"></img>`
 :raw-latex:`\centering \includegraphics[scale=0.55]{leec-title.png}`
 
 
-
-============================================================
-Technical Manual of LEEC: *Let's Encrypt Erlang with Ceylan*
-============================================================
 
 
 :Organisation: Copyright (C) 2020-GENERATION_YEAR_TAG Olivier Boudeville
@@ -44,6 +46,8 @@ Technical Manual of LEEC: *Let's Encrypt Erlang with Ceylan*
 
 .. meta::
    :keywords: LEEC, X509, certificate, SSL, https, Erlang
+
+:raw-html:`</center>`
 
 
 The latest version of this documentation is to be found at the `official LEEC website <http://leec.esperide.org>`_ (``http://leec.esperide.org``).
