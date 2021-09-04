@@ -2,7 +2,7 @@
 [{<<"jsx">>,{pkg,<<"jsx">>,<<"3.0.0">>},0},
  {<<"myriad">>,
   {git,"git://github.com/Olivier-Boudeville/Ceylan-Myriad",
-       {ref,"039b93bf1d4afd80241533bb7380b07c0c9e7262"}},
+       {ref,"be5a10056a7a74609c1774945c8aea3f1ffd1639"}},
   0}]}.
 [
 {pkg_hash,[
