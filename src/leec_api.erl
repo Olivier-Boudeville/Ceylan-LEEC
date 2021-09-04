@@ -323,10 +323,9 @@ request_via_shotgun( Method, Uri, Headers, MaybeBinContent,
 	ContentHeaders = Headers#{ <<"content-type">> =>
 									<<"application/jose+json">> },
 
-
 	% We want to reuse connection if it already exists:
-	{ Connection, NewTCPCache } = get_tcp_connection( UriProtoAtom, UriHost,
-													  UriPort, TCPCache ),
+	{ Connection, NewTCPCache } =
+		get_tcp_connection( UriProtoAtom, UriHost, UriPort, TCPCache ),
 
 	ReqRes = case Method of
 
@@ -522,7 +521,7 @@ on_failed_request( StatusCode, StepAtom ) ->
 							   [ StepAtom, StatusStr ] ),
 
 	throw( { request_failed, { status_code, StatusCode }, { reason, StatusStr },
-			 { step, StepAtom } } ).
+				{ step, StepAtom } } ).
 
 
 

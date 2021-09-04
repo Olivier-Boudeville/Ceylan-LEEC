@@ -29,7 +29,7 @@
 
 
 -export([ obtain_private_key/2, obtain_dh_key/1,
-		  obtain_ca_cert_file/1, obtain_ca_cert_file/2,
+		  obtain_ca_cert_file/2, obtain_ca_cert_file/3,
 		  get_cert_request/3,
 		  generate_certificate/5, write_certificate/3,
 		  key_to_map/1, map_to_key/1 ]).
@@ -60,6 +60,8 @@
 -type tls_public_key() :: leec:tls_public_key().
 
 -type certificate_provider() :: leec:certificate_provider().
+
+-type http_options() :: web_utils:http_options().
 
 
 
@@ -278,15 +280,17 @@ obtain_dh_key( CertDir ) ->
 
 
 % @doc Obtains the intermediate certificate of the default authority.
--spec obtain_ca_cert_file( any_directory_path() ) -> bin_file_path().
-obtain_ca_cert_file( TargetDir ) ->
-	obtain_ca_cert_file( TargetDir, _DefaultProvider=letsencrypt ).
+-spec obtain_ca_cert_file( any_directory_path(), http_options() ) ->
+									bin_file_path().
+obtain_ca_cert_file( TargetDir, HttpOptions ) ->
+	obtain_ca_cert_file( TargetDir, _DefaultProvider=letsencrypt,
+						 HttpOptions ).
 
 
 % @doc Obtains the intermediate certificate of the specified authority.
--spec obtain_ca_cert_file( any_directory_path(), certificate_provider() ) ->
-			file_path().
-obtain_ca_cert_file( TargetDir, _CertProvider=letsencrypt ) ->
+-spec obtain_ca_cert_file( any_directory_path(), certificate_provider(),
+						   http_options() ) -> file_path().
+obtain_ca_cert_file( TargetDir, _CertProvider=letsencrypt, HttpOptions ) ->
 
 	CAUrl = "https://letsencrypt.org/certs/lets-encrypt-r3-cross-signed.pem",
 
@@ -307,11 +311,13 @@ obtain_ca_cert_file( TargetDir, _CertProvider=letsencrypt ) ->
 		false ->
 
 			trace_bridge:info_fmt( "No certificate authority certificate "
-				"file found (no '~ts'), downloading it from ~ts.",
-				[ FilePath, CAUrl ] ),
+				"file found (no '~ts'), downloading it from ~ts, "
+				"with HTTP options ~p.",
+				[ FilePath, CAUrl, HttpOptions ] ),
 
 			% Expected to be equal to FilePath:
-			ResFilePath = web_utils:download_file( CAUrl, TargetDir ),
+			ResFilePath = web_utils:download_file( CAUrl, TargetDir,
+												   HttpOptions ),
 
 			text_utils:string_to_binary( ResFilePath )
 

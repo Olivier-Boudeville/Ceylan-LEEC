@@ -88,9 +88,9 @@
 
 % URI format compatible with the shotgun library.
 %
-% Although the netopts map (in the option map) is fairly useless (just
-% containing a time-out), we kept it, as it is a parameter directly needed as
-% such by shotgun:post/5.
+% The netopts map (in the option map) possibly just contains a time-out, or
+% maybe SSL options; it is a parameter directly needed as such by
+% shotgun:post/5.
 
 
 -type bin_domain() :: net_utils:bin_fqdn().
@@ -180,7 +180,7 @@
 
 
 -type cert_req_option_id() :: 'async' | 'callback' | 'netopts' | 'challenge'
-								| 'sans' | 'json'.
+							| 'sans' | 'json'.
 % Certificate request options.
 
 
@@ -193,7 +193,8 @@
 %
 %  - callback :: fun/1
 %
-%  - netopts :: map() => #{ timeout => unit_utils:milliseconds() }
+%  - netopts :: map() => #{ timeout => unit_utils:milliseconds(),
+%                           ssl => [ ssl:client_option() ] }
 %
 %  - challenge_type :: challenge_type(), default being 'http-01'
 %
@@ -455,7 +456,22 @@ get_default_cert_request_options() ->
 %
 -spec get_default_cert_request_options( boolean() ) -> cert_req_option_map().
 get_default_cert_request_options( Async ) when is_boolean( Async ) ->
-	#{ async => Async, netopts => #{ timeout => ?default_timeout } }.
+	#{ async => Async,
+	   netopts => #{ timeout => ?default_timeout,
+
+					 % To avoid the following warning: 'Authenticity is not
+					 % established by certificate path validation' (however, for
+					 % unspecified reasons, apparently some instances thereof
+					 % remain output).
+					 %
+					 % (verify_peer could be used instead, yet a specific,
+					 % preferably ordered, list of the trusted DER-encoded
+					 % certificates would then have to be specified, see
+					 % https://erlang.org/doc/man/ssl.html#type-cert; here we
+					 % loose the Man-in-the-Middle protection, but TLS still
+					 % provides protection against "casual" eavesdroppers)
+					 %
+					 ssl => #{ verify => verify_none } } }.
 
 
 
@@ -489,35 +505,35 @@ obtain_certificate_for( Domain, FsmPid ) ->
 %
 % Parameters:
 %
-%	- Domain is the domain name to generate an ACME certificate for
+% - Domain is the domain name to generate an ACME certificate for
 %
-%   - FsmPid is the PID of the FSM to rely on
+% - FsmPid is the PID of the FSM to rely on
 %
-%	- CertReqOptionMap is a map listing the options applying to this certificate
-%		request, whose key (as atom)/value pairs (all optional except 'async'
-%		and 'netopts') are:
+% - CertReqOptionMap is a map listing the options applying to this certificate
+% request, whose key (as atom)/value pairs (all optional except 'async' and
+% 'netopts') are:
 %
-%		- 'async' / boolean(): if true, blocks until complete and returns
-%			generated certificate filename
-%							   if false, immediately returns
+%    - 'async' / boolean(): if true, blocks until complete and returns generated
+%    certificate filename if false, immediately returns
 %
-%		- 'callback' / fun/1: function executed when Async is true, once domain
-%			certificate has been successfully generated
+%    - 'callback' / fun/1: function executed when Async is true, once domain
+%    certificate has been successfully generated
 %
-%       - 'netopts' / map(): mostly to specify an HTTP timeout
+%    - 'netopts' / map(): mostly to specify an HTTP timeout or SSL client
+%    options
 %
-%       - 'challenge_type' / challenge_type() is the type of challenge to
-%           rely on when interacting with the ACME server
+%    - 'challenge_type' / challenge_type() is the type of challenge to rely on
+%    when interacting with the ACME server
 %
-%       - 'sans' / [ any_san() ]: a list of the Subject Alternative Names
-%           for that certificate
+%    - 'sans' / [ any_san() ]: a list of the Subject Alternative Names for that
+%    certificate
 %
 % Returns:
 %
-%   - if synchronous (the default): either {certificate_ready, BinFilePath} if
-%   successful, otherwise {error, Err}
+% - if synchronous (the default): either {certificate_ready, BinFilePath} if
+% successful, otherwise {error, Err}
 %
-%	- otherwise (asynchronous), 'async'
+% - otherwise (asynchronous), 'async'
 %
 % Belongs to the user-facing API; requires the LEEC service to be already
 % started.
@@ -595,7 +611,7 @@ obtain_cert_helper( Domain, FsmPid,
 	% BinDomain, Opts}, _, LEState):
 	%
 	CreationRes = case gen_statem:call( ServerRef,
-				_Request={ create, BinDomain, CertReqOptionMap }, Timeout ) of
+			_Request={ create, BinDomain, CertReqOptionMap }, Timeout ) of
 
 		% State of FSM shall thus be 'idle' now:
 		ErrorTerm={ creation_failed, Error } ->
@@ -1686,22 +1702,22 @@ code_change( _, StateName, LEState, _ ) ->
 %
 % Available options are:
 %
-%  - staging: runs in staging environment (otherwise running in production one)
+% - staging: runs in staging environment (otherwise running in production one)
 %
-%  - mode: webroot, slave or standalone
+% - mode: webroot, slave or standalone
 %
-%  - agent_key_file_path: to reuse an existing agent TLS key
+% - agent_key_file_path: to reuse an existing agent TLS key
 %
-%  - cert_dir_path: path to read/save TLS certificates, keys and CSR requests
+% - cert_dir_path: path to read/save TLS certificates, keys and CSR requests
 %
-%  - webroot_dir_path: the webroot directory, in a conventional subdirectory of
-%  which challenge answers shall be written so that the ACME server can download
-%  them
+% - webroot_dir_path: the webroot directory, in a conventional subdirectory of
+% which challenge answers shall be written so that the ACME server can download
+% them
 %
-%  - port: the TCP port at which the corresponding webserver shall be available,
-%  in standalone mode
+% - port: the TCP port at which the corresponding webserver shall be available,
+% in standalone mode
 %
-%  - http_timeout: timeout for ACME API requests (in milliseconds)
+% - http_timeout: timeout for ACME API requests (in milliseconds)
 %
 % Returns LEState (type record 'le_state') filled with corresponding, checked
 % option values.
@@ -1868,11 +1884,11 @@ setup_mode( #le_state{ mode=Mode } ) ->
 %
 % Returns:
 %
-%  - {error, timeout} if failed after X loops
+% - {error, timeout} if failed after X loops
 %
-%  - {error, Err} if another error
+% - {error, Err} if another error
 %
-%  - 'ok' if succeed
+% - 'ok' if succeed
 %
 -spec wait_challenges_valid( fsm_pid() ) -> base_status().
 wait_challenges_valid( FsmPid ) ->
@@ -1926,11 +1942,11 @@ wait_challenges_valid( FsmPid, Count, MaxCount ) ->
 %
 % Returns:
 %
-%  - {error, timeout} if failed after X loops
+% - {error, timeout} if failed after X loops
 %
-%  - {error, Err} if another error
+% - {error, Err} if another error
 %
-%  - {'ok', Response} if succeed
+% - {'ok', Response} if succeed
 %
 -spec wait_creation_completed( fsm_pid(), count() ) ->
 		{ 'ok', map() } | { 'error', 'timeout' | any() }.
