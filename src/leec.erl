@@ -645,7 +645,8 @@ obtain_cert_helper( Domain, FsmPid,
 								trace_bridge:debug_fmt( "Domain '~ts' "
 									"finalized for ~w, returning certificate "
 									"path '~ts'.",
-									[ Domain, FsmPid, BinCertFilePath ] ) ),
+									[ Domain, FsmPid, BinCertFilePath ] ),
+								basic_utils:ignore_unused( BinCertFilePath ) ),
 							Reply;
 
 						Error ->
@@ -737,7 +738,8 @@ stop( FsmPid ) ->
 	%json_utils:stop_parser().
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
-		"FSM ~w stopped (result: ~p).", [ FsmPid, Res ] ) ).
+		"FSM ~w stopped (result: ~p).", [ FsmPid, Res ] ),
+		basic_utils:ignore_unused( Res ) ).
 
 
 
@@ -1348,8 +1350,8 @@ pending( _EventType={ call, From }, _EventContentMsg=Request=switchTofinalize,
 
 	%cond_utils:if_defined( leec_debug_exchanges,
 	trace_bridge:debug_fmt( "[~w] Received, while in 'pending' state, "
-							"request '~ts' from ~w, currently ignored.",
-							[ self(), Request, From ] ),
+		"request '~ts' from ~w, currently ignored.",
+		[ self(), Request, From ] ),
 
 	% { next_state, finalize, ...}?
 
@@ -1649,7 +1651,8 @@ handle_call_for_all_states( ServerRef, _Request=get_agent_key_path, StateName,
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Returning agent key path (while in state '~ts'): ~p.",
-		[ ServerRef, StateName, MaybeKeyPath ] ) ),
+		[ ServerRef, StateName, MaybeKeyPath ] ),
+		basic_utils:ignore_unused( StateName ) ),
 
 	{ keep_state_and_data, _Actions={ reply, _From=ServerRef,
 									  _Res=MaybeKeyPath } };
@@ -1660,7 +1663,8 @@ handle_call_for_all_states( ServerRef, _Request=stop, StateName,
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Received a stop request from ~ts state.",
-		[ ServerRef, StateName ] ) ),
+		[ ServerRef, StateName ] ),
+		basic_utils:ignore_unused( [ ServerRef, StateName ] ) ),
 
 	DestroyLEState = challenge_destroy( Mode, LEState ),
 
@@ -1978,7 +1982,8 @@ wait_creation_completed( FsmPid, Count, Max ) ->
 		Reply={ certificate_ready, BinCertFilePath } ->
 			cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 				"End of waiting for creation of '~ts': read target status "
-				"'finalize' for ~w.", [ BinCertFilePath, FsmPid ] ) ),
+				"'finalize' for ~w.", [ BinCertFilePath, FsmPid ] ),
+				basic_utils:ignore_unused( BinCertFilePath ) ),
 			Reply;
 
 		creation_in_progress ->
