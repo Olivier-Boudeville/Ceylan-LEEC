@@ -143,7 +143,7 @@ binary_to_status( InvalidBinStatus ) ->
 % If a connection to the given Proto://Host:Port is already opened, returns it,
 % otherwise returns a newly opened connection.
 %
-% TODO: checks connection is still alive (ping?)
+% TODO: check connection is still alive (ping?)
 %
 % Note: for long-living processes (ex: up to 90 days can elapse between two
 % certification generations for a given domain), it is certainly safer to reset
@@ -430,7 +430,7 @@ request_via_native_httpc( Method, Uri, Headers, MaybeBinContent,
 				trace_bridge:debug_fmt( "[~w][client] GET request to URI "
 					"'~ts', with following headers:~n  ~p~nand "
 					"HTTP options: ~p.",
-					[ self(), Uri, Headers, Netopts ] ) ),
+					[ self(), Uri, Headers, HttpOpts ] ) ),
 
 			web_utils:get( Uri, Headers, HttpOpts );
 
@@ -554,8 +554,8 @@ on_failed_request( StatusCode, JsonMapBody, StepAtom ) ->
 	end,
 
 	throw( { request_failed, { status_code, StatusCode },
-			 { reason, text_utils:ensure_string( Reason ) },
-			 { step, StepAtom } } ).
+			    { reason, text_utils:ensure_string( Reason ) },
+			    { step, StepAtom } } ).
 
 
 
