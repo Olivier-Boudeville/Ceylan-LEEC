@@ -37,7 +37,6 @@ Technical Manual of LEEC: *Let's Encrypt Erlang with Ceylan*
 :Lastly updated: GENERATION_DATE_TAG
 :Version: PROJECT_VERSION_TAG
 :Status: Stable
-:Lastly updated: Saturday, May 22, 2021
 :Dedication: Users and maintainers of the ``LEEC`` library
 :Abstract:
 
@@ -116,7 +115,7 @@ Compared to the original ``letsencrypt-erlang`` library, the main differences in
 
   - *Ephemeral Diffie-Helman* key, to ensure *Forward Secrecy* by relying on a set of keys that are never communicated
   - `Intermediate Let's Encrypt Certificates <https://letsencrypt.org/certificates/>`_
-
+- SSL-based verification of the ACME peer, to avoid any man-in-the-middle attack
 
 
 ..	 - ``connect_timeout`` deprecated in favor of ``http_timeout``
