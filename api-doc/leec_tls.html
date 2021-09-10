@@ -48,6 +48,10 @@
 <p><tt>file_path() = <a href="file_utils.html#type-file_path">file_utils:file_path()</a></tt></p>
 
 
+<h3 class="typedecl"><a name="type-http_options">http_options()</a></h3>
+<p><tt>http_options() = <a href="web_utils.html#type-http_options">web_utils:http_options()</a></tt></p>
+
+
 <h3 class="typedecl"><a name="type-key_file_info">key_file_info()</a></h3>
 <p><tt>key_file_info() = <a href="leec.html#type-key_file_info">leec:key_file_info()</a></tt></p>
 
@@ -84,8 +88,8 @@
  for encoding.</td></tr>
 <tr><td valign="top"><a href="#map_to_key-1">map_to_key/1</a></td><td>Returns the key record corresponding to the specified map, typically
  obtained from a remote server.</td></tr>
-<tr><td valign="top"><a href="#obtain_ca_cert_file-1">obtain_ca_cert_file/1</a></td><td>Obtains the intermediate certificate of the default authority.</td></tr>
-<tr><td valign="top"><a href="#obtain_ca_cert_file-2">obtain_ca_cert_file/2</a></td><td>Obtains the intermediate certificate of the specified authority.</td></tr>
+<tr><td valign="top"><a href="#obtain_ca_cert_file-2">obtain_ca_cert_file/2</a></td><td>Obtains the intermediate certificate of the default authority.</td></tr>
+<tr><td valign="top"><a href="#obtain_ca_cert_file-3">obtain_ca_cert_file/3</a></td><td>Obtains the intermediate certificate of the specified authority.</td></tr>
 <tr><td valign="top"><a href="#obtain_dh_key-1">obtain_dh_key/1</a></td><td>Secures a proper DH file for safer key exchange, creates it only if 
 necessary, returns its path.</td></tr>
 <tr><td valign="top"><a href="#obtain_private_key-2">obtain_private_key/2</a></td><td>Obtains a private key for the current LEEC agent, either by creating it
@@ -126,15 +130,15 @@ necessary, returns its path.</td></tr>
  obtained from a remote server.
 </p>
 
-<h3 class="function"><a name="obtain_ca_cert_file-1">obtain_ca_cert_file/1</a></h3>
+<h3 class="function"><a name="obtain_ca_cert_file-2">obtain_ca_cert_file/2</a></h3>
 <div class="spec">
-<p><tt>obtain_ca_cert_file(TargetDir::<a href="#type-any_directory_path">any_directory_path()</a>) -&gt; <a href="#type-bin_file_path">bin_file_path()</a></tt><br></p>
+<p><tt>obtain_ca_cert_file(TargetDir::<a href="#type-any_directory_path">any_directory_path()</a>, HttpOptions::<a href="#type-http_options">http_options()</a>) -&gt; <a href="#type-bin_file_path">bin_file_path()</a></tt><br></p>
 <p> </p>
 </div><p>Obtains the intermediate certificate of the default authority.</p>
 
-<h3 class="function"><a name="obtain_ca_cert_file-2">obtain_ca_cert_file/2</a></h3>
+<h3 class="function"><a name="obtain_ca_cert_file-3">obtain_ca_cert_file/3</a></h3>
 <div class="spec">
-<p><tt>obtain_ca_cert_file(TargetDir::<a href="#type-any_directory_path">any_directory_path()</a>, CertProvider::<a href="#type-certificate_provider">certificate_provider()</a>) -&gt; <a href="#type-file_path">file_path()</a></tt><br></p>
+<p><tt>obtain_ca_cert_file(TargetDir::<a href="#type-any_directory_path">any_directory_path()</a>, CertProvider::<a href="#type-certificate_provider">certificate_provider()</a>, HttpOptions::<a href="#type-http_options">http_options()</a>) -&gt; <a href="#type-file_path">file_path()</a></tt><br></p>
 <p> </p>
 </div><p>Obtains the intermediate certificate of the specified authority.</p>
 

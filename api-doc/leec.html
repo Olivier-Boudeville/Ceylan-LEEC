@@ -114,7 +114,8 @@
 
   <p>- callback :: fun/1</p>
 
-  <p>- netopts :: map() =&gt; #{ timeout =&gt; unit_utils:milliseconds() }</p>
+  <p>- netopts :: map() =&gt; #{ timeout =&gt; unit_utils:milliseconds(),                           
+ssl =&gt; [ ssl:client_option() ] }</p>
 
   <p>- challenge_type :: challenge_type(), default being 'http-01'</p>
 
@@ -484,35 +485,35 @@ new certificate for the specified domain (FQDN).</p>
 
  <p>Parameters:</p>
 
-	<p>- Domain is the domain name to generate an ACME certificate for</p>
+ <p>- Domain is the domain name to generate an ACME certificate for</p>
 
-   <p>- FsmPid is the PID of the FSM to rely on</p>
+ <p>- FsmPid is the PID of the FSM to rely on</p>
 
-	<p>- CertReqOptionMap is a map listing the options applying to this certificate		
-request, whose key (as atom)/value pairs (all optional except 'async'		
-and 'netopts') are:</p>
+ <p>- CertReqOptionMap is a map listing the options applying to this certificate 
+request, whose key (as atom)/value pairs (all optional except 'async' and 
+'netopts') are:</p>
 
-		<p>- 'async' / boolean(): if true, blocks until complete and returns			
-generated certificate filename   							
-if false, immediately returns</p>
+    <p>- 'async' / boolean(): if true, blocks until complete and returns generated    
+certificate filename if false, immediately returns</p>
 
-		<p>- 'callback' / fun/1: function executed when Async is true, once domain			
+    <p>- 'callback' / fun/1: function executed when Async is true, once domain    
 certificate has been successfully generated</p>
 
-       <p>- 'netopts' / map(): mostly to specify an HTTP timeout</p>
+    <p>- 'netopts' / map(): mostly to specify an HTTP timeout or SSL client    
+options</p>
 
-       <p>- 'challenge_type' / challenge_type() is the type of challenge to           
-rely on when interacting with the ACME server</p>
+    <p>- 'challenge_type' / challenge_type() is the type of challenge to rely on    
+when interacting with the ACME server</p>
 
-       <p>- 'sans' / [ any_san() ]: a list of the Subject Alternative Names           
-for that certificate</p>
+    <p>- 'sans' / [ any_san() ]: a list of the Subject Alternative Names for that    
+certificate</p>
 
  <p>Returns:</p>
 
-   <p>- if synchronous (the default): either {certificate_ready, BinFilePath} if   
+ <p>- if synchronous (the default): either {certificate_ready, BinFilePath} if 
 successful, otherwise {error, Err}</p>
 
-	<p>- otherwise (asynchronous), 'async'</p>
+ <p>- otherwise (asynchronous), 'async'</p>
 
  Belongs to the user-facing API; requires the LEEC service to be already
  started.
