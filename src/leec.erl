@@ -456,6 +456,9 @@ get_default_cert_request_options() ->
 %
 -spec get_default_cert_request_options( boolean() ) -> cert_req_option_map().
 get_default_cert_request_options( Async ) when is_boolean( Async ) ->
+
+	MatchFun = public_key:pkix_verify_hostname_match_fun( https ),
+
 	#{ async => Async,
 	   netopts => #{ timeout => ?default_timeout,
 
@@ -464,14 +467,19 @@ get_default_cert_request_options( Async ) when is_boolean( Async ) ->
 					 % unspecified reasons, apparently some instances thereof
 					 % remain output).
 					 %
-					 % (verify_peer could be used instead, yet a specific,
-					 % preferably ordered, list of the trusted DER-encoded
-					 % certificates would then have to be specified, see
-					 % https://erlang.org/doc/man/ssl.html#type-cert; here we
-					 % loose the Man-in-the-Middle protection, but TLS still
-					 % provides protection against "casual" eavesdroppers)
+					 % We trust the system DER-encoded certificates, see
+					 % https://erlang.org/doc/man/ssl.html#type-cert as we want
+					 % the TLS protection against "casual" eavesdroppers and
+					 % also the one against Man-in-the-Middle (so we check that
+					 % we interact with the expected ACME server):
 					 %
-					 ssl => #{ verify => verify_none } } }.
+					 %ssl => #{ verify => verify_none } } }.
+					 ssl => #{
+						 verify => verify_peer,
+						 cacertfile => "/etc/ssl/certs/ca-certificates.crt",
+						 depth => 3,
+						 customize_hostname_check =>
+							 [ { match_fun, MatchFun } ] } } }.
 
 
 
