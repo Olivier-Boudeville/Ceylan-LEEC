@@ -29,7 +29,7 @@
 
 
 -export([ obtain_private_key/2, obtain_dh_key/1,
-		  obtain_ca_cert_file/2, obtain_ca_cert_file/3,
+		  obtain_ca_cert_file/1, obtain_ca_cert_file/2, obtain_ca_cert_file/3,
 		  get_cert_request/3,
 		  generate_certificate/5, write_certificate/3,
 		  key_to_map/1, map_to_key/1 ]).
@@ -69,6 +69,8 @@
 % (in a specified filename or in a generated one) or by reading a pre-existing
 % one from file.
 %
+% Does not involve any network access.
+%
 -spec obtain_private_key( maybe( key_file_info() ), bin_directory_path() ) ->
 									tls_private_key().
 obtain_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
@@ -98,7 +100,7 @@ obtain_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 
 	% Could have been more elegant:
 	UniqBinFilename = text_utils:string_to_binary(
-					 file_utils:get_last_path_element( UniqPath ) ),
+						file_utils:get_last_path_element( UniqPath ) ),
 
 	cond_utils:if_defined( leec_debug_keys,
 		trace_bridge:debug_fmt( "[~w] Generated filename for the LEEC agent "
@@ -217,6 +219,8 @@ obtain_private_key( _KeyFileInfo=KeyFilePath, BinCertDirPath ) ->
 % The Ephemeral Diffie-Helman key exchange is a very effective way of ensuring
 % Forward Secrecy by exchanging a set of keys that never hit the wire.
 %
+% Does not involve any network access.
+%
 -spec obtain_dh_key( directory_path() ) -> bin_file_path().
 obtain_dh_key( CertDir ) ->
 
@@ -277,6 +281,17 @@ obtain_dh_key( CertDir ) ->
 
 	end.
 
+
+
+% @doc Obtains the intermediate certificate of the default authority, using
+% default HTTP options.
+%
+-spec obtain_ca_cert_file( any_directory_path() ) -> bin_file_path().
+obtain_ca_cert_file( TargetDir ) ->
+
+	HttpOptions=[ { ssl, web_utils:get_ssl_verify_options() } ],
+
+	obtain_ca_cert_file( TargetDir, HttpOptions ).
 
 
 % @doc Obtains the intermediate certificate of the default authority.
