@@ -115,7 +115,7 @@ Compared to the original ``letsencrypt-erlang`` library, the main differences in
 
   - *Ephemeral Diffie-Helman* key, to ensure *Forward Secrecy* by relying on a set of keys that are never communicated
   - `Intermediate Let's Encrypt Certificates <https://letsencrypt.org/certificates/>`_
-- SSL-based verification of the ACME peer, to avoid any man-in-the-middle attack
+- SSL-based verification of the ACME peer, to avoid any man-in-the-middle attack (quite relevant when fetching security elements)
 
 
 ..	 - ``connect_timeout`` deprecated in favor of ``http_timeout``
@@ -139,7 +139,7 @@ Dependency Basics
 The general dependencies are:
 
 - ``openssl``, version  1.1.1 or higher (required to generate RSA key and certificate request)
-- ``Erlang/OTP`` (refer to the `Myriad prerequisite section <http://myriad.esperide.org#prerequisites>`_  section for the supported versions)
+- ``Erlang/OTP`` (refer to the `Myriad prerequisite section <http://myriad.esperide.org#prerequisites>`_  section for the supported versions); in the context of LEEC, an Erlang version of at least ``24.1`` is strongly recommended in order to `better handle alternate certificate chains <https://blog.voltone.net/post/30>`_
 
 The LEEC-specific ones, which are automatically managed by rebar3 if opting for a rebar-based build, are:
 
