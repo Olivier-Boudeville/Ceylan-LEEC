@@ -400,6 +400,11 @@ request_via_shotgun( Method, Uri, Headers, MaybeBinContent,
 			  LEState#le_state{ tcp_connection_cache=NewTCPCache } };
 
 		_ ->
+
+			trace_bridge:error_fmt( "Request failed (via shotgun backend): "
+				"method was ~p, URI was ~ts, result: ~p.~n Stacktrace: ~ts",
+				[ Method, Uri, ReqRes, code_utils:interpret_stacktrace() ] ),
+
 			throw( { request_failed, Method, UriStr, ReqRes } )
 
 	end.
@@ -480,6 +485,11 @@ request_via_native_httpc( Method, Uri, Headers, MaybeBinContent,
 	case ReqRes of
 
 		{ error, _ErrorReason } ->
+
+			trace_bridge:error_fmt( "Request failed (via native httpc): "
+				"method was ~p, URI was ~ts, result: ~p.~n Stacktrace: ~ts",
+				[ Method, Uri, ReqRes, code_utils:interpret_stacktrace() ] ),
+
 			throw( { request_failed, Method, Uri, ReqRes } );
 
 		{ ReqStatusCode, ReqHeaders, ReqBody } ->
@@ -502,6 +512,11 @@ request_via_native_httpc( Method, Uri, Headers, MaybeBinContent,
 			{ JsonHttpBody, LEState };
 
 		_ ->
+
+			trace_bridge:error_fmt( "Request failed (via native httpc): "
+				"method was ~p, URI was ~ts, result: ~p.~n Stacktrace: ~ts",
+				[ Method, Uri, ReqRes, code_utils:interpret_stacktrace() ] ),
+
 			throw( { request_failed, Method, Uri, ReqRes } )
 
 	end.
@@ -554,8 +569,8 @@ on_failed_request( StatusCode, JsonMapBody, StepAtom ) ->
 	end,
 
 	throw( { request_failed, { status_code, StatusCode },
-			    { reason, text_utils:ensure_string( Reason ) },
-			    { step, StepAtom } } ).
+				{ reason, text_utils:ensure_string( Reason ) },
+				{ step, StepAtom } } ).
 
 
 
