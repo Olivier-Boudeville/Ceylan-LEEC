@@ -18,7 +18,8 @@
 % Creation date: Wednesday, October 28, 2020.
 
 
-% Very basic usage example for Ceylan-LEEC, based on irrelevant settings.
+% @doc Very <b>basic usage example for Ceylan-LEEC</b>, based on irrelevant
+% settings.
 %
 % Allows to check that LEEC can be used directly, out of a rebar3 context.
 %
@@ -121,8 +122,8 @@ run() ->
 	% Unlikely to be relevant either:
 	DomainName = "www.foobar.org",
 
-	% As no webserver is running and DomainName is not
-	% controlled, would be expected to fail with:
+	% As no webserver is running and DomainName is not controlled, would be
+	% expected to fail with:
 	%
 	%[debug] [<0.x.0>] Check resulted in switching from 'pending' to 'invalid'
 	%state.
@@ -151,7 +152,7 @@ run() ->
 
 				{ error, Error } ->
 					test_facilities:display_fmt(
-					  "As expected, an error is raised: ~p", [ Error ] )
+						"As expected, an error is raised: ~p", [ Error ] )
 
 			end;
 

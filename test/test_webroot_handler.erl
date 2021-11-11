@@ -1,4 +1,3 @@
-
 -module(test_webroot_handler).
 %-behaviour(elli_handler).
 
