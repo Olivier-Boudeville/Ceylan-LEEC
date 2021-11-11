@@ -671,8 +671,8 @@ obtain_cert_helper( Domain, FsmPid,
 						"for ~w regarding result ~p.", [ FsmPid, Ret ] )
 								 end ),
 
-			trace_bridge:debug_fmt( "Async callback called "
-				"for ~w regarding result ~p.", [ FsmPid, CreationRes ] ),
+			%trace_bridge:debug_fmt( "Async callback called "
+			%   "for ~w regarding result ~p.", [ FsmPid, CreationRes ] ),
 
 			Callback( CreationRes );
 
