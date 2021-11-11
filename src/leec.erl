@@ -532,9 +532,15 @@ obtain_certificate_for( Domain, FsmPid ) ->
 obtain_certificate_for( Domain, FsmPid, CertReqOptionMap )
   when is_pid( FsmPid ) andalso is_map( CertReqOptionMap ) ->
 
+	DefCertReqOpts = get_default_cert_request_options(),
+
 	% To ensure that all needed option entries are always defined:
-	ReadyCertReqOptMap = maps:merge( _Def=get_default_cert_request_options(),
+	ReadyCertReqOptMap = maps:merge( DefCertReqOpts,
 									 _Prioritary=CertReqOptionMap ),
+
+	trace_bridge:warning_fmt( "The merge of the default certification request "
+		"options ~p with the specified ones ~p resulted in:~n ~p.",
+		[ DefCertReqOpts, CertReqOptionMap, ReadyCertReqOptMap ] ),
 
 	% Also a check:
 	case ReadyCertReqOptMap of

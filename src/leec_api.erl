@@ -263,6 +263,9 @@ decode( _CertReqOptionMap, Response, _LEState ) ->
 			   cert_req_option_map(), le_state() ) -> { body(), le_state() }.
 request( Method, Uri, Headers, MaybeBinContent, CertReqOptionMap, LEState ) ->
 
+	trace_bridge:warning_fmt( "Request of type ~p to ~p relies on options ~p.",
+							  [ Method, Uri, CertReqOptionMap ] ),
+
 	% We used to introduce in these implementations an (optional) waiting (with
 	% timer:sleep/1), as we could see, when using an ACME server in production
 	% (not staging) mode, a 'too many requests' error (code 429: client-side
