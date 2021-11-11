@@ -289,7 +289,7 @@ obtain_dh_key( CertDir ) ->
 -spec obtain_ca_cert_file( any_directory_path() ) -> bin_file_path().
 obtain_ca_cert_file( TargetDir ) ->
 
-	HttpOptions=[ { ssl, web_utils:get_ssl_verify_options() } ],
+	HttpOptions=[ { ssl, web_utils:get_ssl_verify_options( enable ) } ],
 
 	obtain_ca_cert_file( TargetDir, HttpOptions ).
 
