@@ -772,11 +772,14 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 		"Initialising, with following options:~n  ~p.", [ StartOptions ] ) ),
 
 	InitLEState = #le_state{
-					cert_req_option_map=get_default_cert_request_options(),
+					% Implied:
+					%cert_req_option_map=get_default_cert_request_options(),
 					json_parser_state=JsonParserState,
 					tcp_connection_cache=table:new() },
 
 	LEState = setup_mode( get_start_options( StartOptions, InitLEState ) ),
+
+	trace_bridge:warning_fmt( "Initial LE state:~n ~p", [ LEState ] ),
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Initial state:~n  ~p", [ self(), LEState ] ) ),
@@ -819,8 +822,8 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 
 	end,
 
-	AgentPrivateKey = leec_tls:obtain_private_key( KeyFileInfo,
-												   BinCertDirPath ),
+	AgentPrivateKey =
+		leec_tls:obtain_private_key( KeyFileInfo, BinCertDirPath ),
 
 	KeyJws = leec_jws:init( AgentPrivateKey ),
 

@@ -170,12 +170,8 @@
 	challenges = #{} :: leec:uri_challenge_map(),
 
 	% Certificate request options.
-	%
-	% As a doubt existed whether the call was really executed, now doing it
-	% explicitly at creation:
-	%
-	%cert_req_option_map = leec:get_default_cert_request_options()
-	cert_req_option_map = #{} :: leec:cert_req_option_map(),
+	cert_req_option_map =
+		leec:get_default_cert_request_options() :: leec:cert_req_option_map(),
 
 	% Useful to be able to switch JSON parsers at runtime, yet to avoid repeated
 	% initializations thereof:
