@@ -132,8 +132,7 @@
 
 
 -type tcp_connection_cache() :: table( { net_utils:protocol_type(),
-		net_utils:string_host_name(), net_utils:tcp_port() },
-		shotgun:connection() ).
+		net_utils:string_host_name(), tcp_port() }, shotgun:connection() ).
 % For the reuse of TCP connections to the ACME server.
 
 
@@ -414,7 +413,7 @@ start( StartOptions, MaybeBridgeSpec ) ->
 			  trace_bridge:info_fmt( "Starting LEEC (shotgun-based), with "
 				  "following start options:~n  ~p.", [ StartOptions ] ),
 			  [ { ok, _Started } = application:ensure_all_started( A )
-				  || A <- [ shotgun, elli ] ]
+					|| A <- [ shotgun, elli ] ]
 			end },
 
 		{ native_httpc,
@@ -456,6 +455,9 @@ get_default_cert_request_options() ->
 %
 -spec get_default_cert_request_options( boolean() ) -> cert_req_option_map().
 get_default_cert_request_options( Async ) when is_boolean( Async ) ->
+
+	trace_utils:debug( "Setting default certificate request options." ),
+
 	#{ async => Async,
 	   netopts => #{ timeout => ?default_timeout,
 					 % We check that we interact with the expected ACME server:
@@ -530,7 +532,7 @@ obtain_certificate_for( Domain, FsmPid ) ->
 							  cert_req_option_map() ) ->
 		'async' | { 'certificate_ready', bin_file_path() } | error_term().
 obtain_certificate_for( Domain, FsmPid, CertReqOptionMap )
-  when is_pid( FsmPid ) andalso is_map( CertReqOptionMap ) ->
+			when is_pid( FsmPid ) andalso is_map( CertReqOptionMap ) ->
 
 	DefCertReqOpts = get_default_cert_request_options(),
 
@@ -769,8 +771,10 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"Initialising, with following options:~n  ~p.", [ StartOptions ] ) ),
 
-	InitLEState = #le_state{ json_parser_state=JsonParserState,
-							 tcp_connection_cache=table:new() },
+	InitLEState = #le_state{
+					cert_req_option_map=get_default_cert_request_options(),
+					json_parser_state=JsonParserState,
+					tcp_connection_cache=table:new() },
 
 	LEState = setup_mode( get_start_options( StartOptions, InitLEState ) ),
 
@@ -1787,8 +1791,8 @@ get_start_options( _Opts=[ { cert_dir_path, BinCertDirPath } | T ], LEState )
 	case file_utils:is_existing_directory_or_link( BinCertDirPath ) of
 
 		true ->
-			get_start_options( T, LEState#le_state{
-									cert_dir_path=BinCertDirPath } );
+			get_start_options( T,
+				LEState#le_state{ cert_dir_path=BinCertDirPath } );
 
 		false ->
 			throw( { non_existing_certificate_directory,
@@ -1807,7 +1811,7 @@ get_start_options( _Opts=[ { webroot_dir_path, BinWebDirPath } | T ], LEState )
 
 		true ->
 			get_start_options( T,
-						 LEState#le_state{ webroot_dir_path=BinWebDirPath } );
+						LEState#le_state{ webroot_dir_path=BinWebDirPath } );
 
 		false ->
 			throw( { non_existing_webroot_directory,
