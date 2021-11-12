@@ -36,59 +36,59 @@
 % TLS private key:
 -record( tls_private_key, {
 
-  % Ex: [E, N, D] with E: publicExponent, N: modulus, D: privateExponent.
-  raw :: crypto:rsa_private(),
+	% Ex: [E, N, D] with E: publicExponent, N: modulus, D: privateExponent.
+	raw :: crypto:rsa_private(),
 
-  % Ex: b64 encodings of N and E.
-  b64_pair :: { leec:binary_b64(), leec:binary_b64() },
+	% Ex: b64 encodings of N and E.
+	b64_pair :: { leec:binary_b64(), leec:binary_b64() },
 
-  % Absolute path of the RSA private key encoded in ASN.1 DER:
-  file_path :: file_utils:bin_file_path() } ).
+	% Absolute path of the RSA private key encoded in ASN.1 DER:
+	file_path :: file_utils:bin_file_path() } ).
 
 
 
 % TLS public key (ex: the account one):
 -record( tls_public_key, {
 
-  % Key type:
-  kty :: 'RSA',
+	% Key type:
+	kty :: 'RSA',
 
-  n :: text_utils:bin_string(),
+	n :: text_utils:bin_string(),
 
-  e :: text_utils:bin_string() } ).
+	e :: text_utils:bin_string() } ).
 
 
 
 % RSA JSON Web Signature:
 -record( jws, {
 
-  % The signing algorithm:
-  alg = 'RS256' :: leec:jws_algorithm(),
+	% The signing algorithm:
+	alg = 'RS256' :: leec:jws_algorithm(),
 
-  % Ex: "https://acme-staging-v02.api.letsencrypt.org/acme/new-order"
-  url :: leec:bin_uri(),
+	% Ex: "https://acme-staging-v02.api.letsencrypt.org/acme/new-order"
+	url :: leec:bin_uri(),
 
-  % Key identifier; ex:
-  % "https://acme-staging-v02.api.letsencrypt.org/acme/acct/16082748"
-  %
-  kid :: leec:bin_uri(),
+	% Key identifier; ex:
+	% "https://acme-staging-v02.api.letsencrypt.org/acme/acct/16082748"
+	%
+	kid :: leec:bin_uri(),
 
-  % The public key used to verify the JWS, in order to authenticate future
-  % requests from the account to the ACME server:
-  %
-  jwk :: leec:tls_public_key(),
+	% The public key used to verify the JWS, in order to authenticate future
+	% requests from the account to the ACME server:
+	%
+	jwk :: leec:tls_public_key(),
 
-  % The nonce that shall be used for next sending:
-  nonce = undefined :: maybe( leec:nonce() ) } ).
+	% The nonce that shall be used for next sending:
+	nonce = undefined :: maybe( leec:nonce() ) } ).
 
 
 
 % Resulting certificate:
 -record( certificate, {
 
-  cert :: leec:bin_certificate(),
+	cert :: leec:bin_certificate(),
 
-  key :: leec:bin_key() } ).
+	key :: leec:bin_key() } ).
 
 
 
@@ -105,8 +105,7 @@
 	% URIs to be called depending on operations being needed regarding
 	% certificates):
 	%
-	directory_map = undefined ::
-		maybe( file_utils:directory_map() ),
+	directory_map = undefined :: maybe( file_utils:directory_map() ),
 
 	% Directory where certificates are to be stored:
 	cert_dir_path = <<"/tmp">> :: file_utils:bin_directory_path(),
@@ -120,8 +119,7 @@
 	mode = undefined :: maybe( leec:le_mode() ),
 
 	% If mode is 'webroot':
-	webroot_dir_path = undefined ::
-	  maybe( file_utils:bin_directory_path() ),
+	webroot_dir_path = undefined :: maybe( file_utils:bin_directory_path() ),
 
 	% If mode is 'standalone':
 	port = 80 :: net_utils:tcp_port(),
@@ -148,18 +146,15 @@
 	% Information regarding the key of the LEEC agent; it is either created or
 	% read from any user-specified file:
 	%
-	agent_key_file_info = undefined ::
-	  maybe( leec:agent_key_file_info() ),
+	agent_key_file_info = undefined :: maybe( leec:agent_key_file_info() ),
 
 	% The TLS private key the LEEC agent is relying on:
-	agent_private_key = undefined ::
-	  maybe( leec:tls_private_key() ),
+	agent_private_key = undefined :: maybe( leec:tls_private_key() ),
 
 	% No need to record the path to the private key file of the LEEC agent, as
 	% it is a field of the previous attribute:
 	%
-	%agent_key_file_path = undefined ::
-	%  maybe( file_utils:file_path() ),
+	%agent_key_file_path = undefined :: maybe( file_utils:file_path() ),
 
 	% JSON Web Signature of the private key of the LEEC agent:
 	jws = undefined :: maybe( leec:jws() ),
@@ -174,9 +169,13 @@
 	% Known challenges, per URI:
 	challenges = #{} :: leec:uri_challenge_map(),
 
-	% Certificate request options:
-	cert_req_option_map = leec:get_default_cert_request_options()
-								:: leec:cert_req_option_map(),
+	% Certificate request options.
+	%
+	% As a doubt existed whether the call was really executed, now doing it
+	% explicitly at creation:
+	%
+	%cert_req_option_map = leec:get_default_cert_request_options()
+	cert_req_option_map = #{} :: leec:cert_req_option_map(),
 
 	% Useful to be able to switch JSON parsers at runtime, yet to avoid repeated
 	% initializations thereof:
@@ -184,4 +183,4 @@
 	json_parser_state :: json_utils:parser_state(),
 
 	% To re-use TCP connections, on a per FSM basis:
-	tcp_connection_cache :: leec:tcp_connection_cache() }).
+	tcp_connection_cache :: leec:tcp_connection_cache() } ).
