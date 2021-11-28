@@ -539,9 +539,11 @@ obtain_certificate_for( Domain, FsmPid, CertReqOptionMap )
 	ReadyCertReqOptMap = maps:merge( DefCertReqOpts,
 									 _Prioritary=CertReqOptionMap ),
 
-	trace_bridge:warning_fmt( "The merge of the default certification request "
-		"options ~p with the specified ones ~p resulted in:~n ~p.",
-		[ DefCertReqOpts, CertReqOptionMap, ReadyCertReqOptMap ] ),
+	% To trace any discrepancy in security options (like verify_peer):
+	%
+	%trace_bridge:warning_fmt( "The merge of the default certification request "
+	%   "options ~p with the specified ones ~p resulted in:~n ~p.",
+	%   "[ DefCertReqOpts, CertReqOptionMap, ReadyCertReqOptMap ] ),
 
 	% Also a check:
 	case ReadyCertReqOptMap of
@@ -778,7 +780,8 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 
 	LEState = setup_mode( get_start_options( StartOptions, InitLEState ) ),
 
-	trace_bridge:warning_fmt( "Initial LE state:~n ~p", [ LEState ] ),
+	% To check for example verify_peer:
+	%trace_bridge:debug_fmt( "Initial LE state:~n ~p", [ LEState ] ),
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Initial state:~n  ~p", [ self(), LEState ] ) ),

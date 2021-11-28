@@ -202,10 +202,10 @@ obtain_private_key( _KeyFileInfo=KeyFilePath, BinCertDirPath ) ->
 		public_key:pem_entry_decode( KeyEntry ),
 
 	PrivKey = #tls_private_key{
-		 raw=[ E, N, D ],
-		 b64_pair={ leec_utils:b64encode( binary:encode_unsigned( N ) ),
-					leec_utils:b64encode( binary:encode_unsigned( E ) ) },
-		 file_path=text_utils:ensure_binary( FullKeyFilePath ) },
+		raw=[ E, N, D ],
+		b64_pair={ leec_utils:b64encode( binary:encode_unsigned( N ) ),
+				   leec_utils:b64encode( binary:encode_unsigned( E ) ) },
+		file_path=text_utils:ensure_binary( FullKeyFilePath ) },
 
 	cond_utils:if_defined( leec_debug_keys,
 		trace_bridge:debug_fmt( "[~w] Returning following private key:~n  ~p",
