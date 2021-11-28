@@ -410,17 +410,17 @@ start( StartOptions, MaybeBridgeSpec ) ->
 
 		{ shotgun,
 			begin
-			  trace_bridge:info_fmt( "Starting LEEC (shotgun-based), with "
-				  "following start options:~n  ~p.", [ StartOptions ] ),
-			  [ { ok, _Started } = application:ensure_all_started( A )
+				trace_bridge:info_fmt( "Starting LEEC (shotgun-based), with "
+					"following start options:~n  ~p.", [ StartOptions ] ),
+				[ { ok, _Started } = application:ensure_all_started( A )
 					|| A <- [ shotgun, elli ] ]
 			end },
 
 		{ native_httpc,
 			begin
-			  trace_bridge:info_fmt( "Starting LEEC (httpc-based), with "
-				  "following start options:~n  ~p.", [ StartOptions ] ),
-			  web_utils:start( _Opt=ssl )
+				trace_bridge:info_fmt( "Starting LEEC (httpc-based), with "
+					"following start options:~n  ~p.", [ StartOptions ] ),
+				web_utils:start( _Opt=ssl )
 			end } ] ),
 
 	JsonParserState = json_utils:start_parser(),
@@ -462,7 +462,6 @@ get_default_cert_request_options( Async ) when is_boolean( Async ) ->
 	   netopts => #{ timeout => ?default_timeout,
 					 % We check that we interact with the expected ACME server:
 					 ssl => web_utils:get_ssl_verify_options( enable ) } }.
-
 
 
 % @doc Generates, once started, asynchronously (in a non-blocking manner), a new
@@ -551,8 +550,8 @@ obtain_certificate_for( Domain, FsmPid, CertReqOptionMap )
 
 			% Still being in user process, bridge applies:
 			cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
-			  "Requesting FSM ~w to generate asynchronously a certificate "
-			  "for domain '~ts'.", [ FsmPid, Domain ] ) ),
+				"Requesting FSM ~w to generate asynchronously a certificate "
+				"for domain '~ts'.", [ FsmPid, Domain ] ) ),
 
 			% Asynchronous then, in a separate process from the user one, yet
 			% using the same bridge as set for this caller process:
@@ -567,8 +566,8 @@ obtain_certificate_for( Domain, FsmPid, CertReqOptionMap )
 			% be already set:
 			%
 			cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
-			  "Requesting FSM ~w to generate synchronously a certificate "
-			  "for domain '~ts'.", [ FsmPid, Domain ] ) ),
+				"Requesting FSM ~w to generate synchronously a certificate "
+				"for domain '~ts'.", [ FsmPid, Domain ] ) ),
 
 			% Thus a direct synchronous return:
 			obtain_cert_helper( Domain, FsmPid, ReadyCertReqOptMap )
@@ -1836,8 +1835,14 @@ get_start_options( _Opts=[ { port, Port } | _T ], _LEState ) ->
 
 get_start_options( _Opts=[ { http_timeout, Timeout } | T ], LEState )
   when is_integer( Timeout ) ->
+	CertReqOptMap = LEState#le_state.cert_req_option_map,
+	NetOpts = maps:get( netopts, CertReqOptMap, _DefNetOpts=#{} ),
+	% Supersedes any prior value:
+	NetOptsWithTimeout = NetOpts#{ timeout => Timeout },
+	NewCertReqOptMap = CertReqOptMap#{ netopts => NetOptsWithTimeout },
+
 	get_start_options( T, LEState#le_state{
-			  cert_req_option_map=#{ netopts => #{ timeout => Timeout } } } );
+								cert_req_option_map=NewCertReqOptMap } );
 
 get_start_options( _Opts=[ { http_timeout, Timeout } | _T ], _LEState ) ->
 	throw( { invalid_http_timeout, Timeout } );
