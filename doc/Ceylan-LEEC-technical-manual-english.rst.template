@@ -24,7 +24,6 @@ Technical Manual of LEEC: *Let's Encrypt Erlang with Ceylan*
 :raw-html:`<div class="banner"><p><em>LEEC documentation</em> <a href="http://leec.esperide.org">browse latest</a> <a href="https://olivier-boudeville.github.io/Ceylan-LEEC">browse mirror</a> <a href="Ceylan-LEEC-technical-manual-english.pdf">get PDF</a> <a href="#leec_top">go to top</a> <a href="#leec_toc">go to toc</a> <a href="#leec_bottom">go to bottom</a> <a href="api-doc/index.html">browse API</a> <a href="https://github.com/Olivier-Boudeville/Ceylan-LEEC">go to project</a> <a href="mailto:about(dash)leec(at)esperide(dot)com?subject=[Ceylan-LEEC]%20Remark">email us</a></p></div>`
 
 
-
 :raw-html:`<center><img src="leec-title.png" id="responsive-image-small"></img>`
 :raw-latex:`\centering \includegraphics[scale=0.55]{leec-title.png}`
 
@@ -287,7 +286,9 @@ If using LEEC to generate a certificate for a ``baz.foobar.org`` host, the follo
 - ``baz.foobar.org.crt``: the PEM certificate itself of interest (~3450 bytes), to be used by the webserver
 
 
-To get information about this certificate::
+To get information about this certificate:
+
+.. code:: bash
 
  $ openssl x509 -text -noout -in baz.foobar.org.crt
 
