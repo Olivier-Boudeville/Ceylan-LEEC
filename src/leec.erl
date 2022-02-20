@@ -413,7 +413,7 @@ start( StartOptions, MaybeBridgeSpec ) ->
 				trace_bridge:info_fmt( "Starting LEEC (shotgun-based), with "
 					"following start options:~n  ~p.", [ StartOptions ] ),
 				[ { ok, _Started } = application:ensure_all_started( A )
-					|| A <- [ shotgun, elli ] ]
+								|| A <- [ shotgun, elli ] ]
 			end },
 
 		{ native_httpc,
@@ -531,7 +531,7 @@ obtain_certificate_for( Domain, FsmPid ) ->
 							  cert_req_option_map() ) ->
 		'async' | { 'certificate_ready', bin_file_path() } | error_term().
 obtain_certificate_for( Domain, FsmPid, CertReqOptionMap )
-			when is_pid( FsmPid ) andalso is_map( CertReqOptionMap ) ->
+			when is_pid( FsmPid ), is_map( CertReqOptionMap ) ->
 
 	DefCertReqOpts = get_default_cert_request_options(),
 
@@ -577,7 +577,7 @@ obtain_certificate_for( Domain, FsmPid, CertReqOptionMap )
 	end;
 
 obtain_certificate_for( _Domain, FsmPid, CertReqOptionMap )
-  when is_pid( FsmPid ) ->
+								when is_pid( FsmPid ) ->
 	throw( { not_an_option_map, CertReqOptionMap } );
 
 obtain_certificate_for( _Domain, FsmPid, _CertReqOptionMap ) ->
@@ -773,10 +773,10 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 		"Initialising, with following options:~n  ~p.", [ StartOptions ] ) ),
 
 	InitLEState = #le_state{
-					% Implied:
-					%cert_req_option_map=get_default_cert_request_options(),
-					json_parser_state=JsonParserState,
-					tcp_connection_cache=table:new() },
+		% Implied:
+		%cert_req_option_map=get_default_cert_request_options(),
+		json_parser_state=JsonParserState,
+		tcp_connection_cache=table:new() },
 
 	LEState = setup_mode( get_start_options( StartOptions, InitLEState ) ),
 
@@ -1152,6 +1152,7 @@ idle( _EventType=cast,
 	  _EventContentMsg=_Request={ send_ongoing_challenges, TargetPid },
 	  _Data=_LEState ) ->
 
+	% Should be pending:
 	trace_bridge:warning_fmt( "Ignored a send_ongoing_challenges cast "
 		"(targeting ~w) while being idle.", [ TargetPid ] ),
 
@@ -1194,7 +1195,7 @@ pending( _EventType={ call, From }, _EventContentMsg=get_ongoing_challenges,
 	ThumbprintMap = maps:from_list( [ { Token,
 		_Thumbprint=leec_jws:get_key_authorization( AccountKey, Token,
 													LEState ) }
-		  || #{ <<"token">> := Token } <- maps:values( TypeChallengeMap ) ] ),
+			|| #{ <<"token">> := Token } <- maps:values( TypeChallengeMap ) ] ),
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Returning (get) from pending state challenge "
@@ -1219,7 +1220,7 @@ pending( _EventType=cast,
 	ThumbprintMap = maps:from_list( [ { Token,
 		_Thumbprint=leec_jws:get_key_authorization( AccountKey, Token,
 													LEState ) }
-		  || #{ <<"token">> := Token } <- maps:values( TypeChallengeMap ) ] ),
+			|| #{ <<"token">> := Token } <- maps:values( TypeChallengeMap ) ] ),
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Returning (send) from pending state challenge "
@@ -1241,9 +1242,9 @@ pending( _EventType=cast,
 %
 pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 		 _Data=LEState=#le_state{
-					order=#{ <<"authorizations">> := AuthorizationsUris },
-					nonce=InitialNonce, agent_private_key=PrivKey, jws=Jws,
-					cert_req_option_map=CertReqOptionMap } ) ->
+			order=#{ <<"authorizations">> := AuthorizationsUris },
+			nonce=InitialNonce, agent_private_key=PrivKey, jws=Jws,
+			cert_req_option_map=CertReqOptionMap } ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Checking whether challenges are completed.", [ self() ] ) ),
@@ -1338,8 +1339,8 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 
 		_ ->
 			cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
-			  "[~w] Check resulted in switching from 'pending' to '~ts' state.",
-			  [ self(), NextStateName ] ), ok )
+				"[~w] Check resulted in switching from 'pending' to "
+				"'~ts' state.", [ self(), NextStateName ] ), ok )
 
 	end,
 
@@ -1373,7 +1374,7 @@ pending( EventType, EventContentMsg, _LEState ) ->
 		[ self(), EventType, EventContentMsg ] ),
 
 	throw( { unexpected_event, EventType, EventContentMsg,
-			 { state, pending } } ).
+				{ state, pending } } ).
 
 
 
@@ -1450,7 +1451,7 @@ valid( _EventType={ call, ServerRef }, _EventContentMsg=Request,
 
 valid( EventType, EventContentMsg, _LEState ) ->
 	throw( { unexpected_event, EventType, EventContentMsg,
-			 { state, valid }, self() } ).
+				{ state, valid }, self() } ).
 
 
 
@@ -1477,10 +1478,10 @@ finalize( _EventType=enter, _PreviousState, _Data ) ->
 finalize( _EventType={ call, _ServerRef=From },
 		  _EventContentMsg=_Request=manageCreation,
 		  _Data=LEState=#le_state{ order=OrderMap, domain=BinDomain,
-			  %agent_key_file_path=KeyFilePath,
-			  cert_dir_path=BinCertDirPath,
-			  agent_private_key=PrivKey, jws=Jws, nonce=Nonce,
-			  cert_req_option_map=CertReqOptionMap } ) ->
+				%agent_key_file_path=KeyFilePath,
+				cert_dir_path=BinCertDirPath,
+				agent_private_key=PrivKey, jws=Jws, nonce=Nonce,
+				cert_req_option_map=CertReqOptionMap } ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
 		"[~w] Getting progress of creation procedure "
@@ -1552,7 +1553,7 @@ finalize( _EventType={ call, _ServerRef=From },
 			% anyway:
 			%
 			leec_api:close_tcp_connections(
-			  OrderState#le_state.tcp_connection_cache ),
+				OrderState#le_state.tcp_connection_cache ),
 
 			CloseLEState = CertLEState#le_state{
 							tcp_connection_cache=table:new() },
@@ -1590,7 +1591,7 @@ finalize( UnexpectedEventType, EventContentMsg, _LEState ) ->
 	%{ reply, { error, UnexpectedEventType }, finalize, LEState }.
 
 	throw( { unexpected_event, UnexpectedEventType, EventContentMsg,
-			 { state, finalize } } ).
+				{ state, finalize } } ).
 
 
 
@@ -1764,8 +1765,8 @@ get_start_options( _Opts=[ { agent_key_file_path, KeyFilePath } | T ],
 					case file_utils:is_user_readable( AgentKeyFilePath ) of
 
 						true ->
-							BinAgentKeyFilePath = text_utils:string_to_binary(
-									AgentKeyFilePath ),
+							BinAgentKeyFilePath =
+								text_utils:string_to_binary( AgentKeyFilePath ),
 
 							get_start_options( T, LEState#le_state{
 								agent_key_file_info=BinAgentKeyFilePath } );
@@ -1816,7 +1817,7 @@ get_start_options( _Opts=[ { webroot_dir_path, BinWebDirPath } | T ], LEState )
 
 		true ->
 			get_start_options( T,
-						LEState#le_state{ webroot_dir_path=BinWebDirPath } );
+				LEState#le_state{ webroot_dir_path=BinWebDirPath } );
 
 		false ->
 			throw( { non_existing_webroot_directory,
@@ -1869,7 +1870,7 @@ setup_mode( LEState=#le_state{ mode=webroot,
 	ChallengeDirPath =
 		file_utils:join( BinWebrootPath, ?webroot_challenge_path ),
 
-	% TODO: check directory is writable.
+	% TODO: check that directory is writable.
 	file_utils:create_directory_if_not_existing( ChallengeDirPath,
 												 create_parents ),
 
@@ -1978,8 +1979,8 @@ wait_creation_completed( FsmPid, C ) ->
 % (helper)
 %
 -spec wait_creation_completed( fsm_pid(), count(), count() ) ->
-					 { 'certificate_ready', bin_file_path() }
-				   | { 'error', 'timeout' | any() }.
+					{ 'certificate_ready', bin_file_path() }
+				  | { 'error', 'timeout' | any() }.
 wait_creation_completed( _FsmPid, _Count=0, _Max ) ->
 	{ error, timeout };
 
@@ -1997,7 +1998,7 @@ wait_creation_completed( FsmPid, Count, Max ) ->
 
 		creation_in_progress ->
 			cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
-				 "Still waiting for creation from ~w.", [ FsmPid ] ) ),
+				"Still waiting for creation from ~w.", [ FsmPid ] ) ),
 			timer:sleep( 500 * ( Max - Count + 1 ) ),
 			wait_creation_completed( FsmPid, Count-1, Max );
 
@@ -2153,11 +2154,11 @@ perform_authorization_step2( _Pairs=[], LEState=#le_state{ nonce=Nonce } ) ->
 
 perform_authorization_step2( _Pairs=[ { Uri, Challenge } | T ],
 			LEState=#le_state{ nonce=Nonce, agent_private_key=AgentPrivKey,
-						   jws=Jws, cert_req_option_map=CertReqOptionMap } ) ->
+							jws=Jws, cert_req_option_map=CertReqOptionMap } ) ->
 
 	{ { Resp, _Location, NewNonce }, NotifLEState } =
 		leec_api:notify_ready_for_challenge( Challenge, AgentPrivKey,
-							Jws#jws{ nonce=Nonce }, CertReqOptionMap, LEState ),
+			Jws#jws{ nonce=Nonce }, CertReqOptionMap, LEState ),
 
 	case maps:get( <<"status">>, Resp ) of
 
@@ -2242,8 +2243,8 @@ init_for_challenge_type( ChallengeType, _Mode=standalone,
 			Thumbprints = maps:from_list(
 				[ { Token, leec_jws:get_key_authorization( AccntKey,
 														Token, LEState ) }
-				  || #{ <<"token">> := Token }
-						 <- maps:values( UriChallengeMap ) ] ),
+						|| #{ <<"token">> := Token }
+								<- maps:values( UriChallengeMap ) ] ),
 
 			{ ok, _ } = elli:start_link([
 				{ name, { local, leec_elli_listener } },
@@ -2281,8 +2282,8 @@ challenge_destroy( _Mode=webroot,
 
 	[ begin
 
-		  ChalWebPath = file_utils:join(
-						[ BinWPath, ?webroot_challenge_path, Token ] ),
+		  ChalWebPath =
+			  file_utils:join( [ BinWPath, ?webroot_challenge_path, Token ] ),
 
 		  file_utils:remove_file( ChalWebPath )
 
