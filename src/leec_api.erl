@@ -507,10 +507,10 @@ request_via_native_httpc( Method, Uri, Headers, MaybeBinContent,
 			% Updates response from its headers:
 			Resp = BaseResponse#{
 
-				nonce => table:get_value_with_defaults( <<"replay-nonce">>,
-														_Def=null, ReqHeaders ),
+				nonce => table:get_value_with_default( <<"replay-nonce">>,
+													   _Def=null, ReqHeaders ),
 
-				location => table:get_value_with_defaults( <<"location">>,
+				location => table:get_value_with_default( <<"location">>,
 													_Def=null, ReqHeaders ) },
 
 			JsonHttpBody = decode( CertReqOptionMap, Resp, LEState ),
