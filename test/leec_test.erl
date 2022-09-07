@@ -95,15 +95,8 @@ run() ->
 
 	end,
 
-	case file_utils:is_existing_file_or_link( BinKeyPath ) of
-
-		true ->
-			ok;
-
-		false ->
-			throw( { non_existing_agent_key_file, BinKeyPath } )
-
-	end,
+	file_utils:is_existing_file_or_link( BinKeyPath ) orelse
+		throw( { non_existing_agent_key_file, BinKeyPath } ),
 
 	% For the second LEEC FSM, to rely on the same account:
 	SecondLEECOpts = [ { agent_key_file_path, BinKeyPath } | BaseLEECOpts ],
