@@ -31,14 +31,25 @@
 -author("Guillaume Bour (guillaume at bour dot cc)").
 
 % This fork:
--author("Olivier Boudeville (olivier dot boudeville at esperide dot com").
+-author("Olivier Boudeville (olivier dot boudeville at esperide dot com)").
+
+
+% Usage notes:
+%
+% The caller processes may choose to catch exceptions (notably of the exit
+% class), as gen_statem calls may issue them, typically because of a time-out.
+%
+% Possibly LEEC should catch such exceptions and return a
+% basic_utils:base_outcome() result.
+
+
+% Callers may also trap EXIT messages, even if those are not specifically
+% expected.
 
 
 % Replaces the deprecated gen_fsm; we use here the 'state_functions' callback
 % mode, so:
-%
 %  - events are handled by one callback function *per state*
-%
 %  - state names must be atom-only
 %
 -behaviour(gen_statem).
@@ -53,7 +64,8 @@
 		  start/1, start/2,
 		  get_default_cert_request_options/0,
 		  get_default_cert_request_options/1,
-		  obtain_certificate_for/2, obtain_certificate_for/3, stop/1 ]).
+		  obtain_certificate_for/2, obtain_certificate_for/3,
+		  stop/1, terminate/1 ]).
 
 
 % For testing purpose:
@@ -80,13 +92,14 @@
 % Implementation notes:
 %
 % Multiple FSM (Finite State Machines) can be spawned, for parallel certificate
-% management. Not registered as not a singleton anymore.
+% management. Not registered as a singleton anymore.
 
 % Similarly, no more ETS-based connection pool, as it would be shared between
-% concurrent FSMs, whereas eaci connection is private to a given FSM. Instead an
-% (explicit) TCP cache is managed per-FSM.
+% concurrent FSMs, whereas each connection is private to a given FSM. Instead an
+% (explicit) per-FSM TCP cache is managed.
 
-% URI format compatible with the shotgun library.
+
+% The URI format compatible with the shotgun library.
 %
 % The netopts map (in the option map) possibly just contains a time-out, or
 % maybe SSL options; it is a parameter directly needed as such by
@@ -100,6 +113,7 @@
 
 -type le_mode() :: 'webroot' | 'slave' | 'standalone'.
 % Three ways of interfacing LEEC with user code.
+% We mostly concentrate on the slave one.
 
 
 -type fsm_pid() :: pid().
@@ -107,7 +121,7 @@
 
 
 -type certificate_provider() :: 'letsencrypt'.
-% Others may be added in the future.
+% Other providers may be added in the future.
 
 
 -type challenge_type() :: 'http-01'
@@ -135,12 +149,6 @@
 		net_utils:string_host_name(), tcp_port() }, shotgun:connection() ).
 % For the reuse of TCP connections to the ACME server.
 
-
--type string_uri() :: ustring().
-
--type bin_uri() :: binary().
-
--type uri() :: string_uri() | bin_uri().
 
 
 % ACME_BASE below can be for example
@@ -206,17 +214,13 @@
 % ACME operations that may be triggered.
 %
 % Known operations:
-%
 % - `<<"newAccount">>'
-%
 % - `<<"newNonce">>'
-%
 % - `<<"newOrder">>'
-%
 % - `<<"revokeCert">>'
 
 
--type directory_map() :: table( acme_operation(), uri() ).
+-type directory_map() :: table( acme_operation(), bin_uri() ).
 % ACME directory, converting operations to trigger into the URIs to access for
 % them.
 
@@ -291,7 +295,6 @@
 -export_type([ bin_domain/0, domain/0, le_mode/0, fsm_pid/0,
 			   certificate_provider/0, challenge_type/0, bin_challenge_type/0,
 			   token/0, thumbprint/0, thumbprint_map/0, tcp_connection_cache/0,
-			   string_uri/0, bin_uri/0, uri/0,
 			   challenge/0, uri_challenge_map/0, type_challenge_map/0,
 			   start_option/0, cert_req_option_id/0, cert_req_option_map/0,
 			   acme_operation/0, directory_map/0, nonce/0,
@@ -356,11 +359,17 @@
 
 -type json() :: json_utils:json().
 
+-type bin_uri() :: web_utils:bin_uri().
+
 -type application_name() :: otp_utils:application_name().
 
 
 
-% Public API.
+
+%
+% Public API: functions exported by this module in order to be directly called
+% by the user.
+%
 
 
 % @doc Returns an (ordered) list of the LEEC prerequisite OTP applications, to
@@ -716,7 +725,9 @@ obtain_cert_helper( Domain, FsmPid, CertReqOptionMap, MaybeBridgeInfo ) ->
 
 
 
-% @doc Stops the specified instance of LEEC service.
+% @doc Stops the specified instance of LEEC service; switches it to idle (does
+% not terminate it for good).
+%
 -spec stop( fsm_pid() ) -> void().
 stop( FsmPid ) ->
 
@@ -729,7 +740,10 @@ stop( FsmPid ) ->
 	%
 	% (synchronous)
 	%
+	% As apparently may time-out:
+	trace_bridge:warning_fmt( "Requesting FSM ~w to stop.", [ FsmPid ] ),
 	Res = gen_statem:call( _ServerRef=FsmPid, _Request=stop, ?base_timeout ),
+	trace_bridge:warning_fmt( "FSM ~w stopped.", [ FsmPid ] ),
 
 	% Not stopped here, as stopping is only going back to the 'idle' state:
 	%json_utils:stop_parser().
@@ -740,9 +754,36 @@ stop( FsmPid ) ->
 
 
 
+% @doc Terminates the specified instance of LEEC service: stops it properly, and
+% terminates the corresponding FSM process.
+%
+% Not to be mixed up with the terminate/3 function known as a gen_statem
+% callback.
+%
+-spec terminate( fsm_pid() ) -> void().
+terminate( FsmPid ) ->
+
+	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
+		"Requesting FSM ~w to terminate.", [ FsmPid ] ) ),
+
+	trace_bridge:warning_fmt( "Terminating FSM ~w.", [ FsmPid ] ),
+
+	% May exit the calling process with an exception 'timeout'
+	% (e.g. {timeout,{gen_statem,call,[<0.676.0>,stop,15000]}}):
+	%
+	gen_statem:stop( FsmPid, _Reason=normal, _Timeout=5000 ),
+
+	trace_bridge:warning_fmt( "FSM ~w terminated.", [ FsmPid ] ),
+
+	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
+		"FSM ~w terminated.", [ FsmPid ] ) ).
 
 
-% FSM internal API.
+
+
+%
+% FSM internal API: callbacks triggered by gen_statem.
+%
 
 
 % @doc Initializes the LEEC state machine.
@@ -1411,7 +1452,7 @@ valid( _EventType={ call, _ServerRef=From },
 
 	% To avoid a warning:
 	file_utils:remove_file_if_existing(
-	  file_utils:join( BinCertDirPath, KeyFilename ) ),
+		file_utils:join( BinCertDirPath, KeyFilename ) ),
 
 	% KeyFilePath is required for CSR generation:
 	CreatedTLSPrivKey = leec_tls:obtain_private_key( { new, KeyFilename },
@@ -1670,6 +1711,9 @@ handle_call_for_all_states( ServerRef, _Request=stop, StateName,
 		[ ServerRef, StateName ] ),
 		basic_utils:ignore_unused( [ ServerRef, StateName ] ) ),
 
+	trace_bridge:warning_fmt( "FSM ~w is to stop, while in mode '~p'.",
+							  [ self(), Mode ] ),
+
 	DestroyLEState = challenge_destroy( Mode, LEState ),
 
 	% Stopping is just returning back to idle (no action):
@@ -1677,6 +1721,8 @@ handle_call_for_all_states( ServerRef, _Request=stop, StateName,
 	%{ stop_and_reply, _Reason, _Reply={ reply, ServerRef, ok },
 	%   _Data=LEState }.
 
+	trace_bridge:warning_fmt( "FSM ~w stopped, switching to idle'.",
+							  [ self(), Mode ] ),
 	{ next_state, _NextState=idle, _NewData=DestroyLEState };
 
 
@@ -1689,15 +1735,18 @@ handle_call_for_all_states( ServerRef, Request, StateName, _LEState ) ->
 
 
 
-% Standard callbacks:
+% Standard gen_statem callbacks:
 
 % @doc Standard termination callback.
-terminate( _, _, _ ) ->
-	ok.
+terminate( Reason, State, Data ) ->
+	trace_bridge:warning_fmt( "FSM ~w terminating "
+		"(reason: ~p state: ~p; data: ~p).",
+		[ self(), Reason, State, Data ] ).
 
 
 % @doc Standard "code change" callback.
 code_change( _, StateName, LEState, _ ) ->
+	trace_bridge:warning_fmt( "FSM ~w changing code.", [ self() ] ),
 	{ ok, StateName, LEState }.
 
 
@@ -1738,15 +1787,8 @@ get_start_options( _Opts=[ staging | T ], LEState ) ->
 	get_start_options( T, LEState#le_state{ env=staging } );
 
 get_start_options( _Opts=[ { mode, Mode } | T ], LEState ) ->
-	case lists:member( Mode, [ webroot, slave, standalone ] ) of
-
-		true ->
-			ok;
-
-		false ->
-			throw( { invalid_leec_mode, Mode } )
-
-	end,
+	lists:member( Mode, [ webroot, slave, standalone ] ) orelse
+		throw( { invalid_leec_mode, Mode } ),
 	get_start_options( T, LEState#le_state{ mode=Mode } );
 
 % To re-use a previously-stored agent private key:
@@ -1793,7 +1835,7 @@ get_start_options( _Opts=[ { agent_key_file_path, KeyFilePath } | T ],
 
 
 get_start_options( _Opts=[ { cert_dir_path, BinCertDirPath } | T ], LEState )
-  when is_binary( BinCertDirPath ) ->
+								when is_binary( BinCertDirPath ) ->
 	case file_utils:is_existing_directory_or_link( BinCertDirPath ) of
 
 		true ->
@@ -1878,7 +1920,7 @@ setup_mode( LEState=#le_state{ mode=webroot,
 
 % Already checked:
 setup_mode( LEState=#le_state{ mode=standalone, port=Port } )
-  when is_integer( Port ) ->
+						when is_integer( Port ) ->
 	% TODO: check port is unused?
 	LEState;
 
@@ -1897,11 +1939,8 @@ setup_mode( #le_state{ mode=Mode } ) ->
 % the FSM should be in 'valid' state when returning.
 %
 % Returns:
-%
 % - {error, timeout} if failed after X loops
-%
 % - {error, Err} if another error
-%
 % - 'ok' if succeed
 %
 -spec wait_challenges_valid( fsm_pid() ) -> base_status().
@@ -2268,11 +2307,8 @@ init_for_challenge_type( ChallengeType, _Mode=standalone,
 
 % @doc Cleans up challenge context after it has been fullfilled (with success or
 % not); in:
-%
 % - 'webroot' mode: delete token file
-%
 % - 'standalone' mode: stop internal webserver
-%
 % - 'slave' mode: nothing to do
 %
 -spec challenge_destroy( le_mode(), le_state() ) -> le_state().
@@ -2282,10 +2318,10 @@ challenge_destroy( _Mode=webroot,
 
 	[ begin
 
-		  ChalWebPath =
-			  file_utils:join( [ BinWPath, ?webroot_challenge_path, Token ] ),
+		ChalWebPath =
+			file_utils:join( [ BinWPath, ?webroot_challenge_path, Token ] ),
 
-		  file_utils:remove_file( ChalWebPath )
+		file_utils:remove_file( ChalWebPath )
 
 	  end || #{ <<"token">> := Token } <- maps:values( UriChallengeMap ) ],
 
@@ -2298,5 +2334,5 @@ challenge_destroy( _Mode=standalone, LEState ) ->
 	LEState#le_state{ challenges=#{} };
 
 
-challenge_destroy( _Modeslave, LEState ) ->
+challenge_destroy( _Mode=slave, LEState ) ->
 	LEState#le_state{ challenges=#{} }.
