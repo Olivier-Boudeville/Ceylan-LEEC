@@ -9,6 +9,7 @@ declared-types-in-*.txt
 .eunit
 erl_crash.dump
 doc/index.html
+doc/api-doc/
 
 # For Emacs temporary files:
 *.#*
@@ -26,6 +27,10 @@ src/leec.app.src
 
 # Generated:
 conf/rebar.config
+
+doc/mathjax
+doc/Ceylan-LEEC-technical-manual-english.rst
+doc/Ceylan-LEEC-technical-manual-english.html
 
 .eunit
 deps
