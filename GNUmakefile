@@ -30,7 +30,7 @@ all:
 
 
 all-rebar3:
-	@$(MYRIAD_REBAR_EXEC) upgrade
+	@$(MYRIAD_REBAR_EXEC) upgrade --all
 	@$(MYRIAD_REBAR_EXEC) compile
 
 
