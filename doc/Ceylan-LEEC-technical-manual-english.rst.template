@@ -187,7 +187,7 @@ Two build procedures can be used (from the root of LEEC), and are now mostly the
 
 .. code:: bash
 
- $ rebar3 upgrade
+ $ rebar3 upgrade --all
  $ rebar3 compile
 
 - or one relying on Ceylan's native build system; once the relevant prerequisites have been setup (selected, downloaded, built), just run ``make all``
