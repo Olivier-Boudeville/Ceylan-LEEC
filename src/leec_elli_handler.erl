@@ -13,7 +13,7 @@
 %% limitations under the License.
 
 
-% Copyright (C) 2020-2022 Olivier Boudeville
+% Copyright (C) 2020-2023 Olivier Boudeville
 %
 % This file is part of the Ceylan-LEEC library, a fork of the Guillaume Bour's
 % letsencrypt-erlang library, released under the same licence.
