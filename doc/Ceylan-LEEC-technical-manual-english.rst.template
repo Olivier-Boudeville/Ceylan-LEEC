@@ -83,9 +83,16 @@ Overview
 .. (was previously `here <https://github.com/Olivier-Boudeville/letsencrypt-erlang>`_).
 
 
-The LEEC library is the Ceylan fork of the original and much appreciated `letsencrypt-erlang <https://github.com/gbour/letsencrypt-erlang>`_, which is a `Let's Encrypt <https://letsencrypt.org/>`_ client library for Erlang whose author is Guillaume Bour.
+The LEEC library is the Ceylan fork of the original and much appreciated `letsencrypt-erlang <https://github.com/gbour/letsencrypt-erlang>`_, which is a `Let's Encrypt <https://letsencrypt.org/>`_ client library for Erlang, whose author is Guillaume Bour.
 
 LEEC's purpose is to obtain proper X.509 security certificates from ``Let's Encrypt`` - or more generally `ACME servers <https://en.wikipedia.org/wiki/Automated_Certificate_Management_Environment>`_ (version 2), typically in order to secure one's webservers so that they can offer a solid HTTPS connectivity, which is pretty much standard nowadays.
+
+Each certificate covers a single domain or subdomain (possibly a virtual host, and is obtained by proving its ownership by the requester.
+
+At least currently no wildcard certificate is supported (more complex challenges would have to be implemented).
+
+These certificates last for 90 days, so they shall be renewed regularly.
+
 
 LEEC is notably used in the context of `US-Web <http://us-web.esperide.org/>`_.
 
@@ -411,7 +418,7 @@ Possible Enhancements
 - supporting Elliptic Curve cryptography
 - reintroducing elements brought by the upstream project yet not updated by the current fork: unit testing, standalone testing, hex package, various escripts and yml files involved
 - besides the slave mode (main use case of interest with LEEC), better integrating/testing the other modes (webroot and standalone)
-- supporting extra validation challenges, besides ``http-01``, like ``dns-01`` (necessary to obtain wildcard certificates, i.e. applying to all subdomains of a given domain) and ``proof-of-possession-01``
+- supporting extra validation challenges, besides ``http-01``, like ``dns-01`` (necessary to `obtain wildcard certificates <https://letsencrypt.org/docs/faq/#does-let-s-encrypt-issue-wildcard-certificates>`_, i.e. applying to all subdomains of a given domain without leaking their names through SANs) and ``proof-of-possession-01``
 - supporting directly other ACME services besides ``Let's Encrypt`` (like ``ZeroSSL``)
 
 
