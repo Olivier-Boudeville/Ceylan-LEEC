@@ -310,11 +310,11 @@
 -define( webroot_challenge_path, <<".well-known/acme-challenge">> ).
 
 
-% Default overall http time-out, in milliseconds:
--define( default_timeout, 30000 ).
+% Default overall http time-out, in milliseconds (4 minutes):
+-define( default_timeout, 4 * 60 * 1000 ).
 
 % Base time-out, in milliseconds:
--define( base_timeout, 15000 ).
+-define( base_timeout, ?default_timeout div 2 ).
 
 
 -type server_ref() :: gen_statem:server_ref().
@@ -1278,8 +1278,8 @@ pending( _EventType=cast,
 % Switches to the 'valid' state iff all challenges are validated.
 %
 % Transitions to:
-%   - 'pending' if at least one challenge is not completed yet
-%   - 'valid' if all challenges are complete
+%  - 'pending' if at least one challenge is not completed yet
+%  - 'valid' if all challenges are complete
 %
 pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 		 _Data=LEState=#le_state{
@@ -1338,9 +1338,12 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 					revoked;
 
 				% Typically from 'valid', after the ACME time-outs short of
-				% being able to getch relevant challenges from local webserver:
+				% being able to fetch relevant challenges from local webserver:
 				%
 				{ _AnyState, <<"invalid">> } ->
+					trace_bridge:warning_fmt( "[~w] For auth URI ~ts, "
+						"switching from '~ts' to 'invalid' state.",
+						[ self(), AuthUri, AnyState ] ),
 					invalid;
 
 				% By default remains in the current state (including 'pending'):
@@ -1960,7 +1963,7 @@ wait_challenges_valid( FsmPid, Count, MaxCount ) ->
 	% (possibly new) current state being then returned:
 	%
 	case gen_statem:call( _ServerRef=FsmPid,
-				_Request=check_challenges_completed, ?base_timeout ) of
+			_Request=check_challenges_completed, ?base_timeout ) of
 
 		valid ->
 			cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
