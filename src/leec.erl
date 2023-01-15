@@ -310,8 +310,8 @@
 -define( webroot_challenge_path, <<".well-known/acme-challenge">> ).
 
 
-% Default overall http time-out, in milliseconds (4 minutes):
--define( default_timeout, 4 * 60 * 1000 ).
+% Default overall http time-out, in milliseconds (8 minutes):
+-define( default_timeout, 8 * 60 * 1000 ).
 
 % Base time-out, in milliseconds:
 -define( base_timeout, ?default_timeout div 2 ).
@@ -1340,7 +1340,7 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 				% Typically from 'valid', after the ACME time-outs short of
 				% being able to fetch relevant challenges from local webserver:
 				%
-				{ _AnyState, <<"invalid">> } ->
+				{ AnyState, <<"invalid">> } ->
 					trace_bridge:warning_fmt( "[~w] For auth URI ~ts, "
 						"switching from '~ts' to 'invalid' state.",
 						[ self(), AuthUri, AnyState ] ),
