@@ -128,10 +128,6 @@ check-cross-references:
 	@$(MYRIAD_REBAR_EXEC) xref
 
 
-info-paths:
-	@echo "BEAM_PATH_OPT = $(BEAM_PATH_OPT)"
-
-
 info-conditionals:
 	@echo "LEEC_DEBUG_FLAGS = $(LEEC_DEBUG_FLAGS)"
 	@echo "LEEC_CHECK_FLAGS = $(LEEC_CHECK_FLAGS)"

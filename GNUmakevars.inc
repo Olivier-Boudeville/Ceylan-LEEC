@@ -59,7 +59,7 @@ endif
 
 # Topics covered by flags:
 #
-# - fsm: regarding the finite state machine (ex: state changes) and general
+# - fsm: regarding the finite state machine (e.g. state changes) and general
 # operations
 # - keys: regarding all kinds of keys and certificates
 # - network: regarding network elements such as TCP connections
@@ -88,7 +88,7 @@ ERLANG_COMPILER_OPT_BASE += $(LEEC_DEBUG_FLAGS) \
 
 
 
-# Useful to target for example the root of the current layer (ex: to locate the
+# Useful to target for example the root of the current layer (e.g. to locate the
 # relevant, layer-local '_build' directory):
 #
 ifndef LAYER_TOP
@@ -175,7 +175,7 @@ LEEC_BEAM_DIRS := $(LEEC_BEAM_DIR) $(LEEC_TOP)/..
 LEEC_REBAR_BUILD_BASE = $(REBAR_BUILD_DIR)/lib/leec
 
 
-# When building LEEC in an OTP context from its usual (GIT) root (ex: with
+# When building LEEC in an OTP context from its usual (GIT) root (e.g. with
 # 'make rebar3-application'), the BEAMs of Myriad are to be found in the OTP
 # build tree - rather than in a supposedly fully-built usual root for Myriad:
 #
@@ -251,6 +251,9 @@ endif
 ERLANG_COMPILER_OPT_BASE += $(HTTPC_OPT)
 
 
+USE_JSON = true
+
+
 # Documentation section.
 
 ifndef EDOC_OPTS
@@ -293,18 +296,12 @@ PREREQ_ROOT = $(LEEC_TOP)/_build/default/lib
 # them and if all the packages mentioned here are themselves dependencies (in
 # which case they are all sitting together in the _checkouts child directory).
 #
-# Note also we rely on the names of build roots (ex: myriad) as opposed to
-# project/repository names (ex: Ceylan-Myriad):
+# Note also we rely on the names of build roots (e.g. myriad) as opposed to
+# project/repository names (e.g. Ceylan-Myriad):
 #
 # This means that a Ceylan build will ignore the Myriad version in PREREQ_ROOT
 # and use instead one defined just below.
 #
-# This last case happens notably if not using checkout directories, or if using
-# them and if all the packages mentioned here are themselves dependencies (in
-# which case they are all sitting together in the _checkouts child directory).
-#
-# Note also that we rely on the names of build roots (ex: myriad) as opposed to
-# project/repository names (ex: Ceylan-Myriad):
 #
 # First priority is an existing checkout directory:
 ifneq ($(wildcard $(LEEC_TOP)/_checkouts/myriad/.),)
@@ -414,17 +411,18 @@ ifndef GETOPT_TOP
 	endif
 endif
 
-ifndef JSX_TOP
-	ifneq ($(wildcard $(LEEC_TOP)/_checkouts/jsx/.),)
-		JSX_TOP = $(LEEC_TOP)/_checkouts/jsx
-	else
-		ifneq ($(wildcard $(SIBLING_ROOT)/jsx/.),)
-			JSX_TOP = $(SIBLING_ROOT)/jsx
-		else
-			JSX_TOP = $(PREREQ_ROOT)/jsx
-		endif
-	endif
-endif
+# Deactivated as expected to already managed by Myriad:
+#ifndef JSX_TOP
+#	ifneq ($(wildcard $(LEEC_TOP)/_checkouts/jsx/.),)
+#		JSX_TOP = $(LEEC_TOP)/_checkouts/jsx
+#	else
+#		ifneq ($(wildcard $(SIBLING_ROOT)/jsx/.),)
+#			JSX_TOP = $(SIBLING_ROOT)/jsx
+#		else
+#			JSX_TOP = $(PREREQ_ROOT)/jsx
+#		endif
+#	endif
+#endif
 
 ifndef JIFFY_TOP
 	ifneq ($(wildcard $(LEEC_TOP)/_checkouts/jiffy/.),)
@@ -452,8 +450,8 @@ INC += $(foreach dir,$(LEEC_EXTRA_DEPS),-I$(dir)/include) -I$(SIBLING_ROOT) -I$(
 # programatically in the code path; moreover these paths would be transformed
 # (in launch-erl.sh) through realpath, which would lead them to be added for
 # example as NATIVE_BASE/leec/_build/default/lib/X instead of
-# NATIVE_BASE/us_web/_checkouts/leec/_build/default/lib/X (ex: X being jsx),
+# NATIVE_BASE/us_web/_checkouts/leec/_build/default/lib/X (e.g. X being jsx),
 # leading in turn the erroneous detection of duplicated BEAM files in the code
-# path (ex: jsx.beam).
+# path (e.g. jsx.beam).
 #
 #BEAM_DIRS += $(foreach dir,$(LEEC_EXTRA_DEPS),$(dir)/ebin)
