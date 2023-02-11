@@ -266,7 +266,7 @@ request( Method, BinUri, Headers, MaybeBinContent, CertReqOptionMap,
 	% (w.r.t. verify_peer notably):
 	%
 	%trace_bridge:debug_fmt( "Request of type ~p to ~p relies on "
-	%   "following options:~n ~p.", [ Method, Uri, CertReqOptionMap ] ),
+	%   "following options:~n ~p.", [ Method, BinUri, CertReqOptionMap ] ),
 
 	% We used to introduce in these implementations an (optional) waiting (with
 	% timer:sleep/1), as we could see, when using an ACME server in production
@@ -323,7 +323,7 @@ request_via_shotgun( Method, BinUri, Headers, MaybeBinContent,
 
 	cond_utils:if_defined( leec_debug_exchanges,
 		trace_bridge:debug_fmt( "[~w] Preparing a (shotgun-based) ~p request "
-								"to '~ts'.", [ self(), Method, Uri ] ) ),
+								"to '~ts'.", [ self(), Method, BinUri ] ) ),
 
 	ContentHeaders = Headers#{ <<"content-type">> =>
 									<<"application/jose+json">> },
@@ -627,14 +627,14 @@ get_directory_map( Env, CertReqOptionMap, LEState ) ->
 %
 -spec get_nonce( directory_map(), cert_req_option_map(), le_state() ) ->
 					{ nonce(), le_state() }.
-get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, CertReqOptionMap, LEState ) ->
+get_nonce( _DirMap=#{ <<"newNonce">> := BinUri }, CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges,
 		trace_bridge:debug_fmt( "[~w] Getting new nonce from ~ts.",
-								[ self(), Uri ] ) ),
+								[ self(), BinUri ] ) ),
 
 	{ #{ nonce := Nonce, status_code := StatusCode }, NewLEState }  =
-		request( _Method=get, Uri, _Headers=#{}, _MaybeBinContent=undefined,
+		request( _Method=get, BinUri, _Headers=#{}, _MaybeBinContent=undefined,
 				 CertReqOptionMap, LEState ),
 
 	StatusCode =:= ( _NoContent=204 ) orelse
@@ -664,12 +664,12 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, CertReqOptionMap, LEState ) ->
 -spec get_acme_account( directory_map(), tls_private_key(), jws(),
 						cert_req_option_map(), le_state() ) ->
 			{ { json_map_decoded(), bin_uri(), nonce() }, le_state() }.
-get_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
+get_acme_account( _DirMap=#{ <<"newAccount">> := BinUri }, PrivKey, Jws,
 				  CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges,
 		trace_bridge:debug_fmt( "[~w] Requesting a new account from ~ts.",
-								[ self(), Uri ] ) ),
+								[ self(), BinUri ] ) ),
 
 	% Terms of service should not be automatically agreed.
 	%
@@ -677,11 +677,12 @@ get_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 	%
 	Payload = #{ termsOfServiceAgreed => true, contact => [] },
 
-	ReqB64 = leec_jws:encode( PrivKey, Jws#jws{ url=Uri }, Payload, LEState ),
+	ReqB64 = leec_jws:encode( PrivKey, Jws#jws{ url=BinUri }, Payload,
+							  LEState ),
 
 	{ #{ json := RespMap, location := LocationUri, nonce := NewNonce,
-		 status_code := StatusCode }, NewLEState } = request( _Method=post, Uri,
-			_Headers=#{}, _MaybeBinContent=ReqB64,
+		 status_code := StatusCode }, NewLEState } = request( _Method=post,
+			BinUri, _Headers=#{}, _MaybeBinContent=ReqB64,
 			CertReqOptionMap#{ json => true }, LEState ),
 
 	case StatusCode of
@@ -778,19 +779,19 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 -spec get_order( bin_uri(), tls_private_key(), jws(), cert_req_option_map(),
 				 le_state() ) ->
 		{ { json_map_decoded(), bin_uri(), nonce() }, le_state() }.
-get_order( Uri, Key, Jws, CertReqOptionMap, LEState ) ->
+get_order( BinUri, Key, Jws, CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
-		"[~w] Getting order at ~ts.", [ self(), Uri ] ) ),
+		"[~w] Getting order at ~ts.", [ self(), BinUri ] ) ),
 
 	% POST-as-GET implies no payload:
 
-	Req = leec_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined,
+	Req = leec_jws:encode( Key, Jws#jws{ url=BinUri }, _Content=undefined,
 						   LEState ),
 
 	{ #{ json := RespMap, location := Location, nonce := Nonce,
 		 status_code := StatusCode }, NewLEState } =
-		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
+		request( _Method=post, BinUri, _Headers=#{}, _MaybeBinContent=Req,
 				 CertReqOptionMap#{ json=> true }, LEState ),
 
 	StatusCode =:= (_Success=200) orelse
@@ -848,18 +849,19 @@ request_authorization( AuthUri, PrivKey, Jws, CertReqOptionMap, LEState ) ->
 -spec notify_ready_for_challenge( challenge(), tls_private_key(), jws(),
 								  cert_req_option_map(), le_state() ) ->
 			{ { json_map_decoded(), bin_uri(), nonce() }, le_state() }.
-notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
+notify_ready_for_challenge( _Challenge=#{ <<"url">> := BinUri }, PrivKey, Jws,
 							CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
 		"[~w] Notifying the ACME server that our agent is "
-		"ready for challenge validation at ~ts.", [ self(), Uri ] ) ),
+		"ready for challenge validation at ~ts.", [ self(), BinUri ] ) ),
 
 	% POST-as-GET implies no payload:
-	Req = leec_jws:encode( PrivKey, Jws#jws{ url=Uri }, _Content=#{}, LEState ),
+	Req = leec_jws:encode( PrivKey, Jws#jws{ url=BinUri }, _Content=#{},
+						   LEState ),
 
 	{ #{ json := RespMap, location := Location, nonce := Nonce,
-	  status_code := StatusCode }, NewLEState } = request( _Method=post, Uri,
+	  status_code := StatusCode }, NewLEState } = request( _Method=post, BinUri,
 		_Headers=#{}, _MaybeBinContent=Req, CertReqOptionMap#{ json => true },
 														   LEState ),
 
@@ -922,18 +924,18 @@ finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 -spec get_certificate( order_map(), tls_private_key(), jws(),
 					   cert_req_option_map(), le_state() ) ->
 			{ { bin_certificate(), nonce() }, le_state() }.
-get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, CertReqOptionMap,
+get_certificate( #{ <<"certificate">> := BinUri }, Key, Jws, CertReqOptionMap,
 				 LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
-		"[~w] Downloading certificate at ~ts.", [ self(), Uri ] ) ),
+		"[~w] Downloading certificate at ~ts.", [ self(), BinUri ] ) ),
 
 	% POST-as-GET implies no payload:
-	Req = leec_jws:encode( Key, Jws#jws{ url=Uri }, _Content=undefined,
+	Req = leec_jws:encode( Key, Jws#jws{ url=BinUri }, _Content=undefined,
 						   LEState ),
 
 	{ #{ body := BinCert, nonce := NewNonce, status_code := StatusCode  },
-	  NewLEState } = request( _Method=post, Uri, _Headers=#{},
+	  NewLEState } = request( _Method=post, BinUri, _Headers=#{},
 							  _MaybeBinContent=Req, CertReqOptionMap, LEState ),
 
 	StatusCode =:= (_Success=200) orelse
