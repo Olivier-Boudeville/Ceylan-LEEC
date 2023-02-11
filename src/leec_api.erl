@@ -80,12 +80,10 @@
 -type http_status_code() :: web_utils:http_status_code().
 
 -type challenge() :: leec:challenge().
--type uri() :: leec:uri().
--type bin_uri() :: leec:bin_uri().
+-type bin_uri() :: web_utils:bin_uri().
 -type tls_private_key() :: leec:tls_private_key().
 -type tcp_connection_cache() :: leec:tcp_connection_cache().
 -type bin_domain() :: leec:bin_domain().
--type bin_key() :: leec:bin_key().
 -type bin_csr_key() :: leec:bin_csr_key().
 -type directory_map() :: leec:directory_map().
 -type json_map_decoded() :: leec:json_map_decoded().
@@ -145,11 +143,11 @@ binary_to_status( InvalidBinStatus ) ->
 %
 % TODO: check connection is still alive (ping?)
 %
-% Note: for long-living processes (ex: up to 90 days can elapse between two
+% Note: for long-living processes (e.g. up to 90 days can elapse between two
 % certification generations for a given domain), it is certainly safer to reset
 % that connection cache.
 %
--spec get_tcp_connection( net_utils:protocol_type(),
+-spec get_tcp_connection( web_utils:protocol_type(),
 		net_utils:string_host_name(), net_utils:tcp_port(),
 		tcp_connection_cache() ) ->
 							{ shotgun:connection(), tcp_connection_cache() }.
@@ -162,8 +160,8 @@ get_tcp_connection( Proto, Host, Port, TCPCache ) ->
 		key_not_found ->
 
 			cond_utils:if_defined( leec_debug_network,
-			  trace_bridge:debug_fmt( "[~w] Opening a connection to ~ts:~B, "
-				"with the '~ts' scheme.", [ self(), Host, Port, Proto ] ) ),
+				trace_bridge:debug_fmt( "[~w] Opening a connection to ~ts:~B, "
+					"with the '~ts' scheme.", [ self(), Host, Port, Proto ] ) ),
 
 			Conn = case shotgun:open( Host, Port, Proto ) of
 
@@ -193,9 +191,9 @@ get_tcp_connection( Proto, Host, Port, TCPCache ) ->
 
 		{ value, Conn } ->
 			cond_utils:if_defined( leec_debug_network,
-			  trace_bridge:debug_fmt( "[~w] Reusing connection to ~ts:~B, "
-				  "with the '~ts' scheme: ~w.",
-				  [ self(), Host, Port, Proto, Conn ] ) ),
+				trace_bridge:debug_fmt( "[~w] Reusing connection to ~ts:~B, "
+					"with the '~ts' scheme: ~w.",
+					[ self(), Host, Port, Proto, Conn ] ) ),
 			{ Conn, TCPCache }
 
 	end.
@@ -259,9 +257,10 @@ decode( _CertReqOptionMap, Response, _LEState ) ->
 % TODO: is 'application/jose+json' content type always required?
 % (check ACME documentation)
 %
--spec request( 'get' | 'post', uri(), header_map(), maybe( bin_content() ),
+-spec request( 'get' | 'post', bin_uri(), header_map(), maybe( bin_content() ),
 			   cert_req_option_map(), le_state() ) -> { body(), le_state() }.
-request( Method, Uri, Headers, MaybeBinContent, CertReqOptionMap, LEState ) ->
+request( Method, BinUri, Headers, MaybeBinContent, CertReqOptionMap,
+		 LEState ) ->
 
 	% Very talkative, yet useful to check the actual security options used
 	% (w.r.t. verify_peer notably):
@@ -278,13 +277,13 @@ request( Method, Uri, Headers, MaybeBinContent, CertReqOptionMap, LEState ) ->
 
 	cond_utils:if_set_to( myriad_httpc_backend, shotgun,
 
-		_ExprIfMatching=request_via_shotgun( Method, Uri, Headers,
+		_ExprIfMatching=request_via_shotgun( Method, BinUri, Headers,
 			MaybeBinContent, CertReqOptionMap, LEState ),
 
 		% Expecting the myriad_httpc_backend define to be set to 'native_httpc'
 		% instead of 'shotgun' here:
 		%
-		_ExprIfNotMatching=request_via_native_httpc( Method, Uri, Headers,
+		_ExprIfNotMatching=request_via_native_httpc( Method, BinUri, Headers,
 			MaybeBinContent, CertReqOptionMap, LEState ) ).
 
 
@@ -292,14 +291,14 @@ request( Method, Uri, Headers, MaybeBinContent, CertReqOptionMap, LEState ) ->
 % @doc Queries the specified URI (GET or POST) with the shotgun library, and
 % returns the corresponding result with an updated state.
 %
--spec request_via_shotgun( 'get' | 'post', uri(), header_map(),
+-spec request_via_shotgun( 'get' | 'post', bin_uri(), header_map(),
 				maybe( bin_content() ), cert_req_option_map(), le_state() ) ->
 						{ http_body(), le_state() }.
-request_via_shotgun( Method, Uri, Headers, MaybeBinContent,
+request_via_shotgun( Method, BinUri, Headers, MaybeBinContent,
 		CertReqOptionMap=#{ netopts := Netopts },
 		LEState=#le_state{ tcp_connection_cache=TCPCache } ) ->
 
-	UriStr = text_utils:ensure_string( Uri ),
+	UriStr = text_utils:binary_to_string( BinUri ),
 
 	% uri_string:parse/1 will return the same type of strings as the one it is
 	% given.
@@ -409,7 +408,7 @@ request_via_shotgun( Method, Uri, Headers, MaybeBinContent,
 
 			trace_bridge:error_fmt( "Request failed (via shotgun backend): "
 				"method was ~p, URI was ~ts, result: ~p.~n Stacktrace: ~ts",
-				[ Method, Uri, ReqRes, code_utils:interpret_stacktrace() ] ),
+				[ Method, BinUri, ReqRes, code_utils:interpret_stacktrace() ] ),
 
 			throw( { request_failed, Method, UriStr, ReqRes } )
 
@@ -421,15 +420,15 @@ request_via_shotgun( Method, Uri, Headers, MaybeBinContent,
 % module (through Myriad support), and returns the corresponding result with an
 % updated state.
 %
--spec request_via_native_httpc( 'get' | 'post', uri(), header_map(),
+-spec request_via_native_httpc( 'get' | 'post', bin_uri(), header_map(),
 				maybe( bin_content() ), cert_req_option_map(), le_state() ) ->
 						{ http_body(), le_state() }.
-request_via_native_httpc( Method, Uri, Headers, MaybeBinContent,
-			CertReqOptionMap=#{ netopts := Netopts }, LEState ) ->
+request_via_native_httpc( Method, BinUri, Headers, MaybeBinContent,
+		CertReqOptionMap=#{ netopts := Netopts }, LEState ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges,
 		trace_bridge:debug_fmt( "[~w] Preparing a (httpc-based) ~p request "
-								"to '~ts'.", [ self(), Method, Uri ] ) ),
+								"to '~ts'.", [ self(), Method, BinUri ] ) ),
 
 	% Readily compliant:
 	HttpOpts = Netopts,
@@ -441,9 +440,9 @@ request_via_native_httpc( Method, Uri, Headers, MaybeBinContent,
 				trace_bridge:debug_fmt( "[~w][client] GET request to URI "
 					"'~ts', with following headers:~n  ~p~nand "
 					"HTTP options: ~p.",
-					[ self(), Uri, Headers, HttpOpts ] ) ),
+					[ self(), BinUri, Headers, HttpOpts ] ) ),
 
-			web_utils:get( Uri, Headers, HttpOpts );
+			web_utils:get( BinUri, Headers, HttpOpts );
 
 		post ->
 			MaybeContentType = case MaybeBinContent of
@@ -461,10 +460,10 @@ request_via_native_httpc( Method, Uri, Headers, MaybeBinContent,
 				trace_bridge:debug_fmt( "[~w][client] POST request to URI "
 					"'~ts', with following headers:~n  ~p~n"
 					"HTTP options: ~p~nContent: ~p~nContent-type: ~ts.",
-					[ self(), Uri, Headers, HttpOpts, MaybeBinContent,
+					[ self(), BinUri, Headers, HttpOpts, MaybeBinContent,
 					  MaybeContentType ] ) ),
 
-			web_utils:post( Uri, Headers, HttpOpts, MaybeBinContent,
+			web_utils:post( BinUri, Headers, HttpOpts, MaybeBinContent,
 							MaybeContentType )
 
 	end,
@@ -472,7 +471,7 @@ request_via_native_httpc( Method, Uri, Headers, MaybeBinContent,
 	% Very useful yet quite verbose:
 	cond_utils:if_defined( leec_debug_codec,
 		trace_bridge:debug_fmt( "[~w][client] The '~ts' request to ~ts "
-			"resulted in:~n  ~p", [ self(), Method, Uri, ReqRes ] ) ),
+			"resulted in:~n  ~p", [ self(), Method, BinUri, ReqRes ] ) ),
 
 	% Typically success results in ReqRes like:
 
@@ -494,9 +493,9 @@ request_via_native_httpc( Method, Uri, Headers, MaybeBinContent,
 
 			trace_bridge:error_fmt( "Request failed (via native httpc): "
 				"method was ~p, URI was ~ts, result: ~p.~n Stacktrace: ~ts",
-				[ Method, Uri, ReqRes, code_utils:interpret_stacktrace() ] ),
+				[ Method, BinUri, ReqRes, code_utils:interpret_stacktrace() ] ),
 
-			throw( { request_failed, Method, Uri, ReqRes } );
+			throw( { request_failed, Method, BinUri, ReqRes } );
 
 		{ ReqStatusCode, ReqHeaders, ReqBody } ->
 
@@ -508,22 +507,23 @@ request_via_native_httpc( Method, Uri, Headers, MaybeBinContent,
 			Resp = BaseResponse#{
 
 				nonce => table:get_value_with_default( <<"replay-nonce">>,
-													   _Def=null, ReqHeaders ),
+					_Def=null, ReqHeaders ),
 
 				location => table:get_value_with_default( <<"location">>,
-													_Def=null, ReqHeaders ) },
+					_Def=null, ReqHeaders ) },
 
 			JsonHttpBody = decode( CertReqOptionMap, Resp, LEState ),
 
-			{ JsonHttpBody, LEState };
+			{ JsonHttpBody, LEState }
 
-		_ ->
-
-			trace_bridge:error_fmt( "Request failed (via native httpc): "
-				"method was ~p, URI was ~ts, result: ~p.~n Stacktrace: ~ts",
-				[ Method, Uri, ReqRes, code_utils:interpret_stacktrace() ] ),
-
-			throw( { request_failed, Method, Uri, ReqRes } )
+		% Not supposed to happen:
+		%_ ->
+		%
+		%   trace_bridge:error_fmt( "Request failed (via native httpc): "
+		%       "method was ~p, URI was ~ts, result: ~p.~n Stacktrace: ~ts",
+		%       [ Method, BinUri, ReqRes, code_utils:interpret_stacktrace() ] ),
+		%
+		%   throw( { request_failed, Method, BinUri, ReqRes } )
 
 	end.
 
@@ -542,7 +542,7 @@ on_failed_request( StatusCode, StepAtom ) ->
 							   [ StepAtom, StatusStr ] ),
 
 	throw( { request_failed, { status_code, StatusCode }, { reason, StatusStr },
-				{ step, StepAtom } } ).
+			{ step, StepAtom } } ).
 
 
 
@@ -575,8 +575,8 @@ on_failed_request( StatusCode, JsonMapBody, StepAtom ) ->
 	end,
 
 	throw( { request_failed, { status_code, StatusCode },
-				{ reason, text_utils:ensure_string( Reason ) },
-				{ step, StepAtom } } ).
+			{ reason, text_utils:ensure_string( Reason ) },
+			{ step, StepAtom } } ).
 
 
 
@@ -611,15 +611,8 @@ get_directory_map( Env, CertReqOptionMap, LEState ) ->
 		request( _Method=get, DirUri, _Headers=#{}, _MaybeBinContent=undefined,
 				 CertReqOptionMap#{ json => true }, LEState ),
 
-	case StatusCode of
-
-		_Success=200 ->
-			ok;
-
-		_ ->
-			on_failed_request( StatusCode, DirectoryMap, get_directory_map )
-
-	end,
+	StatusCode =:= (_Success=200) orelse
+		on_failed_request( StatusCode, DirectoryMap, get_directory_map ),
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
 		"[~w] Obtained directory map:~n~p", [ self(), DirectoryMap ] ) ),
@@ -644,15 +637,8 @@ get_nonce( _DirMap=#{ <<"newNonce">> := Uri }, CertReqOptionMap, LEState ) ->
 		request( _Method=get, Uri, _Headers=#{}, _MaybeBinContent=undefined,
 				 CertReqOptionMap, LEState ),
 
-	case StatusCode of
-
-		_NoContent=204 ->
-			ok;
-
-		_ ->
-			on_failed_request( StatusCode, get_nonce )
-
-	end,
+	StatusCode =:= ( _NoContent=204 ) orelse
+		on_failed_request( StatusCode, get_nonce ),
 
 	cond_utils:if_defined( leec_debug_exchanges,
 		trace_bridge:debug_fmt( "[~w] New nonce is: ~p.", [ self(), Nonce ] ) ),
@@ -694,7 +680,7 @@ get_acme_account( _DirMap=#{ <<"newAccount">> := Uri }, PrivKey, Jws,
 	ReqB64 = leec_jws:encode( PrivKey, Jws#jws{ url=Uri }, Payload, LEState ),
 
 	{ #{ json := RespMap, location := LocationUri, nonce := NewNonce,
-	   status_code := StatusCode }, NewLEState } = request( _Method=post, Uri,
+		 status_code := StatusCode }, NewLEState } = request( _Method=post, Uri,
 			_Headers=#{}, _MaybeBinContent=ReqB64,
 			CertReqOptionMap#{ json => true }, LEState ),
 
@@ -762,16 +748,8 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 			request( _Method=post, OrderUri, _Headers=#{}, _MaybeBinContent=Req,
 					 CertReqOptionMap#{ json => true }, LEState ),
 
-	case StatusCode of
-
-		_CreatedCode=201 ->
-			ok;
-
-		_ ->
-			on_failed_request( StatusCode, OrderJsonMap,
-							   request_new_certificate )
-
-	end,
+	StatusCode =:= ( _CreatedCode=201 ) orelse
+		on_failed_request( StatusCode, OrderJsonMap, request_new_certificate ),
 
 	cond_utils:if_defined( leec_debug_codec, trace_bridge:debug_fmt(
 		"[~w] Obtained from order URI '~ts' the "
@@ -797,7 +775,7 @@ request_new_certificate( _DirMap=#{ <<"newOrder">> := OrderUri }, BinDomains,
 
 
 % @doc Orders a new certificate from the ACME server.
--spec get_order( bin_uri(), bin_key(), jws(), cert_req_option_map(),
+-spec get_order( bin_uri(), tls_private_key(), jws(), cert_req_option_map(),
 				 le_state() ) ->
 		{ { json_map_decoded(), bin_uri(), nonce() }, le_state() }.
 get_order( Uri, Key, Jws, CertReqOptionMap, LEState ) ->
@@ -815,15 +793,8 @@ get_order( Uri, Key, Jws, CertReqOptionMap, LEState ) ->
 		request( _Method=post, Uri, _Headers=#{}, _MaybeBinContent=Req,
 				 CertReqOptionMap#{ json=> true }, LEState ),
 
-	case StatusCode of
-
-		_Success=200 ->
-			ok;
-
-		_ ->
-			on_failed_request( StatusCode, RespMap, get_order )
-
-	end,
+	StatusCode =:= (_Success=200) orelse
+		on_failed_request( StatusCode, RespMap, get_order ),
 
 	{ { RespMap, Location, Nonce }, NewLEState }.
 
@@ -855,15 +826,8 @@ request_authorization( AuthUri, PrivKey, Jws, CertReqOptionMap, LEState ) ->
 			AuthUri, _Headers=#{}, _MaybeBinContent=B64AuthReq,
 			CertReqOptionMap#{ json=> true }, LEState ),
 
-	case StatusCode of
-
-		_Success=200 ->
-			ok;
-
-		_ ->
-			on_failed_request( StatusCode, RespMap, request_authorization )
-
-	end,
+	StatusCode =:= (_Success=200) orelse
+		on_failed_request( StatusCode, RespMap, request_authorization ),
 
 	{ { RespMap, LocationUri, Nonce }, NewLEState }.
 
@@ -881,8 +845,7 @@ request_authorization( AuthUri, PrivKey, Jws, CertReqOptionMap, LEState ) ->
 %
 %  - Nonce is a new valid replay-nonce
 %
-%
--spec notify_ready_for_challenge( challenge(), bin_key(), jws(),
+-spec notify_ready_for_challenge( challenge(), tls_private_key(), jws(),
 								  cert_req_option_map(), le_state() ) ->
 			{ { json_map_decoded(), bin_uri(), nonce() }, le_state() }.
 notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
@@ -900,15 +863,8 @@ notify_ready_for_challenge( _Challenge=#{ <<"url">> := Uri }, PrivKey, Jws,
 		_Headers=#{}, _MaybeBinContent=Req, CertReqOptionMap#{ json => true },
 														   LEState ),
 
-	case StatusCode of
-
-		_Success=200 ->
-			ok;
-
-		_ ->
-			on_failed_request( StatusCode, RespMap, notify_ready_for_challenge )
-
-	end,
+	StatusCode =:= (_Success=200) orelse
+		on_failed_request( StatusCode, RespMap, notify_ready_for_challenge ),
 
 	{ { RespMap, Location, Nonce }, NewLEState }.
 
@@ -965,7 +921,7 @@ finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 %
 -spec get_certificate( order_map(), tls_private_key(), jws(),
 					   cert_req_option_map(), le_state() ) ->
-		  { { bin_certificate(), nonce() }, le_state() }.
+			{ { bin_certificate(), nonce() }, le_state() }.
 get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, CertReqOptionMap,
 				 LEState ) ->
 
@@ -980,14 +936,7 @@ get_certificate( #{ <<"certificate">> := Uri }, Key, Jws, CertReqOptionMap,
 	  NewLEState } = request( _Method=post, Uri, _Headers=#{},
 							  _MaybeBinContent=Req, CertReqOptionMap, LEState ),
 
-	case StatusCode of
-
-		_Success=200 ->
-			ok;
-
-		_ ->
-			on_failed_request( StatusCode, get_certificate )
-
-	end,
+	StatusCode =:= (_Success=200) orelse
+		on_failed_request( StatusCode, get_certificate ),
 
 	{ { BinCert, NewNonce }, NewLEState }.

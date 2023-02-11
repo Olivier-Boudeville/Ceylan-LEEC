@@ -45,6 +45,8 @@
 
 -type file_path() :: file_utils:file_path().
 -type bin_file_path() :: file_utils:bin_file_path().
+-type any_file_path() :: file_utils:any_file_path().
+-type any_file_name() :: file_utils:any_file_name().
 
 -type directory_path() :: file_utils:bin_directory_path().
 -type bin_directory_path() :: file_utils:bin_directory_path().
@@ -52,7 +54,6 @@
 
 -type bin_fqdn() :: net_utils:bin_fqdn().
 
--type key_file_info() :: leec:key_file_info().
 -type san() :: leec:san().
 -type bin_certificate() :: leec:bin_certificate().
 
@@ -71,14 +72,15 @@
 %
 % Does not involve any network access.
 %
--spec obtain_private_key( maybe( key_file_info() ), bin_directory_path() ) ->
-									tls_private_key().
+-spec obtain_private_key(
+		maybe( { 'new', any_file_name() } | any_file_path() ),
+		bin_directory_path() ) -> tls_private_key().
 obtain_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 
 	% If not set, forges a unique key filename to allow for multiple, concurrent
 	% instances:
 	%
-	% (ex: "leec-agent.key-5")
+	% (e.g. "leec-agent.key-5")
 	%
 	BasePath = file_utils:join( BinCertDirPath, "leec-agent-private.key" ),
 
@@ -88,19 +90,12 @@ obtain_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 	% Safety measure, not expected to trigger or to be passed in an (always
 	% possible) race condition:
 	%
-	case file_utils:is_existing_file( UniqPath ) of
-
-		true ->
-			throw( { already_existing_agent_key, UniqPath } );
-
-		false ->
-			ok
-
-	end,
+	file_utils:is_existing_file( UniqPath ) andalso
+		throw( { already_existing_agent_key, UniqPath } ),
 
 	% Could have been more elegant:
 	UniqBinFilename = text_utils:string_to_binary(
-						file_utils:get_last_path_element( UniqPath ) ),
+		file_utils:get_last_path_element( UniqPath ) ),
 
 	cond_utils:if_defined( leec_debug_keys,
 		trace_bridge:debug_fmt( "[~w] Generated filename for the LEEC agent "
@@ -110,27 +105,20 @@ obtain_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 
 
 % Here we create the requested private key:
-obtain_private_key( _KeyFileInfo={ new, BinKeyFilename }, BinCertDirPath ) ->
+obtain_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 
-	KeyFilePath = file_utils:join( BinCertDirPath, BinKeyFilename ),
+	KeyFilePath = file_utils:join( BinCertDirPath, KeyFilename ),
 
 	cond_utils:if_defined( leec_debug_keys,
 		trace_bridge:debug_fmt( "[~w] A private key is to be created in '~ts'.",
 								[ self(), KeyFilePath ] ) ),
 
-	case file_utils:is_existing_file( KeyFilePath ) of
-
-		true ->
-			% The user code shall remove any prior key first if wanting to avoid
-			% this warning:
-			%
-			trace_bridge:warning_fmt( "A '~ts' key file was already existing, "
-				"overwriting it.", [ KeyFilePath ] );
-
-		false ->
-			ok
-
-	end,
+	file_utils:is_existing_file( KeyFilePath ) andalso
+		% The user code shall remove any prior key first if wanting to avoid
+		% this warning:
+		%
+		trace_bridge:warning_fmt( "A '~ts' key file was already existing, "
+			"overwriting it.", [ KeyFilePath ] ),
 
 	Cmd = executable_utils:get_default_openssl_executable_path()
 		++ " genrsa -out '" ++ KeyFilePath ++ "' 4096",
@@ -151,22 +139,15 @@ obtain_private_key( _KeyFileInfo={ new, BinKeyFilename }, BinCertDirPath ) ->
 
 		{ ErrorCode, CommandOutput } ->
 			trace_bridge:error_fmt(
-			  "Command for creating private key failed (error code: ~B): ~ts.",
-			  [ ErrorCode, CommandOutput ] ),
+				"Command for creating private key failed (error code: ~B): "
+				"~ts.", [ ErrorCode, CommandOutput ] ),
 			throw( { private_key_generation_failed, ErrorCode, CommandOutput,
 					 KeyFilePath } )
 
 	end,
 
-	case file_utils:is_existing_file( KeyFilePath ) of
-
-		true ->
-			ok;
-
-		false ->
-			throw( { generated_private_key_not_found, KeyFilePath } )
-
-	end,
+	file_utils:is_existing_file( KeyFilePath ) orelse
+		throw( { generated_private_key_not_found, KeyFilePath } ),
 
 	cond_utils:if_defined( leec_debug_keys,
 		trace_bridge:debug_fmt( "[~w] Creation of private key in '~ts' "
@@ -180,7 +161,7 @@ obtain_private_key( _KeyFileInfo={ new, BinKeyFilename }, BinCertDirPath ) ->
 obtain_private_key( _KeyFileInfo=KeyFilePath, BinCertDirPath ) ->
 
 	FullKeyFilePath = file_utils:ensure_path_is_absolute( KeyFilePath,
-								_PotentialBasePath=BinCertDirPath ),
+		_PotentialBasePath=BinCertDirPath ),
 
 	PemContent = file_utils:read_whole( FullKeyFilePath ),
 
@@ -404,14 +385,14 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 		"[alt_names]\n"
 	] ++ [
 		[ "DNS.", text_utils:integer_to_string( Index ), " = ", Name, "\n" ]
-		  || { Name, Index } <- NumberedNamePairs ],
+			|| { Name, Index } <- NumberedNamePairs ],
 
 	ConfDir = file_utils:get_base_path( OutCertPath ),
 
 	Domain = text_utils:binary_to_string( BinDomain ),
 
 	ConfFilePath = file_utils:join( ConfDir,
-						"leec_san_openssl." ++ Domain ++ ".cnf" ),
+		"leec_san_openssl." ++ Domain ++ ".cnf" ),
 
 	cond_utils:if_defined( leec_debug_keys,
 		trace_bridge:debug_fmt( "Generating a certificate from '~ts', "
@@ -432,9 +413,9 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 	end,
 
 	Cmd = text_utils:format(
-			"~ts req -new -key '~ts' -sha256 -out '~ts' -config '~ts'",
-			[ executable_utils:get_default_openssl_executable_path(),
-			  KeyfilePath, OutCertPath, ConfFilePath ] ) ++ CertTypeOptStr,
+		"~ts req -new -key '~ts' -sha256 -out '~ts' -config '~ts'",
+		[ executable_utils:get_default_openssl_executable_path(),
+		  KeyfilePath, OutCertPath, ConfFilePath ] ) ++ CertTypeOptStr,
 
 	case system_utils:run_command( Cmd ) of
 
@@ -443,13 +424,13 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 
 		{ _ReturnCode=0, CommandOutput } ->
 			trace_bridge:warning_fmt(
-			  "Command output when generating certificate: ~ts",
-			  [ CommandOutput ] );
+				"Command output when generating certificate: ~ts",
+				[ CommandOutput ] );
 
 		{ ErrorCode, CommandOutput } ->
 			trace_bridge:error_fmt(
-			  "Command for generating certificate failed (error code: ~B): ~ts",
-			  [ ErrorCode, CommandOutput ] ),
+				"Command for generating certificate failed (error code: ~B): "
+				"~ts", [ ErrorCode, CommandOutput ] ),
 			throw( { certificate_generation_failed, ErrorCode, CommandOutput } )
 
 	end,
@@ -497,6 +478,6 @@ map_to_key( Map ) ->
 
 	% Ensures all keys are extracted (using one of our map primitives):
 	{ [ Kty, N, E ], _RemainingTable=#{} } = map_hashtable:extract_entries(
-								[ <<"kty">>, <<"n">>, <<"e">> ], Map ),
+		[ <<"kty">>, <<"n">>, <<"e">> ], Map ),
 
 	#tls_public_key{ kty=Kty, n=N, e=E }.

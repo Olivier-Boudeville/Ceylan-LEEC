@@ -36,10 +36,12 @@
 % TLS private key:
 -record( tls_private_key, {
 
-	% Ex: [E, N, D] with E: publicExponent, N: modulus, D: privateExponent.
-	raw :: crypto:rsa_private(),
+	% For example [E, N, D] with E: publicExponent, N: modulus, D:
+	% privateExponent.
+	%
+	raw :: leec:rsa_private_key(),
 
-	% Ex: b64 encodings of N and E.
+	% For example b64 encodings of N and E.
 	b64_pair :: { leec:binary_b64(), leec:binary_b64() },
 
 	% Absolute path of the RSA private key encoded in ASN.1 DER:
@@ -47,7 +49,7 @@
 
 
 
-% TLS public key (ex: the account one):
+% TLS public key (e.g. the account one):
 -record( tls_public_key, {
 
 	% Key type:
@@ -65,18 +67,18 @@
 	% The signing algorithm:
 	alg = 'RS256' :: leec:jws_algorithm(),
 
-	% Ex: "https://acme-staging-v02.api.letsencrypt.org/acme/new-order"
-	url :: leec:bin_uri(),
+	% For example "https://acme-staging-v02.api.letsencrypt.org/acme/new-order"
+	url :: maybe( leec:bin_uri() ),
 
-	% Key identifier; ex:
+	% Key identifier; e.g.
 	% "https://acme-staging-v02.api.letsencrypt.org/acme/acct/16082748"
 	%
-	kid :: leec:bin_uri(),
+	kid :: maybe( leec:bin_uri() ),
 
 	% The public key used to verify the JWS, in order to authenticate future
 	% requests from the account to the ACME server:
 	%
-	jwk :: leec:tls_public_key(),
+	jwk :: maybe( leec:tls_public_key() ),
 
 	% The nonce that shall be used for next sending:
 	nonce = undefined :: maybe( leec:nonce() ) } ).
@@ -101,11 +103,11 @@
 	% ACME environment:
 	env = prod :: 'staging' | 'prod',
 
-	% URI directory, fetched from ACME servers at startup (i.e. table of the
+	% URI directory, fetched from ACME servers at startup (that is table of the
 	% URIs to be called depending on operations being needed regarding
 	% certificates):
 	%
-	directory_map = undefined :: maybe( file_utils:directory_map() ),
+	directory_map = undefined :: maybe( leec:directory_map() ),
 
 	% Directory where certificates are to be stored:
 	cert_dir_path = <<"/tmp">> :: file_utils:bin_directory_path(),
@@ -115,7 +117,7 @@
 	%
 	cert_key_file = undefined :: maybe( file_utils:bin_file_path() ),
 
-	% Ex: mode = webroot.
+	% For example mode = webroot.
 	mode = undefined :: maybe( leec:le_mode() ),
 
 	% If mode is 'webroot':
@@ -126,7 +128,7 @@
 
 	% An (optional) identifier specified by the user when starting a LEEC
 	% instance (before requesting an operation related to any specific domain)
-	% to ensure the uniqueness thereof (ex: regarding the name of its agent key
+	% to ensure the uniqueness thereof (e.g. regarding the name of its agent key
 	% file):
 	%
 	% (might be added in the future)
@@ -162,9 +164,9 @@
 	% The public key returned by the ACME server when an account is obtained
 	% (its private key remains on the ACME server):
 	%
-	account_key :: leec:tls_public_key(),
+	account_key :: maybe( leec:tls_public_key() ),
 
-	order = undefined :: maybe( leec:directory_map() ),
+	order = undefined :: maybe( leec:order_map() ),
 
 	% Known challenges, per URI:
 	challenges = #{} :: leec:uri_challenge_map(),

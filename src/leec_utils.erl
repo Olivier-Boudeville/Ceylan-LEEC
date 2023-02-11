@@ -35,14 +35,14 @@
 
 -type any_string() :: text_utils:any_string().
 
--type json_parser_state() :: json_utils:json_parser_state().
+-type parser_state() :: json_utils:parser_state().
 
 -type binary_b64() :: leec:binary_b64().
 
 
 
 
-% @doc Encodes specified content in b64.
+% @doc Encodes the specified content in b64.
 -spec b64encode( any_string() ) -> binary_b64().
 b64encode( X ) ->
 	Base64 = base64:encode( X ),
@@ -50,8 +50,8 @@ b64encode( X ) ->
 
 
 
-% @doc Encodes specified content first in JSON, then in b64.
--spec jsonb64encode( map(), json_parser_state() ) -> binary_b64().
+% @doc Encodes the specified content first in JSON, then in b64.
+-spec jsonb64encode( map(), parser_state() ) -> binary_b64().
 jsonb64encode( X, ParserState ) when is_map( X ) ->
 
 	%trace_bridge:debug_fmt( "Encoding in JSON then b64:~n  ~p", [ X ] ),
@@ -93,7 +93,7 @@ hex( C ) ->
 
 
 
-% @doc Returns the SHA256 hexadecimal digest of specified content.
+% @doc Returns the SHA256 hexadecimal digest of the specified content.
 -spec hashdigest( sha256, binary() ) -> binary().
 hashdigest( sha256, Content ) ->
 	hexdigest( crypto:hash( sha256, Content ) ).

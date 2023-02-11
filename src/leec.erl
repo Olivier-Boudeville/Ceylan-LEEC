@@ -56,6 +56,10 @@
 
 
 % This is a (passive) application:
+%
+% (the signatures do not seem to be respected here due to a clash in the start/*
+% functions)
+%
 -behaviour(application).
 
 
@@ -105,6 +109,7 @@
 % maybe SSL options; it is a parameter directly needed as such by
 % shotgun:post/5.
 
+-type bin_uri() :: web_utils:bin_uri().
 
 -type bin_domain() :: net_utils:bin_fqdn().
 
@@ -145,7 +150,7 @@
 % Associating tokens with keys.
 
 
--type tcp_connection_cache() :: table( { net_utils:protocol_type(),
+-type tcp_connection_cache() :: table( { web_utils:protocol_type(),
 		net_utils:string_host_name(), tcp_port() }, shotgun:connection() ).
 % For the reuse of TCP connections to the ACME server.
 
@@ -156,7 +161,7 @@
 % https://community.letsencrypt.org.
 
 
--type challenge() :: table:table( bin_string(), bin_string() ).
+-type challenge() :: table( bin_string(), bin_string() ).
 % All known information regarding a challenge.
 %
 % As Key => example of associated value:
@@ -169,11 +174,13 @@
 %
 % - `<<"url">> =>
 %     <<"ACME_BASE/acme/chall-v3/132509381/-Axkdw">>'
-%
+
+
 -type uri_challenge_map() :: table( bin_uri(), challenge() ).
 
-
 -type type_challenge_map() :: table( challenge_type(), challenge() ).
+
+-type order_map() :: table( bin_string(), bin_uri() ).
 
 
 -type start_option() :: 'staging'
@@ -205,7 +212,7 @@
 %
 %  - challenge_type :: challenge_type(), default being 'http-01'
 %
-%  - sans :: [ bin_san() ]
+%  - sans :: [bin_san()]
 %
 %  - json :: boolean() (not to be set by the user)
 
@@ -264,6 +271,15 @@
 % A CSR key, as a binary.
 
 
+-type key_integer() :: integer() | binary().
+% Element of a key.
+
+-type rsa_private_key() :: [ key_integer() ].
+% Description of a RSA private key.
+%
+% (as crypto:rsa_private() is not exported)
+
+
 -type jws_algorithm() :: 'RS256'.
 
 
@@ -281,8 +297,9 @@
 
 -type tls_private_key() :: #tls_private_key{}.
 
-
 -type tls_public_key() :: #tls_public_key{}.
+
+-type tls_csr() :: binary_b64().
 
 -type jws() :: #jws{}.
 
@@ -292,18 +309,20 @@
 % Needed by other LEEC modules.
 
 
--export_type([ bin_domain/0, domain/0, le_mode/0, fsm_pid/0,
+-export_type([ bin_uri/0, bin_domain/0, domain/0, le_mode/0, fsm_pid/0,
 			   certificate_provider/0, challenge_type/0, bin_challenge_type/0,
 			   token/0, thumbprint/0, thumbprint_map/0, tcp_connection_cache/0,
 			   challenge/0, uri_challenge_map/0, type_challenge_map/0,
+			   order_map/0,
 			   start_option/0, cert_req_option_id/0, cert_req_option_map/0,
 			   acme_operation/0, directory_map/0, nonce/0,
 			   san/0, bin_san/0, any_san/0,
 			   json_map_decoded/0, agent_key_file_info/0,
 			   bin_certificate/0, bin_key/0, bin_csr_key/0,
+			   key_integer/0, rsa_private_key/0,
 			   jws_algorithm/0, binary_b64/0, key_auth/0,
-			   tls_private_key/0, tls_public_key/0, jws/0, certificate/0,
-			   le_state/0 ]).
+			   tls_private_key/0, tls_public_key/0, tls_csr/0,
+			   jws/0, certificate/0, le_state/0, status/0, request/0 ]).
 
 
 % Where Let's Encrypt will attempt to find answers to its http-01 challenges:
@@ -322,7 +341,7 @@
 
 
 -type state_callback_result() ::
-		gen_statem:state_callback_result( gen_statem:action() ).
+		fsm_utils:state_callback_result( gen_statem:action() ).
 
 
 -type status() :: 'pending' | 'processing' | 'valid' | 'invalid' | 'revoked'.
@@ -338,6 +357,8 @@
 -type event_content() :: term().
 
 %-type action() :: gen_statem:action().
+
+-type start_ret() :: gen_statem:start_ret().
 
 
 % Shorthands:
@@ -358,8 +379,6 @@
 -type tcp_port() :: net_utils:tcp_port().
 
 -type json() :: json_utils:json().
-
--type bin_uri() :: web_utils:bin_uri().
 
 -type application_name() :: otp_utils:application_name().
 
@@ -383,7 +402,7 @@
 % - jsx preferred over jiffy; yet neither needs to be initialised as an
 % application
 %
-% - no need to start myriad either
+% - no need to start Myriad either
 %
 -spec get_ordered_prerequisites() -> [ application_name() ].
 get_ordered_prerequisites() ->
@@ -392,14 +411,20 @@ get_ordered_prerequisites() ->
 
 
 % @doc Starts a (non-bridged) instance of the LEEC service FSM.
--spec start( [ start_option() ] ) -> { 'ok', fsm_pid() } | error_term().
+%
+% Apparently the 'application' behaviour would expect as argument:
+% 'normal' | {'failover', atom()} | {'takeover', atom()}
+% and, as return type:
+% {'error', _} | {'ok', pid()} | {'ok', pid(), _} instead.
+%
+-spec start( [ start_option() ] ) -> start_ret().
 start( StartOptions ) ->
 	start( StartOptions, _MaybeBridgeSpec=undefined ).
 
 
 % @doc Starts an instance of the LEEC service FSM, possibly with a trace bridge.
 -spec start( [ start_option() ], maybe( trace_bridge:bridge_spec() ) ) ->
-				{ 'ok', fsm_pid() } | error_term().
+					start_ret().
 start( StartOptions, MaybeBridgeSpec ) ->
 
 	% If a trace bridge is specified, we use it both for the current (caller)
@@ -436,7 +461,7 @@ start( StartOptions, MaybeBridgeSpec ) ->
 
 	{ ok, _AppNames } = application:ensure_all_started( leec ),
 
-	% Usually none, already started by framework (ex: otp_utils):
+	% Usually none, already started by framework (e.g. otp_utils):
 	%trace_bridge:debug_fmt( "Applications started: ~p.", [ AppNames ] ),
 
 	% Not registered in naming service on purpose, to allow for concurrent ACME
@@ -448,7 +473,6 @@ start( StartOptions, MaybeBridgeSpec ) ->
 	gen_statem:start_link( ?MODULE,
 		_InitParams={ StartOptions, JsonParserState, MaybeBridgeSpec },
 		_Opts=[] ).
-
 
 
 % @doc Returns the default options for certificate requests, here enabling the
@@ -642,7 +666,7 @@ obtain_cert_helper( Domain, FsmPid,
 
 					% Most probably 'valid':
 					_LastReadStatus = gen_statem:call( ServerRef,
-											_Req=switchTofinalize, Timeout ),
+						_Req=switchTofinalize, Timeout ),
 
 					case wait_creation_completed( FsmPid, _Count=20 ) of
 
@@ -667,7 +691,8 @@ obtain_cert_helper( Domain, FsmPid,
 				OtherError ->
 					cond_utils:if_defined( leec_debug_fsm,
 						trace_bridge:debug_fmt( "Reset of FSM ~w for '~ts' "
-						  "after error ~p.", [ FsmPid, Domain, OtherError ] ) ),
+							"after error ~p.",
+							[ FsmPid, Domain, OtherError ] ) ),
 					_ = gen_statem:call( _ServerRef=FsmPid, reset ),
 					OtherError
 
@@ -680,9 +705,8 @@ obtain_cert_helper( Domain, FsmPid,
 
 	end,
 
-	case Async of
-
-		true ->
+	Async andalso
+		begin
 			Callback = maps:get( callback, CertReqOptionMap,
 				_DefaultCallback=fun( Ret ) ->
 					trace_bridge:warning_fmt( "Default async callback called "
@@ -692,12 +716,9 @@ obtain_cert_helper( Domain, FsmPid,
 			%trace_bridge:debug_fmt( "Async callback called "
 			%   "for ~w regarding result ~p.", [ FsmPid, CreationRes ] ),
 
-			Callback( CreationRes );
+			Callback( CreationRes )
 
-		_ ->
-			ok
-
-	end,
+		end,
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"Return for domain '~ts' creation (FSM: ~w): ~p",
@@ -851,7 +872,7 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 			% overwritten (with a warning) in this case:
 			%
 			UniqFilename = text_utils:bin_format( "leec-agent-private-~ts.key",
-								[ text_utils:pid_to_core_string( self() ) ] ),
+				[ text_utils:pid_to_core_string( self() ) ] ),
 
 			% Already a binary:
 			{ new, UniqFilename };
@@ -917,7 +938,7 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 % @doc Tells about the retained mode regarding callback. Here, one callback
 % function per state, akin to gen_fsm.
 %
--spec callback_mode() -> gen_statem:callback_mode().
+-spec callback_mode() -> fsm_utils:callback_mode_ret().
 callback_mode() ->
 	% state_enter useful to trigger code once, when entering the 'finalize'
 	% state for the first time:
@@ -987,7 +1008,7 @@ get_ongoing_challenges( FsmPid ) ->
 %
 % Typically useful in a slave operation mode, when the web handler cannot access
 % directly the PID of the LEEC FSM: this code is then called by a third-party
-% process (ex: a certificate manager one, statically known of the web handler,
+% process (e.g. a certificate manager one, statically known of the web handler,
 % and triggered by it), and returns the requested challenged to the specified
 % target PID (most probably the one of the web handler itself).
 %
@@ -1058,7 +1079,7 @@ idle( _EventType={ call, From },
 		"request for domain '~ts', with following options:~n  ~p.",
 		[ self(), BinDomain, CertReqOptionMap ] ) ),
 
-	% Ex: 'http-01', 'tls-sni-01', etc.:
+	% For example 'http-01', 'tls-sni-01', etc.:
 	ChallengeType = maps:get( challenge_type, CertReqOptionMap,
 							  _DefaultChlgType='http-01' ),
 
@@ -1158,11 +1179,11 @@ idle( _EventType={ call, From },
 			case AuthPair of
 
 		{ UriChallengeMap, AuthNonce } ->
-			{ pending, creation_pending, UriChallengeMap, AuthNonce };
+			{ pending, creation_pending, UriChallengeMap, AuthNonce }
 
-		% Currently never happens:
-		{ error, Err, ErrAuthNonce } ->
-			{ idle, { creation_failed, Err }, _ResetChlgMap=#{}, ErrAuthNonce }
+		% Currently cannot happen:
+		%{ error, Err, ErrAuthNonce } ->
+		%   { idle, { creation_failed, Err }, _ResetChlgMap=#{}, ErrAuthNonce }
 
 	end,
 
@@ -1586,7 +1607,7 @@ finalize( _EventType={ call, _ServerRef=From },
 				[ self(), BinCertFilePath ] ) ),
 
 			% Shall we continue with the same account for any next operation?
-			% No, and the current JWS would not be suitable for that (ex: not
+			% No, and the current JWS would not be suitable for that (e.g. not
 			% having the public key of that LEEC agent), and anyway we prefer
 			% creating a new account each time a new operation is performed (as
 			% ~90 days may elapse between two operations). So:
@@ -1994,18 +2015,12 @@ wait_challenges_valid( FsmPid, Count, MaxCount ) ->
 
 
 
+-type wait_creation_result() :: { 'certificate_ready', bin_file_path() }
+							  | {'error', 'timeout' }.
+
+
 % @doc Waits until the certification creation is reported as completed.
-%
-% Returns:
-%
-% - {error, timeout} if failed after X loops
-%
-% - {error, Err} if another error
-%
-% - {'ok', Response} if succeed
-%
--spec wait_creation_completed( fsm_pid(), count() ) ->
-		{ 'ok', map() } | { 'error', 'timeout' | any() }.
+-spec wait_creation_completed( fsm_pid(), count() ) -> wait_creation_result().
 wait_creation_completed( FsmPid, C ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
@@ -2021,8 +2036,7 @@ wait_creation_completed( FsmPid, C ) ->
 % (helper)
 %
 -spec wait_creation_completed( fsm_pid(), count(), count() ) ->
-					{ 'certificate_ready', bin_file_path() }
-				  | { 'error', 'timeout' | any() }.
+								wait_creation_result().
 wait_creation_completed( _FsmPid, _Count=0, _Max ) ->
 	{ error, timeout };
 
@@ -2093,7 +2107,7 @@ perform_authorization( ChallengeType, AuthUris,
 
 
 % @doc Requests authorizations based on specified challenge type and URIs: for
-% each challenge type (ex: http-01, dns-01, etc.), a challenge is proposed.
+% each challenge type (e.g. http-01, dns-01, etc.), a challenge is proposed.
 %
 % At least in some cases, a single authorization URI is actually listed.
 %
@@ -2117,7 +2131,7 @@ perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 							   jws=Jws, cert_req_option_map=CertReqOptionMap },
 			UriChallengeMap ) ->
 
-	% Ex: AuthUri =
+	% For example AuthUri =
 	%  "ACME_BASE/acme/authz-v3/133572032"
 
 	{ { AuthMap, _LocUri, NewNonce }, ReqLEState } =
@@ -2128,7 +2142,7 @@ perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 		"[~w] Step 1: authmap returned for URI '~ts':~n  ~p.",
 		[ self(), AuthUri, AuthMap ] ) ),
 
-	% Ex: AuthMap =
+	% For example AuthMap =
 	% #{<<"challenges">> =>
 	%	   [#{<<"status">> => <<"pending">>,
 	%		  <<"token">> => <<"Nvkad5EmNiANy5-8oPvJ_a29A-iGcCS4aR3MynPc9nM">>,
@@ -2293,16 +2307,17 @@ init_for_challenge_type( ChallengeType, _Mode=standalone,
 				{ callback, leec_elli_handler },
 				{ callback_args, [ #{ Domain => Thumbprints } ] },
 				% If is not 80, a priori should not work as ACME to look for it:
-				{ port, Port } ] );
+				{ port, Port } ] )
 
 		%'tls-sni-01' ->
 		%   TODO
 
-		_ ->
-			trace_bridge:error_fmt( "Standalone mode: unsupported ~p challenge "
-									"type.", [ ChallengeType ] ),
-
-			throw( { unsupported_challenge_type, ChallengeType, standalone } )
+		% Cannot happen:
+		%_ ->
+		%   trace_bridge:error_fmt( "Standalone mode: unsupported ~p challenge "
+		%                           "type.", [ ChallengeType ] ),
+		%
+		%   throw( { unsupported_challenge_type, ChallengeType, standalone } )
 
 	end.
 

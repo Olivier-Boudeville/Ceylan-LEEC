@@ -55,6 +55,7 @@
 -type le_state() :: leec:le_state().
 
 -type tls_private_key() :: leec:tls_private_key().
+-type tls_public_key() :: leec:tls_public_key().
 
 
 
@@ -110,8 +111,8 @@ encode( PrivateKey, Jws, Content,
 %
 % See [https://www.rfc-editor.org/rfc/rfc8555.html#section-8.1].
 %
--spec get_key_authorization( leec:key(), leec:token(), le_state() ) ->
-								   leec:key_auth().
+-spec get_key_authorization( tls_public_key(), leec:token(),
+							 le_state() ) -> leec:key_auth().
 get_key_authorization( #tls_public_key{ kty=Kty, n=N, e=E }, Token,
 					   #le_state{ json_parser_state=ParserState } ) ->
 
