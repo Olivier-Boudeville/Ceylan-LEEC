@@ -251,7 +251,13 @@ endif
 ERLANG_COMPILER_OPT_BASE += $(HTTPC_OPT)
 
 
-USE_JSON = true
+# Leave the option of disabling the make-based detection of JSON support:
+ifndef USE_JSON
+	USE_JSON = true
+endif
+
+
+# Any JSX_TOP left as it.
 
 
 # Documentation section.
