@@ -120,7 +120,7 @@ endif
 # The uniquely-defined version of this layer, for all uses (including rebar and
 # hex):
 #
-LEEC_VERSION := 1.1.8
+LEEC_VERSION := 1.1.9
 
 
 # PROJECT_VERSION should be defined on a per-project basis.
@@ -271,8 +271,8 @@ LEEC_PLT_FILE := $(LEEC_TOP)/leec.plt
 
 # This is the merged PLT of the level just below in the software stack.
 # For 'LEEC', it is the PLT of 'Myriad':
-ifndef PREDECESSOR_PLT
-	PREDECESSOR_PLT = $(MYRIAD_PLT_FILE)
+ifndef PREDECESSOR_PLT_FILE
+	PREDECESSOR_PLT_FILE = $(MYRIAD_PLT_FILE)
 endif
 
 
