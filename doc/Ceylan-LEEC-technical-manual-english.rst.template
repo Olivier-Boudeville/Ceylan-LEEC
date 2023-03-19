@@ -113,8 +113,8 @@ Compared to the original ``letsencrypt-erlang`` library, the main differences in
 - HTTP client can be either ``Shotgun`` or the Erlang-native ``httpc`` client, to avoid any extra dependencies on ``Gun`` and ``Cowlib`` (whose versions could potentially clash with the ones required by any ``Cowboy``-based integrating webserver)
 - porting done from `gen_fsm <https://erlang.org/documentation/doc-6.1/lib/stdlib-2.1/doc/html/gen_fsm.html>`_ (soon to be deprecated) to the newer `gen_statem <https://erlang.org/doc/man/gen_statem.html>`_
 - minor API changes and additions, for a clearer and more flexible mode of operation
-- fixed the compilation with Erlang version 24.0 and higher (ex: w.r.t. to ``http_uri``/``uri_string``, to updated dependencies such as Jiffy, and newer Cowboy for the examples)
-- allow for *concurrent* certificate requests (ex: if managing multiple domains with different keys, new certificates being requested for all of them at webserver start-up); so LEEC generates certificates in parallel and does not rely on a *registered* FSM (*Finite State Machine*) anymore
+- fixed the compilation with Erlang version 24.0 and higher (e.g. w.r.t. to ``http_uri``/``uri_string``, to updated dependencies such as Jiffy, and newer Cowboy for the examples)
+- allow for *concurrent* certificate requests (e.g. if managing multiple domains with different keys, new certificates being requested for all of them at webserver start-up); so LEEC generates certificates in parallel and does not rely on a *registered* FSM (*Finite State Machine*) anymore
 - global, ETS-based TCP connection pool replaced by an (optional) per-FSM internal cache (if relying on Shotgun)
 - support for SAN (`Subject Alternative Name <https://en.wikipedia.org/wiki/Subject_Alternative_Name>`_) certificates, an extension to X.509 enabling a certificate to include a ``subjectAltName`` field to list, here, extra DNS names that are covered by this certificate
 - basic support for the management of:
@@ -129,7 +129,7 @@ Compared to the original ``letsencrypt-erlang`` library, the main differences in
 
 So, even if LEEC can be seen mostly as a "reckless" fork (in the sense that it became quickly obvious that retaining upstream compatibility could hardly be achieved) - with so many source-level differences (in terms of conventions, Myriad integration, whitespace cleanup) that a pull request can difficultly be considered - yet, in spite of the appearances, it remained quite close to the original (mainly differences of form) and followed the same structure.
 
-By some ways, this LEEC fork is safer and more robust than the original, by others not (ex: test coverage, autonomous use, continuous integration). A key goal was to make it easier to understand and maintain.
+By some ways, this LEEC fork is safer and more robust than the original, by others not (e.g. test coverage, autonomous use, continuous integration). A key goal was to make it easier to understand and maintain.
 
 Most of the elements of `this pull request <https://github.com/gbour/letsencrypt-erlang/pull/16/>`_ from Marc Worrell have also been integrated.
 
@@ -214,9 +214,9 @@ The main example of LEEC in action can be found in link with `US-Web <https://us
 
 This mode of operation, described `in this section <https://us-web.esperide.org/#managing-public-key-certificates>`_, is typical of the use case where an Erlang-based webserver (in this case based on `Cowboy <https://github.com/ninenines/cowboy>`_) has to renew certificates corresponding to the various virtual hosts (possibly dispatched under various domains) that it is making available.
 
-A first part is to create as many LEEC FSMs as domains of interest, which will connect to the target ACME servers (most probably Let's Encrypt ones). Each FSM is a LEEC agent that will generate its own (strong) RSA key, create automatically its throwaway ACME account on the server, secure properly the communication (with TLS signatures, nonces, etc.), and wait for further user request regarding its domain of interest (ex: ``foobar.org``).
+A first part is to create as many LEEC FSMs as domains of interest, which will connect to the target ACME servers (most probably Let's Encrypt ones). Each FSM is a LEEC agent that will generate its own (strong) RSA key, create automatically its throwaway ACME account on the server, secure properly the communication (with TLS signatures, nonces, etc.), and wait for further user request regarding its domain of interest (e.g. ``foobar.org``).
 
-Such a request is bound to ask the ACME server to generate (as a Certificate Authority) a X.509 certificate covering, thanks to SAN, a set of subdomains (FQDN) to secure (ex: ``hello.foobar.org``, ``hurricane.foobar.org``) - knowing that no wildcard certificate can be obtained with the ``http-01`` challenge being used here. The ACME server will send challenges to LEEC so that it can prove that it controls indeed all these subdomains.
+Such a request is bound to ask the ACME server to generate (as a Certificate Authority) a X.509 certificate covering, thanks to SAN, a set of subdomains (FQDN) to secure (e.g. ``hello.foobar.org``, ``hurricane.foobar.org``) - knowing that no wildcard certificate can be obtained with the ``http-01`` challenge being used here. The ACME server will send challenges to LEEC so that it can prove that it controls indeed all these subdomains.
 
 A second part of the LEEC action is to ensure that these answers are available indeed, as tokens. In practice the ACME server will attempt to read them at specific URLs (prefixed with ``.well-known/acme-challenge/``) expected to be served for these subdomains (most probably thanks to virtual hosting). If the ACME server is able to query and read, directly from a domain, the right tokens corresponding to the challenges it sent for this domain, then the proof of actual control by the requester is established, and the ACME server can thus issue a corresponding certificate and transmit it appropriately to LEEC.
 
@@ -250,11 +250,11 @@ Design Notes
 Multiple Domains Having Each Multiple Hostnames
 ===============================================
 
-At least the ACME servers from Let's Encrypt enforce various rate limits (both in `production environment <https://letsencrypt.org/docs/rate-limits/>`_ and in `staging <https://letsencrypt.org/docs/staging-environment/>`_ one) that are fairly low, which leads to preferring requesting certificates only on a per-domain basis (ex: globally for ``foobar.org``) rather than on a per-hostname host basis (ex: one for ``baz.foobar.org``, another one for ``hurrican.foobar.org``, etc., these hosts being virtual ones or not), as such requests would quickly become too numerous to respect these rate thresholds.
+At least the ACME servers from Let's Encrypt enforce various rate limits (both in `production environment <https://letsencrypt.org/docs/rate-limits/>`_ and in `staging <https://letsencrypt.org/docs/staging-environment/>`_ one) that are fairly low, which leads to preferring requesting certificates only on a per-domain basis (e.g. globally for ``foobar.org``) rather than on a per-hostname host basis (e.g. one for ``baz.foobar.org``, another one for ``hurrican.foobar.org``, etc., these hosts being virtual ones or not), as such requests would quickly become too numerous to respect these rate thresholds.
 
 A per-domain certificate should then include directly its various hostnames as *Subject Alternative Names* (SAN entries).
 
-With the ``http-01`` challenge type, no wildcard for such SAN hosts (ex: ``*.foobar.org``) can be specified, so all the wanted ones have to be explicitly listed [#]_.
+With the ``http-01`` challenge type, no wildcard for such SAN hosts (e.g. ``*.foobar.org``) can be specified, so all the wanted ones have to be explicitly listed [#]_.
 
 .. [#] As a result, the certificate may disclose virtual hosts that would be otherwise invisible from the Internet (as not even declared in the DNS entries for that domain that would act as wildcard name resolvers).
 
@@ -362,7 +362,7 @@ To get information about this certificate:
 Other Files of Interest
 -----------------------
 
-A ``*.key`` (ex: ``my-foobar-leec-agent-private.key``) file is a (PEM, strong enough) RSA private key generated by LEEC so that its agent can safely authenticate to the ACME servers it is interacting with.
+A ``*.key`` (e.g. ``my-foobar-leec-agent-private.key``) file is a (PEM, strong enough) RSA private key generated by LEEC so that its agent can safely authenticate to the ACME servers it is interacting with.
 
 ``lets-encrypt-r3-cross-signed.pem`` is the (PEM) certificate associated to the *Certificate Authority* (Let's Encrypt here). It is automatically downloaded by LEEC if not already available.
 
