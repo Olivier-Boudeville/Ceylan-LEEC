@@ -115,7 +115,7 @@ ssl =&gt; [ ssl:client_option() ] }</p>
 
   <p>- challenge_type :: challenge_type(), default being 'http-01'</p>
 
-  <p>- sans :: [ bin_san() ]</p>
+  <p>- sans :: [bin_san()]</p>
 
   - json :: boolean() (not to be set by the user)</p>
 
@@ -128,7 +128,7 @@ ssl =&gt; [ ssl:client_option() ] }</p>
 <p> Other providers may be added in the future.</p>
 
 <h3 class="typedecl"><a name="type-challenge">challenge()</a></h3>
-<p><tt>challenge() = <a href="table.html#type-table">table:table</a>(<a href="#type-bin_string">bin_string()</a>, <a href="#type-bin_string">bin_string()</a>)</tt></p>
+<p><tt>challenge() = <a href="#type-table">table</a>(<a href="#type-bin_string">bin_string()</a>, <a href="#type-bin_string">bin_string()</a>)</tt></p>
 <p><p> All known information regarding a challenge.</p>
 
  <p>As Key =&gt; example of associated value:</p>
@@ -140,8 +140,7 @@ ssl =&gt; [ ssl:client_option() ] }</p>
  <p>- <code>&lt;&lt;"type"&gt;&gt; =&gt; &lt;&lt;"http-01"&gt;&gt;</code></p>
 
  - <code>&lt;&lt;"url"&gt;&gt; =&gt;
-     &lt;&lt;"ACME_BASE/acme/chall-v3/132509381/-Axkdw"&gt;&gt;</code>
-</p>
+     &lt;&lt;"ACME_BASE/acme/chall-v3/132509381/-Axkdw"&gt;&gt;</code></p>
 
 <h3 class="typedecl"><a name="type-challenge_type">challenge_type()</a></h3>
 <p><tt>challenge_type() = 'http-01' | 'tls-sni-01' | 'dns-01'</tt></p>
@@ -181,7 +180,7 @@ ssl =&gt; [ ssl:client_option() ] }</p>
 <p> JSON element decoded as a map.</p>
 
 <h3 class="typedecl"><a name="type-jws">jws()</a></h3>
-<p><tt>jws() = #jws{alg = <a href="leec.html#type-jws_algorithm">leec:jws_algorithm()</a>, url = <a href="leec.html#type-bin_uri">leec:bin_uri()</a>, kid = <a href="leec.html#type-bin_uri">leec:bin_uri()</a>, jwk = <a href="leec.html#type-tls_public_key">leec:tls_public_key()</a>, nonce = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-nonce">leec:nonce()</a>)}</tt></p>
+<p><tt>jws() = #jws{alg = <a href="leec.html#type-jws_algorithm">leec:jws_algorithm()</a>, url = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-bin_uri">leec:bin_uri()</a>), kid = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-bin_uri">leec:bin_uri()</a>), jwk = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-tls_public_key">leec:tls_public_key()</a>), nonce = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-nonce">leec:nonce()</a>)}</tt></p>
 
 
 <h3 class="typedecl"><a name="type-jws_algorithm">jws_algorithm()</a></h3>
@@ -192,13 +191,17 @@ ssl =&gt; [ ssl:client_option() ] }</p>
 <p><tt>key_auth() = binary()</tt></p>
 
 
+<h3 class="typedecl"><a name="type-key_integer">key_integer()</a></h3>
+<p><tt>key_integer() = integer() | binary()</tt></p>
+<p> Element of a key.</p>
+
 <h3 class="typedecl"><a name="type-le_mode">le_mode()</a></h3>
 <p><tt>le_mode() = webroot | slave | standalone</tt></p>
 <p> Three ways of interfacing LEEC with user code.
  We mostly concentrate on the slave one.</p>
 
 <h3 class="typedecl"><a name="type-le_state">le_state()</a></h3>
-<p><tt>le_state() = #le_state{env = staging | prod, directory_map = <a href="#type-maybe">maybe</a>(<a href="file_utils.html#type-directory_map">file_utils:directory_map()</a>), cert_dir_path = <a href="file_utils.html#type-bin_directory_path">file_utils:bin_directory_path()</a>, cert_key_file = <a href="#type-maybe">maybe</a>(<a href="file_utils.html#type-bin_file_path">file_utils:bin_file_path()</a>), mode = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-le_mode">leec:le_mode()</a>), webroot_dir_path = <a href="#type-maybe">maybe</a>(<a href="file_utils.html#type-bin_directory_path">file_utils:bin_directory_path()</a>), port = <a href="net_utils.html#type-tcp_port">net_utils:tcp_port()</a>, nonce = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-nonce">leec:nonce()</a>), domain = <a href="#type-maybe">maybe</a>(<a href="net_utils.html#type-bin_fqdn">net_utils:bin_fqdn()</a>), sans = [<a href="leec.html#type-san">leec:san()</a>], agent_key_file_info = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-agent_key_file_info">leec:agent_key_file_info()</a>), agent_private_key = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-tls_private_key">leec:tls_private_key()</a>), jws = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-jws">leec:jws()</a>), account_key = <a href="leec.html#type-tls_public_key">leec:tls_public_key()</a>, order = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-directory_map">leec:directory_map()</a>), challenges = <a href="leec.html#type-uri_challenge_map">leec:uri_challenge_map()</a>, cert_req_option_map = <a href="leec.html#type-cert_req_option_map">leec:cert_req_option_map()</a>, json_parser_state = <a href="json_utils.html#type-parser_state">json_utils:parser_state()</a>, tcp_connection_cache = <a href="leec.html#type-tcp_connection_cache">leec:tcp_connection_cache()</a>}</tt></p>
+<p><tt>le_state() = #le_state{env = staging | prod, directory_map = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-directory_map">leec:directory_map()</a>), cert_dir_path = <a href="file_utils.html#type-bin_directory_path">file_utils:bin_directory_path()</a>, cert_key_file = <a href="#type-maybe">maybe</a>(<a href="file_utils.html#type-bin_file_path">file_utils:bin_file_path()</a>), mode = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-le_mode">leec:le_mode()</a>), webroot_dir_path = <a href="#type-maybe">maybe</a>(<a href="file_utils.html#type-bin_directory_path">file_utils:bin_directory_path()</a>), port = <a href="net_utils.html#type-tcp_port">net_utils:tcp_port()</a>, nonce = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-nonce">leec:nonce()</a>), domain = <a href="#type-maybe">maybe</a>(<a href="net_utils.html#type-bin_fqdn">net_utils:bin_fqdn()</a>), sans = [<a href="leec.html#type-san">leec:san()</a>], agent_key_file_info = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-agent_key_file_info">leec:agent_key_file_info()</a>), agent_private_key = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-tls_private_key">leec:tls_private_key()</a>), jws = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-jws">leec:jws()</a>), account_key = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-tls_public_key">leec:tls_public_key()</a>), order = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-order_map">leec:order_map()</a>), challenges = <a href="leec.html#type-uri_challenge_map">leec:uri_challenge_map()</a>, cert_req_option_map = <a href="leec.html#type-cert_req_option_map">leec:cert_req_option_map()</a>, json_parser_state = <a href="json_utils.html#type-parser_state">json_utils:parser_state()</a>, tcp_connection_cache = <a href="leec.html#type-tcp_connection_cache">leec:tcp_connection_cache()</a>}</tt></p>
 <p> Needed by other LEEC modules.</p>
 
 <h3 class="typedecl"><a name="type-maybe">maybe()</a></h3>
@@ -209,6 +212,20 @@ ssl =&gt; [ ssl:client_option() ] }</p>
 <p><tt>nonce() = binary()</tt></p>
 <p> An arbitrary binary that can be used just once in a cryptographic
  communication.</p>
+
+<h3 class="typedecl"><a name="type-order_map">order_map()</a></h3>
+<p><tt>order_map() = <a href="#type-table">table</a>(<a href="#type-bin_string">bin_string()</a>, <a href="#type-bin_uri">bin_uri()</a>)</tt></p>
+
+
+<h3 class="typedecl"><a name="type-request">request()</a></h3>
+<p><tt>request() = atom()</tt></p>
+
+
+<h3 class="typedecl"><a name="type-rsa_private_key">rsa_private_key()</a></h3>
+<p><tt>rsa_private_key() = [<a href="#type-key_integer">key_integer()</a>]</tt></p>
+<p><p> Description of a RSA private key.</p>
+
+ (as crypto:rsa_private() is not exported)</p>
 
 <h3 class="typedecl"><a name="type-san">san()</a></h3>
 <p><tt>san() = <a href="#type-ustring">ustring()</a></tt></p>
@@ -221,16 +238,24 @@ certificate using a subjectAltName field.</p>
 <p><tt>start_option() = staging | {mode, <a href="#type-le_mode">le_mode()</a>} | {key_file_path, <a href="#type-any_file_path">any_file_path()</a>} | {cert_dir_path, <a href="#type-any_directory_path">any_directory_path()</a>} | {webroot_dir_path, <a href="#type-any_directory_path">any_directory_path()</a>} | {port, <a href="#type-tcp_port">tcp_port()</a>} | {http_timeout, <a href="unit_utils.html#type-milliseconds">unit_utils:milliseconds()</a>}</tt></p>
 <p> A user-specified LEEC start option.</p>
 
-<h3 class="typedecl"><a name="type-state_callback_result">state_callback_result()</a></h3>
-<p><tt>state_callback_result() = <a href="http://www.erlang.org/edoc/doc/stdlib/doc/gen_statem.html#type-state_callback_result">gen_statem:state_callback_result</a>(<a href="http://www.erlang.org/edoc/doc/stdlib/doc/gen_statem.html#type-action">gen_statem:action()</a>)</tt></p>
+<h3 class="typedecl"><a name="type-start_ret">start_ret()</a></h3>
+<p><tt>start_ret() = <a href="http://www.erlang.org/edoc/doc/stdlib/doc/gen_statem.html#type-start_ret">gen_statem:start_ret()</a></tt></p>
 
+
+<h3 class="typedecl"><a name="type-state_callback_result">state_callback_result()</a></h3>
+<p><tt>state_callback_result() = <a href="fsm_utils.html#type-state_callback_result">fsm_utils:state_callback_result</a>(<a href="http://www.erlang.org/edoc/doc/stdlib/doc/gen_statem.html#type-action">gen_statem:action()</a>)</tt></p>
+
+
+<h3 class="typedecl"><a name="type-status">status()</a></h3>
+<p><tt>status() = pending | processing | valid | invalid | revoked</tt></p>
+<p> FSM status (corresponding to state names).</p>
 
 <h3 class="typedecl"><a name="type-table">table()</a></h3>
 <p><tt>table(K, V) = <a href="map_hashtable.html#type-map_hashtable">map_hashtable:map_hashtable</a>(K, V)</tt></p>
 
 
 <h3 class="typedecl"><a name="type-tcp_connection_cache">tcp_connection_cache()</a></h3>
-<p><tt>tcp_connection_cache() = <a href="#type-table">table</a>({<a href="net_utils.html#type-protocol_type">net_utils:protocol_type()</a>, <a href="net_utils.html#type-string_host_name">net_utils:string_host_name()</a>, <a href="#type-tcp_port">tcp_port()</a>}, <a href="shotgun.html#type-connection">shotgun:connection()</a>)</tt></p>
+<p><tt>tcp_connection_cache() = <a href="#type-table">table</a>({<a href="web_utils.html#type-protocol_type">web_utils:protocol_type()</a>, <a href="net_utils.html#type-string_host_name">net_utils:string_host_name()</a>, <a href="#type-tcp_port">tcp_port()</a>}, <a href="shotgun.html#type-connection">shotgun:connection()</a>)</tt></p>
 <p> For the reuse of TCP connections to the ACME server.</p>
 
 <h3 class="typedecl"><a name="type-tcp_port">tcp_port()</a></h3>
@@ -245,8 +270,12 @@ certificate using a subjectAltName field.</p>
 <p><tt>thumbprint_map() = <a href="#type-table">table</a>(<a href="#type-token">token()</a>, <a href="#type-thumbprint">thumbprint()</a>)</tt></p>
 <p> Associating tokens with keys.</p>
 
+<h3 class="typedecl"><a name="type-tls_csr">tls_csr()</a></h3>
+<p><tt>tls_csr() = <a href="#type-binary_b64">binary_b64()</a></tt></p>
+
+
 <h3 class="typedecl"><a name="type-tls_private_key">tls_private_key()</a></h3>
-<p><tt>tls_private_key() = #tls_private_key{raw = <a href="http://www.erlang.org/edoc/doc/crypto/doc/crypto.html#type-rsa_private">crypto:rsa_private()</a>, b64_pair = {<a href="leec.html#type-binary_b64">leec:binary_b64()</a>, <a href="leec.html#type-binary_b64">leec:binary_b64()</a>}, file_path = <a href="file_utils.html#type-bin_file_path">file_utils:bin_file_path()</a>}</tt></p>
+<p><tt>tls_private_key() = #tls_private_key{raw = <a href="leec.html#type-rsa_private_key">leec:rsa_private_key()</a>, b64_pair = {<a href="leec.html#type-binary_b64">leec:binary_b64()</a>, <a href="leec.html#type-binary_b64">leec:binary_b64()</a>}, file_path = <a href="file_utils.html#type-bin_file_path">file_utils:bin_file_path()</a>}</tt></p>
 
 
 <h3 class="typedecl"><a name="type-tls_public_key">tls_public_key()</a></h3>
@@ -311,7 +340,7 @@ terminates the corresponding FSM process.</td></tr>
 
 <h3 class="function"><a name="callback_mode-0">callback_mode/0</a></h3>
 <div class="spec">
-<p><tt>callback_mode() -&gt; <a href="http://www.erlang.org/edoc/doc/stdlib/doc/gen_statem.html#type-callback_mode">gen_statem:callback_mode()</a></tt><br></p>
+<p><tt>callback_mode() -&gt; <a href="fsm_utils.html#type-callback_mode_ret">fsm_utils:callback_mode_ret()</a></tt><br></p>
 <p> </p>
 </div><p>Tells about the retained mode regarding callback. Here, one callback
  function per state, akin to gen_fsm.
@@ -396,7 +425,7 @@ erlang_color</p>
  <p>- jsx preferred over jiffy; yet neither needs to be initialised as an 
 application</p>
 
- - no need to start myriad either
+ - no need to start Myriad either
 </p>
 
 <h3 class="function"><a name="idle-3">idle/3</a></h3>
@@ -527,7 +556,7 @@ successful, otherwise {error, Err}</p>
 
  <p>Typically useful in a slave operation mode, when the web handler cannot access 
 directly the PID of the LEEC FSM: this code is then called by a third-party 
-process (ex: a certificate manager one, statically known of the web handler, 
+process (e.g. a certificate manager one, statically known of the web handler, 
 and triggered by it), and returns the requested challenged to the specified 
 target PID (most probably the one of the web handler itself).</p>
 
@@ -536,13 +565,19 @@ target PID (most probably the one of the web handler itself).</p>
 
 <h3 class="function"><a name="start-1">start/1</a></h3>
 <div class="spec">
-<p><tt>start(StartOptions::[<a href="#type-start_option">start_option()</a>]) -&gt; {ok, <a href="#type-fsm_pid">fsm_pid()</a>} | <a href="#type-error_term">error_term()</a></tt><br></p>
+<p><tt>start(StartOptions::[<a href="#type-start_option">start_option()</a>]) -&gt; <a href="#type-start_ret">start_ret()</a></tt><br></p>
 <p> </p>
-</div><p>Starts a (non-bridged) instance of the LEEC service FSM.</p>
+</div><p><p>Starts a (non-bridged) instance of the LEEC service FSM.</p>
+
+ Apparently the 'application' behaviour would expect as argument:
+ 'normal' | {'failover', atom()} | {'takeover', atom()}
+ and, as return type:
+ {'error', _} | {'ok', pid()} | {'ok', pid(), _} instead.
+</p>
 
 <h3 class="function"><a name="start-2">start/2</a></h3>
 <div class="spec">
-<p><tt>start(StartOptions::[<a href="#type-start_option">start_option()</a>], MaybeBridgeSpec::<a href="#type-maybe">maybe</a>(<a href="trace_bridge.html#type-bridge_spec">trace_bridge:bridge_spec()</a>)) -&gt; {ok, <a href="#type-fsm_pid">fsm_pid()</a>} | <a href="#type-error_term">error_term()</a></tt><br></p>
+<p><tt>start(StartOptions::[<a href="#type-start_option">start_option()</a>], MaybeBridgeSpec::<a href="#type-maybe">maybe</a>(<a href="trace_bridge.html#type-bridge_spec">trace_bridge:bridge_spec()</a>)) -&gt; <a href="#type-start_ret">start_ret()</a></tt><br></p>
 <p> </p>
 </div><p>Starts an instance of the LEEC service FSM, possibly with a trace bridge.</p>
 

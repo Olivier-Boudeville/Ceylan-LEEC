@@ -20,6 +20,14 @@
 <p><tt>any_directory_path() = <a href="file_utils.html#type-any_directory_path">file_utils:any_directory_path()</a></tt></p>
 
 
+<h3 class="typedecl"><a name="type-any_file_name">any_file_name()</a></h3>
+<p><tt>any_file_name() = <a href="file_utils.html#type-any_file_name">file_utils:any_file_name()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-any_file_path">any_file_path()</a></h3>
+<p><tt>any_file_path() = <a href="file_utils.html#type-any_file_path">file_utils:any_file_path()</a></tt></p>
+
+
 <h3 class="typedecl"><a name="type-bin_certificate">bin_certificate()</a></h3>
 <p><tt>bin_certificate() = <a href="leec.html#type-bin_certificate">leec:bin_certificate()</a></tt></p>
 
@@ -50,10 +58,6 @@
 
 <h3 class="typedecl"><a name="type-http_options">http_options()</a></h3>
 <p><tt>http_options() = <a href="web_utils.html#type-http_options">web_utils:http_options()</a></tt></p>
-
-
-<h3 class="typedecl"><a name="type-key_file_info">key_file_info()</a></h3>
-<p><tt>key_file_info() = <a href="leec.html#type-key_file_info">leec:key_file_info()</a></tt></p>
 
 
 <h3 class="typedecl"><a name="type-maybe">maybe()</a></h3>
@@ -167,7 +171,7 @@ Forward Secrecy by exchanging a set of keys that never hit the wire.</p>
 
 <h3 class="function"><a name="obtain_private_key-2">obtain_private_key/2</a></h3>
 <div class="spec">
-<p><tt>obtain_private_key(KeyFileInfo::<a href="#type-maybe">maybe</a>(<a href="#type-key_file_info">key_file_info()</a>), BinCertDirPath::<a href="#type-bin_directory_path">bin_directory_path()</a>) -&gt; <a href="#type-tls_private_key">tls_private_key()</a></tt><br></p>
+<p><tt>obtain_private_key(KeyFileInfo::<a href="#type-maybe">maybe</a>({new, <a href="#type-any_file_name">any_file_name()</a>} | <a href="#type-any_file_path">any_file_path()</a>), BinCertDirPath::<a href="#type-bin_directory_path">bin_directory_path()</a>) -&gt; <a href="#type-tls_private_key">tls_private_key()</a></tt><br></p>
 <p> </p>
 </div><p><p>Obtains a private key for the current LEEC agent, either by creating it 
 (in a specified filename or in a generated one) or by reading a pre-existing 
