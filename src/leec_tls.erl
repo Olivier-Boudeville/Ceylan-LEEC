@@ -233,7 +233,7 @@ obtain_dh_key( CertDir ) ->
 			case system_utils:run_command( Cmd ) of
 
 				{ _ReturnCode=0, _CommandOutput="" } ->
-					 ok;
+					ok;
 
 				% Not deserving a warning, as returning in case of success:
 				% "Generating DH parameters, 2048 bit long safe prime, [...]".

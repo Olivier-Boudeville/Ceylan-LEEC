@@ -85,14 +85,26 @@ Overview
 
 The LEEC library is the Ceylan fork of the original and much appreciated `letsencrypt-erlang <https://github.com/gbour/letsencrypt-erlang>`_, which is a `Let's Encrypt <https://letsencrypt.org/>`_ client library for Erlang, whose author is Guillaume Bour.
 
-LEEC's purpose is to obtain proper X.509 security certificates from ``Let's Encrypt`` - or more generally `ACME servers <https://en.wikipedia.org/wiki/Automated_Certificate_Management_Environment>`_ (version 2), typically in order to secure one's webservers so that they can offer a solid HTTPS connectivity, which is pretty much standard nowadays.
+LEEC's purpose is to obtain proper X.509 security certificates from ``Let's Encrypt`` - or more generally from any `ACME server <https://en.wikipedia.org/wiki/Automated_Certificate_Management_Environment>`_ (version 2) - to perform *Domain Validation*.
 
-Each certificate covers a single domain or subdomain (possibly a virtual host, and is obtained by proving its ownership by the requester.
+Such certificates are typically used in order to secure one's webserver so that it can offer a solid HTTPS connectivity, which is pretty much standard nowadays; yet they may also used for mail servers, FTP servers, and many more [#]_.
 
-At least currently no wildcard certificate is supported (more complex challenges would have to be implemented).
+.. [#] For Email encryption and code signing, one may refer to `this section regarding OpenPGP <https://howtos.esperide.org/Cybersecurity.html#openpgp>`_.
 
-These certificates last for 90 days, so they shall be renewed regularly.
 
+Three levels of certificates can be considered:
+
+- **pure single-domain certificates**; for example a certificate applying only to ``foobar.org``
+- **single-domain certificates with SANs** (*Subject Alternative Name*); for example a certificate applying only to a domain (e.g. ``foobar.org``) and related extra, predetermined DNS names (like ``alpha.foobar.org``, ``beta.foobar.org``, etc.)
+- **wildcard certificates**; for example a certificate applying to a domain (e.g. ``foobar.org``) and to *any* subdomain thereof (e.g. ``*.foobar.org``)
+
+Subdomains may be managed by different hosts or may correspond to virtual hosts, i.e. be managed by a single host that is able to multiplex the accesses that are made to them, based on the pseudo-host that the requester specified (then for example serving different web contents based on it).
+
+Each certificate is obtained by proving to its ACME server of the issuer the ownership/control of a webserver or of a DNS entry.
+
+At least currently, no wildcard certificate is managed as in-depth as it is done for per-domain certificates (more complex challenges would have to be implemented), yet it is `nevertheless supported <#wildcard-certificate>`_.
+
+To ensure freshness, these certificates have intentionally a short lifespan (e.g. they last for 90 days); they shall therefore be renewed regularly and automatically from the certificate authority.
 
 LEEC is notably used in the context of `US-Web <http://us-web.esperide.org/>`_.
 
@@ -122,7 +134,7 @@ Compared to the original ``letsencrypt-erlang`` library, the main differences in
   - *Ephemeral Diffie-Helman* key, to ensure *Forward Secrecy* by relying on a set of keys that are never communicated
   - `Intermediate Let's Encrypt Certificates <https://letsencrypt.org/certificates/>`_
 - SSL-based verification of the ACME peer, to avoid any man-in-the-middle attack (quite relevant when fetching security elements)
-
+- first basic support of wildcard certificates
 
 ..	 - ``connect_timeout`` deprecated in favor of ``http_timeout``
 
@@ -212,6 +224,9 @@ The main example of LEEC in action can be found in link with `US-Web <https://us
 .. [#] By the way, if you are currently reading `LEEC's official website <https://leec.esperide.org>`_, then your browser already checked LEEC-obtained certificates!
 
 
+Single-Domain Certificates with the ``http-01`` Challenge
+=========================================================
+
 This mode of operation, described `in this section <https://us-web.esperide.org/#managing-public-key-certificates>`_, is typical of the use case where an Erlang-based webserver (in this case based on `Cowboy <https://github.com/ninenines/cowboy>`_) has to renew certificates corresponding to the various virtual hosts (possibly dispatched under various domains) that it is making available.
 
 A first part is to create as many LEEC FSMs as domains of interest, which will connect to the target ACME servers (most probably Let's Encrypt ones). Each FSM is a LEEC agent that will generate its own (strong) RSA key, create automatically its throwaway ACME account on the server, secure properly the communication (with TLS signatures, nonces, etc.), and wait for further user request regarding its domain of interest (e.g. ``foobar.org``).
@@ -240,6 +255,214 @@ In practice, the user code is expected:
 For US-Web, (1), (2) and (4) are managed by `class_USCertificateManager.erl <https://github.com/Olivier-Boudeville/us-web/blob/master/src/class_USCertificateManager.erl>`_ (see respectively ``init_leec/5``, ``request_certificate/1`` and the ``onCertificateRequestOutcome/2`` callback). (3) is taken in charge by `us_web_letsencrypt_handler.erl <https://github.com/Olivier-Boudeville/us-web/blob/master/src/us_web_letsencrypt_handler.erl>`_ (see ``init/2``).
 
 
+.. _`wildcard certificate`:
+
+Wildcard-Domain Certificates with the ``dns-01`` Challenge
+==========================================================
+
+
+Limits of the Single-Domain Certificates
+----------------------------------------
+
+As discussed in the previous section, obtaining single-domain certificates thanks to the ``http-01`` challenge is not straightforward, and has some drawbacks:
+
+- as dedicated key pairs will be needed for each actual domain name (for ``foo.bar.org``, ``buzz.bar.org``, etc.), whenever having to host a fair number of websites (a few dozens?), you will have to generate as many of them; this will multiply the chances of experimenting failures and hitting the rate limits enforced by your ACME provider (typically Let's Encrypt)
+- anyone curious enough will be able to access the SAN (*Subject Alt Names*) information listed in one's resulting SSL certificate (this is trivially done with most browsers) and collect all the DNS Names listed there, thus revealing them - whereas your DNS configuration may be set not to disclose them [#]_; moreover, without this SAN information (needed in this scheme but then publicly available), we do not believe anyone could easily guess what are the domains have been defined (and thus what are the websites that are hosted by a given "root" domain; this corresponds in our example to the ``foo`` and ``buzz`` domains of the ``bar.org`` root one)
+
+.. [#] Note that, regardless of the settings in terms of DNS and certificates, with SNI (i.e. *Server Name Indication*, the method to multiplex virtual hosts onto a single actual host), the specific visited virtual hostname (e.g. ``baz``, in ``baz.foobar.org``) is not encrypted, and thus might be known of an eavesdropper.
+
+
+
+Wildcard Certificates: Pros and Cons
+------------------------------------
+
+A more satisfactory solution is to rely on the more flexible wildcard certificates, that are certificates that apply to *any* subdomain (e.g. ``*.bar.org``) of a given root one. Fortunately, ACME providers like Let's Encrypt now offer them as well [#]_.
+
+.. [#] Of course such certificates may be purchased instead, but they tend to be quite expensive. Moreover one may prefer to favour a free Internet, able to operate without commercial structures.
+
+
+This implies far fewer keys and, ultimately less information publicly disseminated, yet also to switch from a ``http-01`` challenge (where you prove that you control a corresponding webserver) to a ``dns-01`` one (where you prove that you control the corresponding DNS zone entry).
+
+This entails a few consequences:
+
+- such a certificate generation mechanism has to update a DNS entry, which is probably more complex than updating a website accordingly
+- this requires that the DNS provider for that domain supports such an automated update, through an API bound to be specific to this provider
+- modifying one's DNS entries automatically is fraught with security risks: the needed credentials shall not accessed by third parties, otherwise they could complete a dns-01 challenge to acquire new certificates or revoke existing certificates for the associated domains; various measures (credential file protection, IP-based restriction) can help
+
+
+
+LEEC (Preliminary) Support of Wildcard Certificates
+---------------------------------------------------
+
+At least currently, LEEC supports wildcard certificates only very superficially, through the third-party (yet considered reliable) scripts that are used, directly or not, by the vast majority of server installations. Care has been taken to streamline and secure the operation as much as possible (for example with as little permissions given as possible).
+
+.. Note::
+
+   Instead a better approach would have been to recode all exchanges directly from Erlang, with direct REST requests like already done for the single-domain certificates.
+
+   Although fully possible (moreover many LEEC existing elements could be re-used for this new use), this ideal approach would require significant development time, dedication and efforts. Any contribution welcome!
+
+
+So, for the time being, LEEC merely integrates the well-known procedures described by many sources (for instance, in French: `[1] <https://wiki-tech.io/S%C3%A9curit%C3%A9/Chiffrement/Wildcard>`_, `[2] <https://docs.khroners.fr/books/debian/page/generer-un-certificat-wildcard>`_, `[3] <https://remiflandrois.fr/2020/03/26/creation-certificat-wildcard-ovh/>`_). This is done here on Arch Linux, and for the OVH DNS provider (we are not affiliated in any way to it).
+
+
+Additionally to the intrinsic advantages of wildcard certificates, with this approach we moved:
+
+- (probably) from a leaf certificate to a more flexible full-chain one
+- from a 4096-bit RSA algorithm to a more recent, supposedly stronger, smaller 256-bit id-ecPublicKey (ASN1 OID: prime256v1 / NIST CURVE: P-256) one
+
+
+
+Software Installation
+.....................
+
+The certbot mechanism will have to use the API that is specific to one's DNS provider, in our case it will be `certbot-dns-ovh <https://certbot-dns-ovh.readthedocs.io/en/stable/>`_.
+
+Installation can be done with ``pacman -Sy certbot certbot-dns-ovh``.
+
+
+
+DNS Configuration
+.................
+
+Once a key has been created (through the web interface), all operations (including key management) take place through REST calls.
+
+
+Creation of an API Key
+______________________
+
+
+For each domain, the credentials can then be obtained thanks to, here, the `OVH createToken API function <https://api.ovh.com/createToken/>`_. The ``Create API Keys`` form will request:
+
+- an application name (e.g. "LEEC for foobar.org")
+- an application description (e.g. "LEEC YYYYMMDD update token for foobar.org")
+- a validity duration (``Unlimited`` if wanting to automate)
+- the GET/POST/DELETE operations to enable (replace below ``YOUR_DOMAIN`` by your actual domain, like ``foobar.org``):
+
+=================  ==================================
+HTTP Request Type  Parameter
+=================  ==================================
+GET                /domain/zone/
+GET                /domain/zone/YOUR_DOMAIN/
+GET                /domain/zone/YOUR_DOMAIN/status
+GET                /domain/zone/YOUR_DOMAIN/record
+GET                /domain/zone/YOUR_DOMAIN/record/*
+POST               /domain/zone/YOUR_DOMAIN/record
+POST               /domain/zone/YOUR_DOMAIN/refresh
+DELETE             /domain/zone/YOUR_DOMAIN/record/*
+=================  ==================================
+
+.. Note:: Due to the aforementioned DNS security risks, we strongly recommend that a set of allowed IP addresses is specified in order to constrain the origin of the API request calls.
+		  By design one has already a fixed public IP for one's server, isn't it?
+		  However, should one's server be hacked, the attacker may both control an allowed IP and any local credential file...
+
+
+
+Deletion of an API Key
+______________________
+
+Unused keys/tokens (especially those of unlimited validity) shall be deleted. This cannot be done directly from a dedicated, user-friendly account-based web interface, so REST calls will have to be issued (from an allowed IP, typically the one of the server of interest).
+
+For that the ``ApplicationID`` of the target token to delete shall then be obtained thanks to... a token, and a relevant one (otherwise: "This call has not been granted").
+
+So the first step is to create a suitable (limited-time) token, by pointing one's browser to `this URL <https://eu.api.ovh.com/createToken/?GET=/me/api/application&GET=/me/api/application/*&DELETE=/me/api/application/*>`_ to request such a token.
+
+Once the form filled and the token generated, the returned credential information may then be temporarily stored in one's environment; for example:
+
+.. code:: bash
+
+ # Never recording credentials in the shell history of this (UNIX) user:
+ $ unset HISTFILE
+
+ # Application Key:
+ $ AK="3a2b42bc0caeb7d4"
+
+ # Application Secret:
+ $ AS="fb7472abcd8f9980210571ca502d793c"
+
+ # Consumer Key (attached to one's account):
+ $ CK="5b1226df0d5ea12192ae2c9642cf7b60"
+
+
+Then the actual deletion can be done, by fetching the target ``applicationId`` token (alternatively the `API web interface <https://eu.api.ovh.com/console/#/me/api/application/%7BapplicationId%7D~GET>`_ can be used):
+
+.. code:: bash
+
+ # As a one-liner, to ensure that timestamp is fresh enough (otherwise: "Query
+ # out of time"):
+ #
+ $ METHOD=GET; QUERY="https://eu.api.ovh.com/1.0/me/api/application"; BODY=""; TIMESTAMP="$(date +%s)"; SHA="$(echo -n ${AS}+${CK}+${METHOD}+${QUERY}+${BODY}+${TIMESTAMP} | shasum | cut -d ' ' -f 1)"; SIGNATURE="\$1\$${SHA}"; curl -X ${METHOD} -H "Content-type: application/json" -H "X-Ovh-Application: ${AK}" -H "X-Ovh-Consumer: ${CK}" -H "X-Ovh-Signature: ${SIGNATURE}" -H "X-Ovh-Timestamp: ${TIMESTAMP}" ${QUERY}
+ [212174,212168]
+
+ # Presumably the oldest one:
+ $ TOKEN_TO_DELETE=212168
+
+ # Checking the target token (validity not returned by this call):
+ $ METHOD=GET; QUERY="https://eu.api.ovh.com/1.0/me/api/application/${TOKEN_TO_DELETE}"; BODY=""; TIMESTAMP="$(date +%s)"; SHA="$(echo -n ${AS}+${CK}+${METHOD}+${QUERY}+${BODY}+${TIMESTAMP} | shasum | cut -d ' ' -f 1)"; SIGNATURE="\$1\$${SHA}"; curl -X ${METHOD} -H "Content-type: application/json" -H "X-Ovh-Application: ${AK}" -H "X-Ovh-Consumer: ${CK}" -H "X-Ovh-Signature: ${SIGNATURE}" -H "X-Ovh-Timestamp: ${TIMESTAMP}" ${QUERY}
+ {"applicationId":212168,"name":"LEEC-for foobar.org","description":"LEEC foobar.org updater","status":"active","applicationKey":"3a2b42bc0caeb7d4"}
+
+ # Deletion:
+ $ METHOD=DELETE; QUERY="https://eu.api.ovh.com/1.0/me/api/application/${TOKEN_TO_DELETE}"; BODY=""; TIMESTAMP="$(date +%s)"; SHA="$(echo -n ${AS}+${CK}+${METHOD}+${QUERY}+${BODY}+${TIMESTAMP} | shasum | cut -d ' ' -f 1)"; SIGNATURE="\$1\$${SHA}"; curl -X ${METHOD} -H "Content-type: application/json" -H "X-Ovh-Application: ${AK}" -H "X-Ovh-Consumer: ${CK}" -H "X-Ovh-Signature: ${SIGNATURE}" -H "X-Ovh-Timestamp: ${TIMESTAMP}" ${QUERY}
+ null
+
+ # Checking the deletion:
+ $ METHOD=GET; QUERY="https://eu.api.ovh.com/1.0/me/api/application"; BODY=""; TIMESTAMP="$(date +%s)"; SHA="$(echo -n ${AS}+${CK}+${METHOD}+${QUERY}+${BODY}+${TIMESTAMP} | shasum | cut -d ' ' -f 1)"; SIGNATURE="\$1\$${SHA}"; curl -X ${METHOD} -H "Content-type: application/json" -H "X-Ovh-Application: ${AK}" -H "X-Ovh-Consumer: ${CK}" -H "X-Ovh-Signature: ${SIGNATURE}" -H "X-Ovh-Timestamp: ${TIMESTAMP}" ${QUERY}
+ [213174]
+
+
+
+Certbot Configuration
+.....................
+
+Now that, for a given domain, we have a suitable token and credentials, the latter ones will have to be made available to certbot.
+
+We do not want this third-party code to run as root, we prefer running it as a LEEC-specific user, typically a user related to the webserver for any usage like `US-Web <http://us-web.esperide.org/>`_.
+
+We therefore create in a directory of choice (for example ``/etc/xdg/universal-server/``) a ``leec-ovh-credentials-for-foobar.org.txt`` file whose content is:
+
+.. code:: bash
+
+ dns_ovh_endpoint = ovh-eu
+ dns_ovh_application_key = 3a2b42bc0caeb7d4
+ dns_ovh_application_secret = fb7472abcd8f9980210571ca502d793c
+ dns_ovh_consumer_key = 5b1226df0d5ea12192ae2c9642cf7b60
+
+
+and set proper permissions for it, for example:
+
+
+.. code:: bash
+
+ $ chmod 400 leec-ovh-credentials-for-foobar.org.txt
+ $ chown web-srv:us-srv leec-ovh-credentials-for-foobar.org.txt
+ $ chattr +i leec-ovh-credentials-for-foobar.org.txt
+
+
+
+Certbot Execution
+.................
+
+Then an interactive test run can be done for example first as root with:
+
+.. code:: bash
+
+ $ certbot certonly --dns-ovh --dns-ovh-credentials /etc/xdg/universal-server/leec-ovh-credentials-for-foobar.org.txt -d foobar.org -d *.foobar.org
+
+This should succeed in creating the ``/etc/letsencrypt/live/foobar.org/fullchain.pem`` (the certificate file used in most server software) and ``/etc/letsencrypt/live/foobar.org/privkey.pem`` symlinks to the actual credentials (the private key of this certificate).
+
+
+A second more involved test could be as the final user (e.g. ``web-srv``), from the target directory (e.g. ``/opt/universal-server/us_web-data/certificates``):
+
+.. code:: bash
+
+ $ sudo -u web-srv certbot certonly --config-dir . --work-dir . --logs-dir . --non-interactive --agree-tos --email you@foobar.org --dns-ovh --dns-ovh-credentials /etc/xdg/universal-server/leec-ovh-credentials-for-foobar.org.txt -d foobar.org -d *.foobar.org
+
+The following actual (PEM-encoded) files of interest that are then obtained (in ``/etc/letsencrypt/{live,archive}/foobar.org``) are:
+
+- ``cert.pem``: the public key certificate file
+- ``privkey.pem``: the private key certificate file
+- ``chain.pem``: the certificate chain file
+- ``fullchain.pem``: the concatenation of ``cert.pem`` and ``chain.pem`` (rarely useful)
 
 ------------
 Design Notes

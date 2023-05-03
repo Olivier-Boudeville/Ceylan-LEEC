@@ -126,13 +126,31 @@
 
 
 -type certificate_provider() :: 'letsencrypt'.
+% These are CA (Certificate Authorities).
+%
 % Other providers may be added in the future.
 
 
--type challenge_type() :: 'http-01'
-						| 'tls-sni-01'
-						| 'dns-01'.
-% Note: only the 'http-01' challenge type is supported currently.
+-type certificate_type() ::
+
+	'single_domain' % Possibly with different names, i.e. SANs
+					% (Subject Alternative Name); based on the http-01
+					% challenge.
+
+	'wildcard_domain'. % To authenticate any DNS name matching the wildcard
+					   % name; based on the dns-01 challenge.
+% The types of certificates that can requested from a certificate authority.
+%
+% Depending on the target certificate type, different challenges will be used.
+%
+% DNS names in certificates may only have a single wildcard character, and it
+% must be the entire leftmost DNS label, for instance "*.foobar.org".
+
+
+-type challenge_type() :: 'http-01'     % Supported internally.
+						| 'dns-01'      % Supported based on certbot.
+						| 'tls-sni-01'. % Not supported.
+% The type of challenges supported.
 
 
 -type bin_challenge_type() :: bin_string().
@@ -183,14 +201,23 @@
 -type order_map() :: table( bin_string(), bin_uri() ).
 
 
--type start_option() :: 'staging'
+-type start_option() ::
+	start_common_option()
+  | start_single_domain_option()
+  | start_wildcard_domain_option().
+% A user-specified LEEC start option.
+
+-type start_common_option() ::
+		'staging'
+	  | { 'key_file_path', any_file_path() }
+	  | { 'cert_dir_path', any_directory_path() }.
+%
+start_single_domain_option()
+
 					 | { 'mode', le_mode() }
-					 | { 'key_file_path', any_file_path() }
-					 | { 'cert_dir_path', any_directory_path() }
 					 | { 'webroot_dir_path', any_directory_path() }
 					 | { 'port', tcp_port() }
 					 | { 'http_timeout', unit_utils:milliseconds() }.
-% A user-specified LEEC start option.
 
 
 -type cert_req_option_id() :: 'async' | 'callback' | 'netopts' | 'challenge'
@@ -310,7 +337,8 @@
 
 
 -export_type([ bin_uri/0, bin_domain/0, domain/0, le_mode/0, fsm_pid/0,
-			   certificate_provider/0, challenge_type/0, bin_challenge_type/0,
+			   certificate_provider/0, certificate_type/0,
+			   challenge_type/0, bin_challenge_type/0,
 			   token/0, thumbprint/0, thumbprint_map/0, tcp_connection_cache/0,
 			   challenge/0, uri_challenge_map/0, type_challenge_map/0,
 			   order_map/0,
@@ -345,7 +373,7 @@
 
 
 -type status() :: 'pending' | 'processing' | 'valid' | 'invalid' | 'revoked'.
-% FSM status (corresponding to state names).
+% LEEC FSM status (corresponding to state names).
 
 
 -type request() :: atom().
@@ -1621,7 +1649,7 @@ finalize( _EventType={ call, _ServerRef=From },
 				OrderState#le_state.tcp_connection_cache ),
 
 			CloseLEState = CertLEState#le_state{
-							tcp_connection_cache=table:new() },
+				tcp_connection_cache=table:new() },
 
 			{ { { certificate_ready, BinCertFilePath }, idle, DownloadNonce,
 				AgentKeyJws }, CloseLEState };
@@ -1878,7 +1906,7 @@ get_start_options( _Opts=[ { cert_dir_path, CertDirPath } | T ], LEState ) ->
 
 
 get_start_options( _Opts=[ { webroot_dir_path, BinWebDirPath } | T ], LEState )
-  when is_binary( BinWebDirPath ) ->
+								when is_binary( BinWebDirPath ) ->
 	case file_utils:is_existing_directory_or_link( BinWebDirPath ) of
 
 		true ->

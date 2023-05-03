@@ -16,6 +16,8 @@
 %
 % This file is part of the Ceylan-LEEC library, a fork of the Guillaume Bour's
 % letsencrypt-erlang library, released under the same licence.
+%
+% This file was forked on 2020.
 
 
 % @doc This module manages <b>JSON Web Signatures</b> (JWS).
