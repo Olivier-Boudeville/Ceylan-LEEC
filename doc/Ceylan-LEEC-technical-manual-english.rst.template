@@ -227,17 +227,17 @@ The main example of LEEC in action can be found in link with `US-Web <https://us
 Single-Domain Certificates with the ``http-01`` Challenge
 =========================================================
 
-This mode of operation, described `in this section <https://us-web.esperide.org/#managing-public-key-certificates>`_, is typical of the use case where an Erlang-based webserver (in this case based on `Cowboy <https://github.com/ninenines/cowboy>`_) has to renew certificates corresponding to the various virtual hosts (possibly dispatched under various domains) that it is making available.
+This mode of operation, described `in this section <https://us-web.esperide.org/#managing-public-key-certificates>`_, is typical of the use case where an Erlang-based webserver (in this case based on `Cowboy <https://github.com/ninenines/cowboy>`_) has to automatically renew certificates corresponding to the various virtual hosts (possibly dispatched under various domains) that it is making available.
 
 A first part is to create as many LEEC FSMs as domains of interest, which will connect to the target ACME servers (most probably Let's Encrypt ones). Each FSM is a LEEC agent that will generate its own (strong) RSA key, create automatically its throwaway ACME account on the server, secure properly the communication (with TLS signatures, nonces, etc.), and wait for further user request regarding its domain of interest (e.g. ``foobar.org``).
 
-Such a request is bound to ask the ACME server to generate (as a Certificate Authority) a X.509 certificate covering, thanks to SAN, a set of subdomains (FQDN) to secure (e.g. ``hello.foobar.org``, ``hurricane.foobar.org``) - knowing that no wildcard certificate can be obtained with the ``http-01`` challenge being used here. The ACME server will send challenges to LEEC so that it can prove that it controls indeed all these subdomains.
+Such a request is bound to ask the ACME server to generate (as a Certificate Authority) a X.509 certificate covering, thanks to SAN, a set of subdomains (as FQDNs) to secure (e.g. ``hello.foobar.org``, ``hurricane.foobar.org``) - knowing that no wildcard certificate can be obtained with the ``http-01`` challenge being used here. The ACME server will send challenges to LEEC so that it can prove that it controls indeed each of these subdomains.
 
-A second part of the LEEC action is to ensure that these answers are available indeed, as tokens. In practice the ACME server will attempt to read them at specific URLs (prefixed with ``.well-known/acme-challenge/``) expected to be served for these subdomains (most probably thanks to virtual hosting). If the ACME server is able to query and read, directly from a domain, the right tokens corresponding to the challenges it sent for this domain, then the proof of actual control by the requester is established, and the ACME server can thus issue a corresponding certificate and transmit it appropriately to LEEC.
+A second part of the LEEC action is to ensure that these answers are available indeed, as tokens. In practice the ACME server will attempt to read the information it communicated at the previous step from specific URLs (prefixed with ``.well-known/acme-challenge/``) expected to be served for these subdomains (most probably thanks to virtual hosting). If the ACME server is able to query and read, directly from a domain, the right tokens corresponding to the challenges it sent for this domain, then the proof of actual control by the requester is established, and the ACME server can thus issue a corresponding certificate and transmit it appropriately to LEEC.
 
 The overall webserver of the user shall thus track the transitions of these FSMs until (hopefully) they successfully complete their procedure and obtain from their ACME server the corresponding certificate. Then only the user webserver will be able to fire its https support with these brand new certificates [#]_.
 
-.. [#] Before, even if suitable certificates were pre-existing, at least the ACME URL prefix was to remain over http instead of being automatically promoted to https as all others.
+.. [#] Before, even if suitable certificates were pre-existing, at least the ACME URL prefix must remain over http instead of being automatically promoted to https as all others, otherwise no challenge could succeed.
 
 
 Finally, a task scheduler may be used to trigger renewals on time (not too soon, not too late, as ACME rules apply and, of course, each FQDN shall be covered by a valid certificate at any time), and a task ring may be used to (paradoxically) ensure that the webserver as a whole does not interact too much in parallel (through its various LEEC FSMs) with the ACME server (despite hosting potentially a large number of FQDNs), knowing that severe rate limits (example in `production <https://letsencrypt.org/docs/rate-limits/>`_) apply.
@@ -266,44 +266,46 @@ Limits of the Single-Domain Certificates
 
 As discussed in the previous section, obtaining single-domain certificates thanks to the ``http-01`` challenge is not straightforward, and has some drawbacks:
 
-- as dedicated key pairs will be needed for each actual domain name (for ``foo.bar.org``, ``buzz.bar.org``, etc.), whenever having to host a fair number of websites (a few dozens?), you will have to generate as many of them; this will multiply the chances of experimenting failures and hitting the rate limits enforced by your ACME provider (typically Let's Encrypt)
-- anyone curious enough will be able to access the SAN (*Subject Alt Names*) information listed in one's resulting SSL certificate (this is trivially done with most browsers) and collect all the DNS Names listed there, thus revealing them - whereas your DNS configuration may be set not to disclose them [#]_; moreover, without this SAN information (needed in this scheme but then publicly available), we do not believe anyone could easily guess what are the domains have been defined (and thus what are the websites that are hosted by a given "root" domain; this corresponds in our example to the ``foo`` and ``buzz`` domains of the ``bar.org`` root one)
+- as dedicated key pairs will be needed for each actual domain name (for ``foo.bar.org``, ``buzz.bar.org``, etc.), whenever having to host a fair number of websites (a few dozens?), you will have to generate as many of them; this will multiply the chances of experimenting failures and hitting the rate limits enforced by your ACME provider (typically Let's Encrypt); yet using SANs (*Subject Alt Names*) is a sure way to reduce considerably the number of certificates to be issued (only one for each of your "top-level" domains, regardless of the number of the virtual hosts they each federate)
+- anyone curious enough will be able to access the SAN  information listed in one's resulting SSL certificate (this is trivially done with most browsers) and collect all the DNS Names listed there, thus revealing them - whereas your DNS configuration may be set not to disclose them [#]_; moreover, without this SAN information (needed in this scheme but then publicly available), we do not believe anyone could easily guess what are the domains that have been defined (and thus what are the websites that are hosted by a given "root" domain; this corresponds in our example to the ``foo`` and ``buzz`` domains of the ``bar.org`` root one [#]_)
 
-.. [#] Note that, regardless of the settings in terms of DNS and certificates, with SNI (i.e. *Server Name Indication*, the method to multiplex virtual hosts onto a single actual host), the specific visited virtual hostname (e.g. ``baz``, in ``baz.foobar.org``) is not encrypted, and thus might be known of an eavesdropper.
+.. [#] Note that, regardless of the settings in terms of DNS and certificates, with SNI (i.e. *Server Name Indication*, the method to multiplex virtual hosts onto a single actual host), the specific visited virtual hostname (e.g. ``foo``, in ``foo.bar.org``) is not encrypted, and thus might be known of an eavesdropper.
+
+.. [#] Note that there is no need to specify explicitly in a DNS zone one's subdomain CNAME (e.g. ``"foo IN CNAME bar.org."``): a wildcard entry (``"* IN CNAME bar.org."``) can be preferred (more flexible, and not disclosing any subdomain). It is quite complementary to wildcard certificates, in the sense that, then, subdomains have never to be listed outside of one's server.
 
 
 
 Wildcard Certificates: Pros and Cons
 ------------------------------------
 
-A more satisfactory solution is to rely on the more flexible wildcard certificates, that are certificates that apply to *any* subdomain (e.g. ``*.bar.org``) of a given root one. Fortunately, ACME providers like Let's Encrypt now offer them as well [#]_.
+A more satisfactory solution is to rely on the more flexible wildcard certificates, that are certificates that can apply to *any* subdomain (e.g. ``*.bar.org``) of a given root one. Fortunately, ACME providers like Let's Encrypt now offer them as well [#]_.
 
-.. [#] Of course such certificates may be purchased instead, but they tend to be quite expensive. Moreover one may prefer to favour a free Internet, able to operate without commercial structures.
+.. [#] Of course such certificates may be purchased instead, but they tend to be quite expensive. Moreover one may prefer to favour a free Internet, able to operate as much as possible without black-box, commercial solutions.
 
 
-This implies far fewer keys and, ultimately less information publicly disseminated, yet also to switch from a ``http-01`` challenge (where you prove that you control a corresponding webserver) to a ``dns-01`` one (where you prove that you control the corresponding DNS zone entry).
+This implies far fewer keys and, ultimately, less information publicly disseminated; this implies also switching from a ``http-01`` challenge (where you prove that you control a webserver corresponding to a given domain) to a ``dns-01`` one (where you prove that you control the corresponding DNS zone entry).
 
 This entails a few consequences:
 
 - such a certificate generation mechanism has to update a DNS entry, which is probably more complex than updating a website accordingly
-- this requires that the DNS provider for that domain supports such an automated update, through an API bound to be specific to this provider
-- modifying one's DNS entries automatically is fraught with security risks: the needed credentials shall not accessed by third parties, otherwise they could complete a dns-01 challenge to acquire new certificates or revoke existing certificates for the associated domains; various measures (credential file protection, IP-based restriction) can help
+- this requires that the DNS provider for that domain supports such an automated update, through an API - bound to be specific to this provider
+- modifying one's DNS entries automatically is fraught with security risks: the needed credentials shall not be accessed by third parties, otherwise they could complete a dns-01 challenge on their own to acquire new certificates for the associated domains and/or revoke your own existing certificates; yet various measures (credential file protection, IP-based restriction) can help reducing these risks
 
 
 
 LEEC (Preliminary) Support of Wildcard Certificates
 ---------------------------------------------------
 
-At least currently, LEEC supports wildcard certificates only very superficially, through the third-party (yet considered reliable) scripts that are used, directly or not, by the vast majority of server installations. Care has been taken to streamline and secure the operation as much as possible (for example with as little permissions given as possible).
+At least currently, LEEC supports wildcard certificates only very superficially, through the third-party (yet considered reliable, and free software) solution that is used, directly or not, by the vast majority of server installations - namely `certbot <https://certbot.eff.org/>`_. Care has been taken to streamline and secure the operation as much as possible (for example with as little permissions given as possible, not to jeopardise one's server).
 
 .. Note::
 
-   Instead a better approach would have been to recode all exchanges directly from Erlang, with direct REST requests like already done for the single-domain certificates.
+   A better approach would have been to instead recode all exchanges directly from Erlang, with direct REST requests, like already done for the single-domain certificates.
 
-   Although fully possible (moreover many LEEC existing elements could be re-used for this new use), this ideal approach would require significant development time, dedication and efforts. Any contribution welcome!
+   Although fully possible (moreover many LEEC existing elements could be re-used for this new validation challenge), this ideal approach would require significant development time, dedication and efforts. Any contribution welcome!
 
 
-So, for the time being, LEEC merely integrates the well-known procedures described by many sources (for instance, in French: `[1] <https://wiki-tech.io/S%C3%A9curit%C3%A9/Chiffrement/Wildcard>`_, `[2] <https://docs.khroners.fr/books/debian/page/generer-un-certificat-wildcard>`_, `[3] <https://remiflandrois.fr/2020/03/26/creation-certificat-wildcard-ovh/>`_). This is done here on Arch Linux, and for the OVH DNS provider (we are not affiliated in any way to it).
+So, for the time being, LEEC merely integrates the well-known procedures described by many sources (for instance, in French: `[1] <https://wiki-tech.io/S%C3%A9curit%C3%A9/Chiffrement/Wildcard>`_, `[2] <https://docs.khroners.fr/books/debian/page/generer-un-certificat-wildcard>`_, `[3] <https://remiflandrois.fr/2020/03/26/creation-certificat-wildcard-ovh/>`_). This is done here on Arch Linux, and for the OVH DNS provider (to which of course we are not affiliated in any way).
 
 
 Additionally to the intrinsic advantages of wildcard certificates, with this approach we moved:
@@ -325,7 +327,9 @@ Installation can be done with ``pacman -Sy certbot certbot-dns-ovh``.
 DNS Configuration
 .................
 
-Once a key has been created (through the web interface), all operations (including key management) take place through REST calls.
+The goal here is to be able to update automatically (by program) the relevant DNS settings of one's target domain (so that the ACME challenge can be written there).
+
+For that, once a key has been created (through the web interface of the DNS provider - here, OVH), all operations (including key management) are to take place through REST calls that one can issue once for all, before having certbot be able to operate on its own.
 
 
 Creation of an API Key
@@ -337,7 +341,7 @@ For each domain, the credentials can then be obtained thanks to, here, the `OVH 
 - an application name (e.g. "LEEC for foobar.org")
 - an application description (e.g. "LEEC YYYYMMDD update token for foobar.org")
 - a validity duration (``Unlimited`` if wanting to automate)
-- the GET/POST/DELETE operations to enable (replace below ``YOUR_DOMAIN`` by your actual domain, like ``foobar.org``):
+- the GET/POST/DELETE operations to enable for this token (replace below ``YOUR_DOMAIN`` by your actual domain, like ``foobar.org``):
 
 =================  ==================================
 HTTP Request Type  Parameter
@@ -352,22 +356,22 @@ POST               /domain/zone/YOUR_DOMAIN/refresh
 DELETE             /domain/zone/YOUR_DOMAIN/record/*
 =================  ==================================
 
-.. Note:: Due to the aforementioned DNS security risks, we strongly recommend that a set of allowed IP addresses is specified in order to constrain the origin of the API request calls.
-		  By design one has already a fixed public IP for one's server, isn't it?
-		  However, should one's server be hacked, the attacker may both control an allowed IP and any local credential file...
+.. Note:: Due to the aforementioned DNS security risks, we strongly recommend that a set of allowed IP addresses is specified in order to constrain the origin of the API request calls. By design one has already a fixed public IP for one's server, isn't it?
+
+		  However, should one's server be hacked, the attacker may then control both one of the allowed IPs and also any local credential file...
 
 
 
 Deletion of an API Key
 ______________________
 
-Unused keys/tokens (especially those of unlimited validity) shall be deleted. This cannot be done directly from a dedicated, user-friendly account-based web interface, so REST calls will have to be issued (from an allowed IP, typically the one of the server of interest).
+Unused keys/tokens (especially those of unlimited validity) shall be deleted. This cannot be done here directly from a dedicated, user-friendly account-based web interface, so REST calls will have to be issued (from an allowed IP, typically the one of the server of interest).
 
-For that the ``ApplicationID`` of the target token to delete shall then be obtained thanks to... a token, and a relevant one (otherwise: "This call has not been granted").
+For that the ``ApplicationID`` of the target token to delete shall then be obtained thanks to... another token, and a relevant one (otherwise: "This call has not been granted").
 
 So the first step is to create a suitable (limited-time) token, by pointing one's browser to `this URL <https://eu.api.ovh.com/createToken/?GET=/me/api/application&GET=/me/api/application/*&DELETE=/me/api/application/*>`_ to request such a token.
 
-Once the form filled and the token generated, the returned credential information may then be temporarily stored in one's environment; for example:
+Once the form filled and the token generated, the returned credentials information may then be temporarily stored in one's environment; for example (of course these are bogus values):
 
 .. code:: bash
 
@@ -391,22 +395,52 @@ Then the actual deletion can be done, by fetching the target ``applicationId`` t
  # As a one-liner, to ensure that timestamp is fresh enough (otherwise: "Query
  # out of time"):
  #
- $ METHOD=GET; QUERY="https://eu.api.ovh.com/1.0/me/api/application"; BODY=""; TIMESTAMP="$(date +%s)"; SHA="$(echo -n ${AS}+${CK}+${METHOD}+${QUERY}+${BODY}+${TIMESTAMP} | shasum | cut -d ' ' -f 1)"; SIGNATURE="\$1\$${SHA}"; curl -X ${METHOD} -H "Content-type: application/json" -H "X-Ovh-Application: ${AK}" -H "X-Ovh-Consumer: ${CK}" -H "X-Ovh-Signature: ${SIGNATURE}" -H "X-Ovh-Timestamp: ${TIMESTAMP}" ${QUERY}
+ $ METHOD=GET; QUERY="https://eu.api.ovh.com/1.0/me/api/application"; \
+  BODY=""; TIMESTAMP="$(date +%s)"; \
+  SHA="$(echo -n ${AS}+${CK}+${METHOD}+${QUERY}+${BODY}+${TIMESTAMP} \
+  | shasum | cut -d ' ' -f 1)"; SIGNATURE="\$1\$${SHA}"; \
+  curl -X ${METHOD} -H "Content-type: application/json" \
+  -H "X-Ovh-Application: ${AK}" \
+  -H "X-Ovh-Consumer: ${CK}" -H "X-Ovh-Signature: ${SIGNATURE}" \
+  -H "X-Ovh-Timestamp: ${TIMESTAMP}" ${QUERY}
  [212174,212168]
 
  # Presumably the oldest one:
  $ TOKEN_TO_DELETE=212168
 
  # Checking the target token (validity not returned by this call):
- $ METHOD=GET; QUERY="https://eu.api.ovh.com/1.0/me/api/application/${TOKEN_TO_DELETE}"; BODY=""; TIMESTAMP="$(date +%s)"; SHA="$(echo -n ${AS}+${CK}+${METHOD}+${QUERY}+${BODY}+${TIMESTAMP} | shasum | cut -d ' ' -f 1)"; SIGNATURE="\$1\$${SHA}"; curl -X ${METHOD} -H "Content-type: application/json" -H "X-Ovh-Application: ${AK}" -H "X-Ovh-Consumer: ${CK}" -H "X-Ovh-Signature: ${SIGNATURE}" -H "X-Ovh-Timestamp: ${TIMESTAMP}" ${QUERY}
- {"applicationId":212168,"name":"LEEC-for foobar.org","description":"LEEC foobar.org updater","status":"active","applicationKey":"3a2b42bc0caeb7d4"}
+ $ METHOD=GET; \
+ QUERY="https://eu.api.ovh.com/1.0/me/api/application/${TOKEN_TO_DELETE}"; \
+ BODY=""; TIMESTAMP="$(date +%s)"; \
+ SHA="$(echo -n ${AS}+${CK}+${METHOD}+${QUERY}+${BODY}+${TIMESTAMP} \
+ | shasum | cut -d ' ' -f 1)"; \
+ SIGNATURE="\$1\$${SHA}"; curl -X ${METHOD} -H "Content-type: application/json" \
+ -H "X-Ovh-Application: ${AK}" \
+ -H "X-Ovh-Consumer: ${CK}" -H "X-Ovh-Signature: ${SIGNATURE}" \
+ -H "X-Ovh-Timestamp: ${TIMESTAMP}" ${QUERY}
+ {"applicationId":212168,"name":"LEEC-for foobar.org",
+  "description":"LEEC foobar.org updater","status":"active",
+  "applicationKey":"3a2b42bc0caeb7d4"}
 
  # Deletion:
- $ METHOD=DELETE; QUERY="https://eu.api.ovh.com/1.0/me/api/application/${TOKEN_TO_DELETE}"; BODY=""; TIMESTAMP="$(date +%s)"; SHA="$(echo -n ${AS}+${CK}+${METHOD}+${QUERY}+${BODY}+${TIMESTAMP} | shasum | cut -d ' ' -f 1)"; SIGNATURE="\$1\$${SHA}"; curl -X ${METHOD} -H "Content-type: application/json" -H "X-Ovh-Application: ${AK}" -H "X-Ovh-Consumer: ${CK}" -H "X-Ovh-Signature: ${SIGNATURE}" -H "X-Ovh-Timestamp: ${TIMESTAMP}" ${QUERY}
+ $ METHOD=DELETE; \
+ QUERY="https://eu.api.ovh.com/1.0/me/api/application/${TOKEN_TO_DELETE}"; \
+ BODY=""; TIMESTAMP="$(date +%s)"; \
+ SHA="$(echo -n ${AS}+${CK}+${METHOD}+${QUERY}+${BODY}+${TIMESTAMP} | shasum \
+ | cut -d ' ' -f 1)"; SIGNATURE="\$1\$${SHA}"; \
+ curl -X ${METHOD} -H "Content-type: application/json" \
+ -H "X-Ovh-Application: ${AK}" -H "X-Ovh-Consumer: ${CK}" \
+ -H "X-Ovh-Signature: ${SIGNATURE}" -H "X-Ovh-Timestamp: ${TIMESTAMP}" ${QUERY}
  null
 
  # Checking the deletion:
- $ METHOD=GET; QUERY="https://eu.api.ovh.com/1.0/me/api/application"; BODY=""; TIMESTAMP="$(date +%s)"; SHA="$(echo -n ${AS}+${CK}+${METHOD}+${QUERY}+${BODY}+${TIMESTAMP} | shasum | cut -d ' ' -f 1)"; SIGNATURE="\$1\$${SHA}"; curl -X ${METHOD} -H "Content-type: application/json" -H "X-Ovh-Application: ${AK}" -H "X-Ovh-Consumer: ${CK}" -H "X-Ovh-Signature: ${SIGNATURE}" -H "X-Ovh-Timestamp: ${TIMESTAMP}" ${QUERY}
+ $ METHOD=GET; QUERY="https://eu.api.ovh.com/1.0/me/api/application"; \
+ BODY=""; TIMESTAMP="$(date +%s)"; \
+ SHA="$(echo -n ${AS}+${CK}+${METHOD}+${QUERY}+${BODY}+${TIMESTAMP} | shasum \
+ | cut -d ' ' -f 1)"; SIGNATURE="\$1\$${SHA}"; \
+ curl -X ${METHOD} -H "Content-type: application/json" \
+ -H "X-Ovh-Application: ${AK}" -H "X-Ovh-Consumer: ${CK}" \
+ -H "X-Ovh-Signature: ${SIGNATURE}" -H "X-Ovh-Timestamp: ${TIMESTAMP}" ${QUERY}
  [213174]
 
 
@@ -414,9 +448,11 @@ Then the actual deletion can be done, by fetching the target ``applicationId`` t
 Certbot Configuration
 .....................
 
-Now that, for a given domain, we have a suitable token and credentials, the latter ones will have to be made available to certbot.
+Now that, for a given domain, we have a suitable token and credentials, these latter ones will have to be made available to certbot.
 
-We do not want this third-party code to run as root, we prefer running it as a LEEC-specific user, typically a user related to the webserver for any usage like `US-Web <http://us-web.esperide.org/>`_.
+We do not want this third-party code to run as root, we prefer running it as a LEEC-specific user: typically, for any usage like `US-Web <http://us-web.esperide.org/>`_, the specific user running the webserver.
+
+.. _`credentials file`:
 
 We therefore create in a directory of choice (for example ``/etc/xdg/universal-server/``) a ``leec-ovh-credentials-for-foobar.org.txt`` file whose content is:
 
@@ -428,7 +464,7 @@ We therefore create in a directory of choice (for example ``/etc/xdg/universal-s
  dns_ovh_consumer_key = 5b1226df0d5ea12192ae2c9642cf7b60
 
 
-and set proper permissions for it, for example:
+and assign to it proper permissions, for example:
 
 
 .. code:: bash
@@ -442,27 +478,36 @@ and set proper permissions for it, for example:
 Certbot Execution
 .................
 
-Then an interactive test run can be done for example first as root with:
+Then an interactive test can be conducted, for example first as root, with:
 
 .. code:: bash
 
- $ certbot certonly --dns-ovh --dns-ovh-credentials /etc/xdg/universal-server/leec-ovh-credentials-for-foobar.org.txt -d foobar.org -d *.foobar.org
+ $ certbot certonly --dns-ovh --dns-ovh-credentials \
+ /etc/xdg/universal-server/leec-ovh-credentials-for-foobar.org.txt \
+ -d foobar.org -d *.foobar.org
 
-This should succeed in creating the ``/etc/letsencrypt/live/foobar.org/fullchain.pem`` (the certificate file used in most server software) and ``/etc/letsencrypt/live/foobar.org/privkey.pem`` symlinks to the actual credentials (the private key of this certificate).
+This should succeed in creating the ``/etc/letsencrypt/live/foobar.org/fullchain.pem`` (the certificate file used by most server software) and the ``/etc/letsencrypt/live/foobar.org/privkey.pem`` symlink to the actual credentials (the private key associated to this certificate).
 
 
 A second more involved test could be as the final user (e.g. ``web-srv``), from the target directory (e.g. ``/opt/universal-server/us_web-data/certificates``):
 
 .. code:: bash
 
- $ sudo -u web-srv certbot certonly --config-dir . --work-dir . --logs-dir . --non-interactive --agree-tos --email you@foobar.org --dns-ovh --dns-ovh-credentials /etc/xdg/universal-server/leec-ovh-credentials-for-foobar.org.txt -d foobar.org -d *.foobar.org
+ $ sudo -u web-srv certbot certonly --config-dir . --work-dir . \
+ --logs-dir . --non-interactive --agree-tos --email you@foobar.org \
+ --dns-ovh --dns-ovh-credentials \
+ /etc/xdg/universal-server/leec-ovh-credentials-for-foobar.org.txt \
+ -d foobar.org -d *.foobar.org
 
 The following actual (PEM-encoded) files of interest that are then obtained (in ``/etc/letsencrypt/{live,archive}/foobar.org``) are:
 
 - ``cert.pem``: the public key certificate file
 - ``privkey.pem``: the private key certificate file
 - ``chain.pem``: the certificate chain file
-- ``fullchain.pem``: the concatenation of ``cert.pem`` and ``chain.pem`` (rarely useful)
+- ``fullchain.pem``: the concatenation of ``cert.pem`` and ``chain.pem``
+
+.. fullchain  (rarely useful)
+
 
 ------------
 Design Notes
@@ -483,6 +528,8 @@ With the ``http-01`` challenge type, no wildcard for such SAN hosts (e.g. ``*.fo
 
 So for example, with LEEC, the certificate for ``foobar.org`` (that would be managed by a dedicated LEEC agent) should list following SAN entries: ``baz.foobar.org``, ``hurrican.foobar.org``, etc.
 
+For more flexibility a `wildcard certificate`_ may be preferred.
+
 
 
 Concurrent Certificate Operations
@@ -501,7 +548,7 @@ Should this issue arise, an option is to use a single FSM and to trigger certifi
 Let's Encrypt Accounts
 ======================
 
-Currently LEEC creates automatically throwaway ACME accounts, which is convenient yet may prevent the use if `CAA <https://letsencrypt.org/docs/caa/>`_ (*Certificate Authority Authorization*).
+Currently LEEC creates automatically throwaway ACME accounts, which is convenient yet may prevent the use of `CAA <https://letsencrypt.org/docs/caa/>`_ (*Certificate Authority Authorization*), if wanting to specify which Certificate Authorities (CAs) are allowed to issue certificates for one's domain.
 
 
 
@@ -512,8 +559,8 @@ Getting Information about the Generated Certificates
 If using LEEC to generate a certificate for a ``baz.foobar.org`` host, the following three files shall be obtained from the Let's Encrypt ACME server:
 
 - ``baz.foobar.org.csr``: the PEM certificate request, sent to the ACME server (~980 bytes)
-- ``baz.foobar.org.key``: the TLS private key regular file, kept on the server (~1675 bytes)
-- ``baz.foobar.org.crt``: the PEM certificate itself of interest (~3450 bytes), to be used by the webserver
+- ``baz.foobar.org.key``: the TLS private key regular file, generated on the server host, and kept there (~1675 bytes)
+- ``baz.foobar.org.crt``: the PEM certificate itself of interest (~3450 bytes), to be used by the webserver afterwards
 
 
 To get information about this certificate:
@@ -589,7 +636,7 @@ A ``*.key`` (e.g. ``my-foobar-leec-agent-private.key``) file is a (PEM, strong e
 
 ``lets-encrypt-r3-cross-signed.pem`` is the (PEM) certificate associated to the *Certificate Authority* (Let's Encrypt here). It is automatically downloaded by LEEC if not already available.
 
-The ``dh-params.pem`` file contains the parameters generated by LEEC in order to allow for safer *Ephemeral Diffie-Helman key exchanges* that is used to provide Forward Secrecy with TLS (see `this article <https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange>`_ for further information). Its generation may take quite some time.
+The ``dh-params.pem`` file contains the parameters generated by LEEC in order to allow for a safer *Ephemeral Diffie-Helman key exchange*, which is used to provide Forward Secrecy with TLS (see `this article <https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange>`_ for further information). Its generation may take quite some time (but is to happen once).
 
 
 ------------------------------------------------
@@ -641,8 +688,9 @@ Possible Enhancements
 - supporting Elliptic Curve cryptography
 - reintroducing elements brought by the upstream project yet not updated by the current fork: unit testing, standalone testing, hex package, various escripts and yml files involved
 - besides the slave mode (main use case of interest with LEEC), better integrating/testing the other modes (webroot and standalone)
-- supporting extra validation challenges, besides ``http-01``, like ``dns-01`` (necessary to `obtain wildcard certificates <https://letsencrypt.org/docs/faq/#does-let-s-encrypt-issue-wildcard-certificates>`_, i.e. applying to all subdomains of a given domain without leaking their names through SANs) and ``proof-of-possession-01``
+- supporting extra validation challenges, besides ``http-01`` and ``dns-01`` (necessary to `obtain wildcard certificates <https://letsencrypt.org/docs/faq/#does-let-s-encrypt-issue-wildcard-certificates>`_, i.e. applying to all subdomains of a given domain without leaking their names through SANs), like ``proof-of-possession-01``
 - supporting directly other ACME services besides ``Let's Encrypt`` (like ``ZeroSSL``)
+- implementing for good ``dns-01`` rather than using certbot for that
 
 
 
@@ -653,6 +701,7 @@ Please React!
 If you have information more detailed or more recent than those presented in this document, if you noticed errors, neglects or points insufficiently discussed, drop us a line! (for that, follow the Support_ guidelines).
 
 One may also be interested in `our mini-HOWTO regarding cybersecurity <https://howtos.esperide.org/Cybersecurity.html>`_.
+
 
 
 -----------

@@ -47,22 +47,22 @@
 -type bin_file_path() :: file_utils:bin_file_path().
 -type any_file_path() :: file_utils:any_file_path().
 -type any_file_name() :: file_utils:any_file_name().
-
 -type directory_path() :: file_utils:bin_directory_path().
 -type bin_directory_path() :: file_utils:bin_directory_path().
 -type any_directory_path() :: file_utils:any_directory_path().
 
 -type bin_fqdn() :: net_utils:bin_fqdn().
 
+-type http_options() :: web_utils:http_options().
+
 -type san() :: leec:san().
 -type bin_certificate() :: leec:bin_certificate().
-
 -type tls_private_key() :: leec:tls_private_key().
 -type tls_public_key() :: leec:tls_public_key().
-
+-type cert_file_path() :: leec:cert_file_path().
+-type cert_priv_key_file_path() :: leec:cert_priv_key_file_path().
 -type certificate_provider() :: leec:certificate_provider().
 
--type http_options() :: web_utils:http_options().
 
 
 
@@ -324,6 +324,9 @@ obtain_ca_cert_file( TargetDir, _CertProvider=letsencrypt, HttpOptions ) ->
 
 
 % @doc Returns a CSR certificate request.
+%
+% For that, generates also the whole base certificante and its private key.
+%
 -spec get_cert_request( bin_fqdn(), bin_directory_path(), [ san() ] ) ->
 								leec:tls_csr().
 get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
@@ -335,14 +338,19 @@ get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 
 	Domain = text_utils:binary_to_string( BinDomain ),
 
-	KeyFilePath = file_utils:join( BinCertDirPath, Domain ++ ".key" ),
+	PrivKeyFilePath = file_utils:join( BinCertDirPath,
+		leec:get_certificate_priv_key_filename( Domain ) ),
 
 	CertFilePath = file_utils:join( BinCertDirPath, Domain ++ ".csr" ),
 
 	cond_utils:if_defined( leec_debug_keys,
-		trace_bridge:debug_fmt( "CSR file path: '~ts'.", [ CertFilePath ] ) ),
+		trace_bridge:debug_fmt( "CSR file path: '~ts'; "
+			"certificate private key file path: '~ts'.",
+			[ CertFilePath, PrivKeyFilePath ] ) ),
 
-	generate_certificate( request, BinDomain, CertFilePath, KeyFilePath, SANs ),
+	% Produces CertFilePath and PrivKeyFilePath:
+	generate_certificate( request, BinDomain, CertFilePath, PrivKeyFilePath,
+						  SANs ),
 
 	RawCsr = file_utils:read_whole( CertFilePath ),
 
@@ -360,9 +368,10 @@ get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 % @doc Generates the specified certificate with subjectAlternativeName, either
 % an actual one, or a temporary (1 day), autosigned one.
 %
--spec generate_certificate( 'request' | 'autosigned', bin_fqdn(), file_path(),
-							file_path(), [ san() ] ) -> void().
-generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
+-spec generate_certificate( 'request' | 'autosigned', bin_fqdn(),
+	cert_file_path(), cert_priv_key_file_path(), [ san() ] ) -> void().
+generate_certificate( CertType, BinDomain, OutCertPath, PrivKeyFilePath,
+					  SANs ) ->
 
 	% First, generates a configuration file, in the same directory as the target
 	% certificate:
@@ -389,10 +398,10 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 
 	ConfDir = file_utils:get_base_path( OutCertPath ),
 
-	Domain = text_utils:binary_to_string( BinDomain ),
+	DomainStr = text_utils:binary_to_string( BinDomain ),
 
 	ConfFilePath = file_utils:join( ConfDir,
-		"leec_san_openssl." ++ Domain ++ ".cnf" ),
+		"leec_san_openssl." ++ DomainStr ++ ".cnf" ),
 
 	cond_utils:if_defined( leec_debug_keys,
 		trace_bridge:debug_fmt( "Generating a certificate from '~ts', "
@@ -415,8 +424,9 @@ generate_certificate( CertType, BinDomain, OutCertPath, KeyfilePath, SANs ) ->
 	Cmd = text_utils:format(
 		"~ts req -new -key '~ts' -sha256 -out '~ts' -config '~ts'",
 		[ executable_utils:get_default_openssl_executable_path(),
-		  KeyfilePath, OutCertPath, ConfFilePath ] ) ++ CertTypeOptStr,
+		  PrivKeyFilePath, OutCertPath, ConfFilePath ] ) ++ CertTypeOptStr,
 
+	% system_utils:run_executable/n would have been better:
 	case system_utils:run_command( Cmd ) of
 
 		{ _ReturnCode=0, _CommandOutput="" } ->

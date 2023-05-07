@@ -33,7 +33,9 @@
 % As records are so much clearer and relevant than maps in this context:
 
 
-% TLS private key:
+% The TLS private key (locally generated and never sent) of the target
+% certificate:
+%
 -record( tls_private_key, {
 
 	% For example [E, N, D] with E: publicExponent, N: modulus, D:
@@ -49,7 +51,7 @@
 
 
 
-% TLS public key (e.g. the account one):
+% The TLS public key (locally generated) of the target certificate:
 -record( tls_public_key, {
 
 	% Key type:
@@ -86,22 +88,24 @@
 
 
 % Resulting certificate:
--record( certificate, {
-
-	cert :: leec:bin_certificate(),
-
-	key :: leec:bin_key() } ).
+%-record( certificate, {
+%
+%	% The (public) certificate obtained:
+%	cert :: leec:bin_certificate(),
+%
+%	% Its associated private key (kept locally):
+%	key :: leec:bin_key() } ).
 
 
 
 % For internal use only:
 
 
-% State of a LEEC FSM instance:
--record( le_state, {
+% State of a LEEC FSM instance for the http-01 challenge:
+-record( leec_http_state, {
 
-	% ACME environment:
-	env = prod :: 'staging' | 'prod',
+	% The selected ACME environment:
+	environment = production :: leec:environment(),
 
 	% URI directory, fetched from ACME servers at startup (that is table of the
 	% URIs to be called depending on operations being needed regarding
@@ -110,15 +114,20 @@
 	directory_map = undefined :: maybe( leec:directory_map() ),
 
 	% Directory where certificates are to be stored:
-	cert_dir_path = <<"/tmp">> :: file_utils:bin_directory_path(),
+	cert_dir_path :: file_utils:bin_directory_path(),
 
 	% The filename (relative to cert_dir_path) of the target certificate (CSR)
 	% private key file (if any) for the domain(s) of interest.
 	%
 	cert_key_file = undefined :: maybe( file_utils:bin_file_path() ),
 
-	% For example mode = webroot.
-	mode = undefined :: maybe( leec:le_mode() ),
+	% The absolute path to the file containing the private key of the target
+	% certificate:
+	%
+	cert_priv_key_path = undefined :: maybe( leec:cert_priv_key_file_path() ),
+
+	% Interfacing mode; for example webroot.
+	interfacing_mode = undefined :: maybe( leec:web_interfacing_mode() ),
 
 	% If mode is 'webroot':
 	webroot_dir_path = undefined :: maybe( file_utils:bin_directory_path() ),
@@ -182,3 +191,36 @@
 
 	% To re-use TCP connections, on a per FSM basis:
 	tcp_connection_cache :: leec:tcp_connection_cache() } ).
+
+
+
+
+% State of a LEEC instance for the dns-01 challenge:
+-record( leec_dns_state, {
+
+	% The selected ACME environment:
+	environment = production :: leec:environment(),
+
+	% Directory where work data is to be written:
+	work_dir_path :: file_utils:bin_directory_path(),
+
+	% Path to the certbot executable:
+	certbot_path :: file_utils:bin_executable_path(),
+
+	% Directory where DNS credentials are to be read:
+	credentials_dir_path :: file_utils:bin_directory_path(),
+
+	% Directory where certificates are to be stored:
+	cert_dir_path :: file_utils:bin_directory_path(),
+
+	% The filename (relative to cert_dir_path) of the target certificate (CSR)
+	% private key file (if any) for the domain(s) of interest.
+	%
+	cert_key_file = undefined :: maybe( file_utils:bin_file_path() ),
+
+	domain = undefined :: maybe( net_utils:bin_fqdn() )
+
+	% Email address used for registration and recovery contact:
+	% Not relevant here: email :: maybe( email_utils:bin_email_address() )
+
+ } ).

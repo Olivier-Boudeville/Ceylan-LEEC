@@ -30,7 +30,7 @@
 -author("Guillaume Bour (guillaume at bour dot cc)").
 
 % This fork:
--author("Olivier Boudeville (olivier dot boudeville at esperide dot com").
+-author("Olivier Boudeville (olivier dot boudeville at esperide dot com)").
 
 
 -export([ init/1, encode/4, get_key_authorization/3 ]).
@@ -42,9 +42,7 @@
 
 -type payload() :: table( atom(), term() ).
 % Known keys:
-%
 %  - termsOfServiceAgreed :: boolean()
-%
 %  - contact :: ustring()
 
 
@@ -54,7 +52,7 @@
 % Shorthands:
 
 -type jws() :: leec:jws().
--type le_state() :: leec:le_state().
+-type leec_http_state() :: leec:leec_http_state().
 
 -type tls_private_key() :: leec:tls_private_key().
 -type tls_public_key() :: leec:tls_public_key().
@@ -76,10 +74,10 @@ init( #tls_private_key{ b64_pair={ N, E } } ) ->
 %
 % Content is the payload (if any).
 %
--spec encode( tls_private_key(), jws(), content(), le_state() ) ->
+-spec encode( tls_private_key(), jws(), content(), leec_http_state() ) ->
 					leec:binary_b64().
 encode( PrivateKey, Jws, Content,
-		#le_state{ json_parser_state=ParserState } ) ->
+		#leec_http_state{ json_parser_state=ParserState } ) ->
 
 	cond_utils:if_defined( leec_debug_codec, trace_bridge:debug_fmt(
 		"Encoding to JSON following JWS:~n  ~p~n with content: ~p",
@@ -114,9 +112,9 @@ encode( PrivateKey, Jws, Content,
 % See [https://www.rfc-editor.org/rfc/rfc8555.html#section-8.1].
 %
 -spec get_key_authorization( tls_public_key(), leec:token(),
-							 le_state() ) -> leec:key_auth().
+							 leec_http_state() ) -> leec:key_auth().
 get_key_authorization( #tls_public_key{ kty=Kty, n=N, e=E }, Token,
-					   #le_state{ json_parser_state=ParserState } ) ->
+					   #leec_http_state{ json_parser_state=ParserState } ) ->
 
 	Thumbprint = json_utils:to_json( #{ <<"kty">> => Kty, <<"n">> => N,
 										<<"e">> => E }, ParserState ),

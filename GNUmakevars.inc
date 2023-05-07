@@ -66,6 +66,7 @@ endif
 # - exchanges: regarding the exchanges with ACME servers
 # - codec: regarding encoding/decoding activities
 # - sni: regarding Server Name Indication
+# - bot: regarding the use of certificate bots (typically certbot)
 #
 # Defining debug flags (at least the most verbose are by default commented-out):
 ifeq ($(ENABLE_DEBUG),true)
@@ -75,6 +76,7 @@ ifeq ($(ENABLE_DEBUG),true)
 	#LEEC_DEBUG_FLAGS += -Dleec_debug_exchanges
 	#LEEC_DEBUG_FLAGS += -Dleec_debug_codec
 	#LEEC_DEBUG_FLAGS += -Dleec_debug_sni
+	LEEC_DEBUG_FLAGS += -Dleec_debug_bot
 endif
 
 # Defining check flags:

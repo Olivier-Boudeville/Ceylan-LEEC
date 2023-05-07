@@ -65,9 +65,9 @@
 
 % Public API:
 -export([ get_ordered_prerequisites/0,
-		  start/1, start/2,
-		  get_default_cert_request_options/0,
+		  start/2, start/3,
 		  get_default_cert_request_options/1,
+		  get_default_cert_request_options/2,
 		  obtain_certificate_for/2, obtain_certificate_for/3,
 		  stop/1, terminate/1 ]).
 
@@ -77,8 +77,13 @@
 		  get_agent_key_path/1 ]).
 
 
+% Facilities:
+-export([ dns_provider_to_string/1, get_credentials_path_for/3,
+		  get_certificate_priv_key_filename/1 ]).
+
+
 % For spawn purpose:
--export([ obtain_cert_helper/4 ]).
+-export([ obtain_cert_helper/5 ]).
 
 
 % FSM gen_statem base API:
@@ -88,15 +93,32 @@
 % FSM state-corresponding callbacks:
 -export([ idle/3, pending/3, valid/3, finalize/3, invalid/3 ]).
 
+-export([ state_to_string/1 ]).
+
 
 % For myriad_spawn*:
 -include_lib("myriad/include/spawn_utils.hrl").
 
 
+% Design notes:
+%
+% For all challenges, starting LEEC returns the PID of a process in charge of
+% the certificate creation, typically a FSM.
+%
+% This is indeed a FSM (gen_statem) for the http-01 challenge but, at least
+% currently, it is a mere intermediary process for the dns-01 challenge, which
+% is only in charge of running certbot.
+%
+% The idea is that if, in the future, a full implementation of dns-01 is done
+% (like for http-01), then certbot will be dropped but the LEEC API may not
+% change.
+
+
+
 % Implementation notes:
 %
 % Multiple FSM (Finite State Machines) can be spawned, for parallel certificate
-% management. Not registered as a singleton anymore.
+% management; so such a FSM is not registered as a singleton anymore.
 
 % Similarly, no more ETS-based connection pool, as it would be shared between
 % concurrent FSMs, whereas each connection is private to a given FSM. Instead an
@@ -113,12 +135,17 @@
 
 -type bin_domain() :: net_utils:bin_fqdn().
 
--type domain() :: net_utils:string_fqdn() | bin_domain().
+-type domain_name() :: net_utils:string_fqdn() | bin_domain().
 
 
--type le_mode() :: 'webroot' | 'slave' | 'standalone'.
+-type web_interfacing_mode() ::
+	'webroot'     % If using a third-party webserver (e.g. Apache)
+  | 'slave'       % If LEEC is driven by the caller (e.g. US-Web)
+  | 'standalone'. % If letting LEEC handle the web dance
+				  % (with the Elli webserver)
 % Three ways of interfacing LEEC with user code.
-% We mostly concentrate on the slave one.
+%
+% We mostly concentrated on the slave one.
 
 
 -type fsm_pid() :: pid().
@@ -128,7 +155,7 @@
 -type certificate_provider() :: 'letsencrypt'.
 % These are CA (Certificate Authorities).
 %
-% Other providers may be added in the future.
+% Other certificate providers (e.g. ZeroSSL) may be added in the future.
 
 
 -type certificate_type() ::
@@ -137,7 +164,7 @@
 					% (Subject Alternative Name); based on the http-01
 					% challenge.
 
-	'wildcard_domain'. % To authenticate any DNS name matching the wildcard
+  | 'wildcard_domain'. % To authenticate any DNS name matching the wildcard
 					   % name; based on the dns-01 challenge.
 % The types of certificates that can requested from a certificate authority.
 %
@@ -147,14 +174,63 @@
 % must be the entire leftmost DNS label, for instance "*.foobar.org".
 
 
--type challenge_type() :: 'http-01'     % Supported internally.
-						| 'dns-01'      % Supported based on certbot.
-						| 'tls-sni-01'. % Not supported.
+-type challenge_type() ::
+	'http-01'     % Supported internally.
+  | 'dns-01'      % Supported based on certbot.
+  | 'tls-sni-01'. % Not supported.
 % The type of challenges supported.
 
 
 -type bin_challenge_type() :: bin_string().
 % Challenge type, as a binary string.
+
+
+-type environment() :: 'staging' | 'production'.
+% The ACME environments.
+%
+% Production is 'default' in ACME parlance.
+
+
+-type pem_file_path() :: bin_file_path().
+% A path to a PEM-encoded ("Privacy Enhanced Mail", a rather misleading naming)
+% file may contain just a public certificate, or an entire certificate chain
+% including the public key, private key, and root certificates (which is
+% preferrable), or even just a certificate request.
+%
+% This is a text file containing sections like "-----BEGIN CERTIFICATE-----",
+% "-----BEGIN PRIVATE KEY-----", etc.
+%
+% Its extension may be ".pem".
+
+
+-type cert_file_path() :: pem_file_path().
+% A PEM-encoded file containing the actual certificate of interest.
+%
+% Typical names for such files may be "fullchain.pem", "cert.pem" or
+% "MYDOMAIN.crt".
+
+
+-type cert_priv_key_file_path() :: pem_file_path().
+% A PEM-encoded file containing the private key corresponding to a certificate,
+% as securely sent back by an ACME server.
+%
+% Such a key must be strongly secured.
+%
+% Typical names for such files may be "privkey.pem" or "MYDOMAIN.key".
+
+
+-type creation_outcome() ::
+	{ 'certificate_generation_success', cert_file_path(),
+	  cert_priv_key_file_path() }
+  | { 'certificate_generation_failure', error_reason() }.
+% The value returned by an attempt of certification creation.
+
+
+
+-export_type([ pem_file_path/0, cert_file_path/0, cert_priv_key_file_path/0,
+			   start_outcome/0, obtain_outcome/0, obtained_outcome/0,
+			   creation_outcome/0 ]).
+
 
 
 % Supposedly:
@@ -203,25 +279,65 @@
 
 -type start_option() ::
 	start_common_option()
-  | start_single_domain_option()
-  | start_wildcard_domain_option().
+  | start_http_01_option() % for single-domain certificates
+  | start_dns_01_option(). % for wildcard certificates
 % A user-specified LEEC start option.
 
+
 -type start_common_option() ::
-		'staging'
-	  | { 'key_file_path', any_file_path() }
-	  | { 'cert_dir_path', any_directory_path() }.
-%
-start_single_domain_option()
 
-					 | { 'mode', le_mode() }
-					 | { 'webroot_dir_path', any_directory_path() }
-					 | { 'port', tcp_port() }
-					 | { 'http_timeout', unit_utils:milliseconds() }.
+	% By default the 'production' environment is used:
+	{ 'environment', environment() }
+
+	% The work directory in which LEEC is to write working data (e.g. logs); it
+	% must therefore be writable by the current user.
+	%
+	% The default work directory is the current directory.
+	%
+  | { 'work_dir_path', any_directory_path() }
+
+	% The private key that shall be used to authenticate this agent to the ACME
+	% server (not the certificate private key):
+	%
+  | { 'agent_key_file_path', any_file_path() }
+
+	% The directory in which the obtained certificates will be stored.
+
+	% The default certificate directory is the current directory.
+	%
+  | { 'cert_dir_path', any_directory_path() }.
+% Options common to all challenge types.
 
 
--type cert_req_option_id() :: 'async' | 'callback' | 'netopts' | 'challenge'
-							| 'sans' | 'json'.
+-type start_http_01_option() ::
+	{ 'interfacing_mode', web_interfacing_mode() }
+  | { 'webroot_dir_path', any_directory_path() }
+  | { 'port', tcp_port() }
+  | { 'http_timeout', milliseconds() }.
+% Options associated to the http-01 challenge, for single-domain certificates.
+
+
+-type start_dns_01_option() ::
+
+	% The DNS provider where an entry will have to be updated for the challenge:
+	{ 'dns_provider', dns_provider() }
+
+	% The directory in which the DNS credentials will be looked up:
+  | { 'cred_dir_path', any_directory_path() }.
+% Options associated to the dns-01 challenge, for wildcard certificates.
+
+
+-type dns_provider() :: 'ovh'.
+% The known and supported DNS providers.
+
+
+-type credentials_path() :: any_file_path().
+% A path to a file containing LEEC-related credentials.
+% See https://leec.esperide.org/#credentials-file.
+
+
+-type cert_req_option_id() :: 'async' | 'callback' | 'netopts'
+							| 'challenge_type' | 'sans' | 'json'.
 % Certificate request options.
 
 
@@ -230,18 +346,37 @@ start_single_domain_option()
 %
 % Known (atom) keys:
 %
-%  - async :: boolean() [if not defined, supposed true]
+%  - options common for all certificate requests:
 %
-%  - callback :: fun/1
+%    - async :: boolean():
+%       - if true (the default), immediately returns, and a callback will be
+%       triggered once the certificate is obtained
+%       - if false, blocks until completed, and returns the path to the
+%       generated certificate
 %
-%  - netopts :: map() => #{ timeout => unit_utils:milliseconds(),
-%                           ssl => [ ssl:client_option() ] }
+%    - callback :: fun/1: the function executed when Async is true, once the
+%      domain certificate has been successfully obtained
 %
-%  - challenge_type :: challenge_type(), default being 'http-01'
+%  - options for http-01 certificate requests:
+%    - netopts :: map() => #{ timeout => milliseconds(),
+%                             ssl => [ssl:client_option()] }:
+%      to specify an HTTP timeout or SSL client options
 %
-%  - sans :: [bin_san()]
+%    - sans :: [any_san()]: a list of the Subject Alternative Names for that
+%      certificate (if single-domain, not wildcard)
 %
-%  - json :: boolean() (not to be set by the user)
+%  - options for dns-01 certificate requests:
+%
+%    - email: email address used for registration and recovery contact
+%    (otherwise specifying leec-certificates@DOMAIN)
+%
+%  - not to be set by the user:
+%
+%    - json :: boolean()
+%
+%    - challenge_type :: challenge_type() is the type of challenge to rely on
+%    when interacting with the ACME server
+
 
 
 -type acme_operation() :: bin_string().
@@ -322,27 +457,54 @@ start_single_domain_option()
 % For the records introduced:
 -include("leec.hrl").
 
+
 -type tls_private_key() :: #tls_private_key{}.
+% The TLS private key (locally generated and never sent) of the target
+% certificate.
+
 
 -type tls_public_key() :: #tls_public_key{}.
+% The TLS public key (locally generated) of the target certificate.
+
 
 -type tls_csr() :: binary_b64().
 
 -type jws() :: #jws{}.
 
--type certificate() :: #certificate{}.
 
--type le_state() :: #le_state{}.
+%-type certificate() :: #certificate{}.
+% A record containing the public and private elements of a certificate.
+
+-type leec_state() :: leec_http_state() | leec_dns_state().
+% Any type of LEEC state.
+
+-type leec_http_state() :: #leec_http_state{}.
+% LEEC state for the http-01 challenge.
+%
 % Needed by other LEEC modules.
 
 
--export_type([ bin_uri/0, bin_domain/0, domain/0, le_mode/0, fsm_pid/0,
+-type leec_dns_state() :: #leec_dns_state{}.
+% LEEC state for the dns-01 challenge.
+%
+% Needed by other LEEC modules.
+
+
+-export_type([ bin_uri/0, bin_domain/0, domain_name/0,
+			   web_interfacing_mode/0, fsm_pid/0,
 			   certificate_provider/0, certificate_type/0,
 			   challenge_type/0, bin_challenge_type/0,
+			   environment/0,
 			   token/0, thumbprint/0, thumbprint_map/0, tcp_connection_cache/0,
 			   challenge/0, uri_challenge_map/0, type_challenge_map/0,
 			   order_map/0,
-			   start_option/0, cert_req_option_id/0, cert_req_option_map/0,
+
+			   start_option/0, start_common_option/0, start_http_01_option/0,
+			   start_dns_01_option/0,
+
+			   dns_provider/0, credentials_path/0,
+
+			   cert_req_option_id/0, cert_req_option_map/0,
 			   acme_operation/0, directory_map/0, nonce/0,
 			   san/0, bin_san/0, any_san/0,
 			   json_map_decoded/0, agent_key_file_info/0,
@@ -350,7 +512,9 @@ start_single_domain_option()
 			   key_integer/0, rsa_private_key/0,
 			   jws_algorithm/0, binary_b64/0, key_auth/0,
 			   tls_private_key/0, tls_public_key/0, tls_csr/0,
-			   jws/0, certificate/0, le_state/0, status/0, request/0 ]).
+			   jws/0, %certificate/0,
+			   leec_state/0, leec_http_state/0, leec_dns_state/0,
+			   status/0, request/0 ]).
 
 
 % Where Let's Encrypt will attempt to find answers to its http-01 challenges:
@@ -386,23 +550,51 @@ start_single_domain_option()
 
 %-type action() :: gen_statem:action().
 
--type start_ret() :: gen_statem:start_ret().
+
+-type leec_caller_state() :: { challenge_type(), fsm_pid() }.
+% The minimal LEEC state returned to the caller.
+%
+% Not to be mixed up with the internal state of LEEC FSMs.
+
+
+-type start_outcome() :: { 'ok', leec_caller_state() }
+					   | basic_utils:tagged_error().
+						 %'ok' | gen_statem:start_ret().
+% Returned value after starting LEEC.
+%
+% In practice, for all challenges: either an error or {ok, LeecCallerState}.
+
+
+-type obtained_outcome() ::
+	{ 'certificate_ready', cert_file_path(), cert_priv_key_file_path() }
+  | tagged_error().
+% Returned value after having sent a request to obtain a certificate.
+
+
+-type obtain_outcome() :: 'async' | obtained_outcome().
+% Returned value once requesting a certificate.
+
 
 
 % Shorthands:
 
 -type count() :: basic_utils:count().
--type error_term() :: basic_utils:error_term().
+%-type error_term() :: basic_utils:error_term().
+-type error_reason() :: basic_utils:error_reason().
+-type tagged_error() :: basic_utils:tagged_error().
+
 -type base_status() :: basic_utils:base_status().
 
 -type ustring() :: text_utils:ustring().
 -type bin_string() :: text_utils:bin_string().
 
+-type file_name() :: file_utils: file_name().
 -type bin_file_path() :: file_utils:bin_file_path().
 -type any_file_path() :: file_utils:any_file_path().
 
 -type any_directory_path() :: file_utils:any_directory_path().
 
+-type milliseconds() :: unit_utils:milliseconds().
 
 -type tcp_port() :: net_utils:tcp_port().
 
@@ -410,6 +602,7 @@ start_single_domain_option()
 
 -type application_name() :: otp_utils:application_name().
 
+-type bridge_spec() :: trace_bridge:bridge_spec().
 
 
 
@@ -430,7 +623,7 @@ start_single_domain_option()
 % - jsx preferred over jiffy; yet neither needs to be initialised as an
 % application
 %
-% - no need to start Myriad either
+% - no need to start Myriad either (library application)
 %
 -spec get_ordered_prerequisites() -> [ application_name() ].
 get_ordered_prerequisites() ->
@@ -438,22 +631,38 @@ get_ordered_prerequisites() ->
 						  [ shotgun ], _ThenNativeHttpc=[] ).
 
 
-% @doc Starts a (non-bridged) instance of the LEEC service FSM.
+
+% @doc Starts a (non-bridged) instance of the LEEC service FSM, meant to rely on
+% the specified type of challenge.
 %
+% See start/3 for more details.
+%
+-spec start( challenge_type(), [ start_option() ] ) -> start_outcome().
+start( ChallengeType, StartOptions ) ->
+	start( ChallengeType, StartOptions, _MaybeBridgeSpec=undefined ).
+
+
+
+% @doc Starts an instance of the LEEC service FSM, possibly with a trace bridge,
+% meant to rely on the specified type of challenge.
+%
+% Note that for most challenges to succeed, LEEC must be started from the domain
+% of interest, as a webserver there must be controlled (for the http-01
+% challenge) or its DNS zone must be updated, from an authorised IP address (for
+% the dns-01 challenge).
+%
+% Note also that some challenges (especially the dns-01 one) will take
+% significant time to succeed (typically as a few minutes will have to be waited
+% to account for DNS changes to propagate).
+%
+-spec start( challenge_type(), [ start_option() ], maybe( bridge_spec() ) ) ->
+										start_outcome().
 % Apparently the 'application' behaviour would expect as argument:
 % 'normal' | {'failover', atom()} | {'takeover', atom()}
 % and, as return type:
 % {'error', _} | {'ok', pid()} | {'ok', pid(), _} instead.
 %
--spec start( [ start_option() ] ) -> start_ret().
-start( StartOptions ) ->
-	start( StartOptions, _MaybeBridgeSpec=undefined ).
-
-
-% @doc Starts an instance of the LEEC service FSM, possibly with a trace bridge.
--spec start( [ start_option() ], maybe( trace_bridge:bridge_spec() ) ) ->
-					start_ret().
-start( StartOptions, MaybeBridgeSpec ) ->
+start( ChallengeType='http-01', StartOptions, MaybeBridgeSpec ) ->
 
 	% If a trace bridge is specified, we use it both for the current (caller)
 	% process and the ones it creates, i.e. the associated FSM and, possibly,
@@ -465,24 +674,31 @@ start( StartOptions, MaybeBridgeSpec ) ->
 	% shotgun not being listed in LEEC's .app file anymore (otherwise it would
 	% be started even if native_httpc had been preferred), it is not
 	% automatically started; this is thus done here (elli also is not wanted
-	% anymore by default, it might be started only iff in standalone mode):
+	% anymore by default, it might be started only iff in standalone interfacing
+	% mode):
 	%
 	% Intentionally no default token defined:
 	cond_utils:switch_set_to( myriad_httpc_backend, [
 
 		{ shotgun,
 			begin
-				trace_bridge:info_fmt( "Starting LEEC (shotgun-based), with "
+				trace_bridge:info_fmt( "Starting LEEC (shotgun-based), "
+					"for the http-01 challenge with "
 					"following start options:~n  ~p.", [ StartOptions ] ),
+
 				[ { ok, _Started } = application:ensure_all_started( A )
-								|| A <- [ shotgun, elli ] ]
+					|| A <- [ shotgun, elli ] ]
+
 			end },
 
 		{ native_httpc,
 			begin
-				trace_bridge:info_fmt( "Starting LEEC (httpc-based), with "
+				trace_bridge:info_fmt( "Starting LEEC (httpc-based), "
+					"for the http-01 challenge with "
 					"following start options:~n  ~p.", [ StartOptions ] ),
+
 				web_utils:start( _Opt=ssl )
+
 			end } ] ),
 
 	JsonParserState = json_utils:start_parser(),
@@ -498,55 +714,132 @@ start( StartOptions, MaybeBridgeSpec ) ->
 	% Calls init/1 on the new process, and returns its outcome:
 	% (the FSM shall use any bridge as well)
 	%
-	gen_statem:start_link( ?MODULE,
+	{ ok, FSMPid } = gen_statem:start_link( ?MODULE,
 		_InitParams={ StartOptions, JsonParserState, MaybeBridgeSpec },
-		_Opts=[] ).
+		_Opts=[] ),
+
+	{ ok, { ChallengeType, FSMPid } };
 
 
-% @doc Returns the default options for certificate requests, here enabling the
-% async (non-blocking) mode.
+start( ChallengeType='dns-01', StartOptions, MaybeBridgeSpec ) ->
+
+	% First this caller process:
+	trace_bridge:register_if_not_already( MaybeBridgeSpec ),
+
+	trace_bridge:info_fmt( "Starting LEEC for the dns-01 challenge "
+		"with following start options:~n  ~p.", [ StartOptions ] ),
+
+	% Performing checks from the caller process is more convenient:
+
+	BinCertbotPath = text_utils:string_to_binary(
+		leec_bot:get_certbot_executable_path() ),
+
+	BinCredBasePath = case maps:find( _K=cred_dir_path, StartOptions ) of
+
+		{ ok, CredBaseDir } ->
+			file_utils:is_existing_directory_or_link( CredBaseDir ) orelse
+				throw( { non_existing_credentials_directory, CredBaseDir } ),
+			text_utils:ensure_binary( CredBaseDir );
+
+		error ->
+			throw( no_credentials_directory_set )
+
+	end,
+
+	BinWorkDir = case maps:find( work_dir_path, StartOptions ) of
+
+		{ ok, WorkDir } ->
+			file_utils:is_existing_directory_or_link( WorkDir ) orelse
+				throw( { non_existing_work_directory, WorkDir } ),
+			text_utils:ensure_binary( WorkDir );
+
+		error ->
+			file_utils:get_bin_current_directory()
+
+	end,
+
+	BinCertDir = case maps:find( cert_dir_path, StartOptions ) of
+
+		{ ok, CertDir } ->
+			file_utils:is_existing_directory_or_link( CertDir ) orelse
+				throw( { non_existing_certificate_directory, CertDir } ),
+			text_utils:ensure_binary( CertDir );
+
+		error ->
+			file_utils:get_bin_current_directory()
+
+	end,
+
+	LDState = #leec_dns_state{
+		work_dir_path=BinWorkDir,
+		certbot_path=BinCertbotPath,
+		credentials_dir_path=BinCredBasePath,
+		cert_dir_path=BinCertDir },
+
+	trace_bridge:debug_fmt( "LEEC state: ~ts.",
+							[ state_to_string( LDState ) ] ),
+
+	BotPid = ?myriad_spawn_link( _Mod=leec_bot, init_bot,
+								 [ LDState, MaybeBridgeSpec ] ),
+
+	{ ok, { ChallengeType, BotPid } };
+
+start( ChallengeType, _StartOptions, _MaybeBridgeSpec ) ->
+	{ error, { unsupported_challenge_type, ChallengeType } }.
+
+
+
+% @doc Returns the default options for certificate requests for the specified
+% challenge type, here enabling the async (non-blocking) mode.
 %
--spec get_default_cert_request_options() -> cert_req_option_map().
-get_default_cert_request_options() ->
-	get_default_cert_request_options( _Async=true ).
+-spec get_default_cert_request_options( challenge_type() ) ->
+												cert_req_option_map().
+get_default_cert_request_options( ChallengeType ) ->
+	get_default_cert_request_options( ChallengeType, _Async=true ).
+
 
 
 % @doc Returns the default optionsfor certificate requests, with specified async
 % mode.
 %
--spec get_default_cert_request_options( boolean() ) -> cert_req_option_map().
-get_default_cert_request_options( Async ) when is_boolean( Async ) ->
+-spec get_default_cert_request_options( challenge_type(), boolean() ) ->
+										cert_req_option_map().
+get_default_cert_request_options( _ChallengeType='http-01', Async )
+												when is_boolean( Async ) ->
 
-	trace_utils:debug( "Setting default certificate request options." ),
+	%trace_utils:debug( "Returning default certificate request options." ),
 
 	#{ async => Async,
 	   netopts => #{ timeout => ?default_timeout,
 					 % We check that we interact with the expected ACME server:
-					 ssl => web_utils:get_ssl_verify_options( enable ) } }.
+					 ssl => web_utils:get_ssl_verify_options( enable ) } };
+
+get_default_cert_request_options( _ChallengeType='dns-01', Async )
+												when is_boolean( Async ) ->
+
+	%trace_utils:debug( "Returning default certificate request options." ),
+
+	#{ async => Async }.
+
+
 
 
 % @doc Generates, once started, asynchronously (in a non-blocking manner), a new
 % certificate for the specified domain (FQDN).
 %
 % Parameters:
-%
 % - Domain is the domain name to generate an ACME certificate for
+% - LeecCallerState is the caller state obtained when starting LEEC
 %
-% - FsmPid is the PID of the FSM to rely on
-%
-% Returns:
-%
-% - 'async' if async is set (the default being sync)
-%
-% - {error, Err} if a failure happens
+% See obtain_certificate_for/3 for the return type.
 %
 % Belongs to the user-facing API; requires the LEEC service to be already
 % started.
 %
--spec obtain_certificate_for( domain(), fsm_pid() ) -> 'async' | error_term().
-obtain_certificate_for( Domain, FsmPid ) ->
-	obtain_certificate_for( Domain, FsmPid,
-							get_default_cert_request_options() ).
+-spec obtain_certificate_for( domain_name(), leec_caller_state() ) ->
+										obtain_outcome().
+obtain_certificate_for( Domain, LeecCallerState ) ->
+	obtain_certificate_for( Domain, LeecCallerState, _NoCertReqOpts=#{} ).
 
 
 
@@ -554,47 +847,23 @@ obtain_certificate_for( Domain, FsmPid ) ->
 % new certificate for the specified domain (FQDN).
 %
 % Parameters:
-%
 % - Domain is the domain name to generate an ACME certificate for
-%
-% - FsmPid is the PID of the FSM to rely on
-%
+% - LeecCallerState is the caller state obtained when starting LEEC
 % - CertReqOptionMap is a map listing the options applying to this certificate
-% request, whose key (as atom)/value pairs (all optional except 'async' and
-% 'netopts') are:
-%
-%    - 'async' / boolean(): if true, blocks until complete and returns generated
-%    certificate filename if false, immediately returns
-%
-%    - 'callback' / fun/1: function executed when Async is true, once domain
-%    certificate has been successfully generated
-%
-%    - 'netopts' / map(): mostly to specify an HTTP timeout or SSL client
-%    options
-%
-%    - 'challenge_type' / challenge_type() is the type of challenge to rely on
-%    when interacting with the ACME server
-%
-%    - 'sans' / [ any_san() ]: a list of the Subject Alternative Names for that
-%    certificate
-%
-% Returns:
-%
-% - if synchronous (the default): either {certificate_ready, BinFilePath} if
-% successful, otherwise {error, Err}
-%
-% - otherwise (asynchronous), 'async'
+% request, whose key (as atom) / value pairs may depend on the challenge type
 %
 % Belongs to the user-facing API; requires the LEEC service to be already
 % started.
 %
--spec obtain_certificate_for( Domain :: domain(), fsm_pid(),
-							  cert_req_option_map() ) ->
-		'async' | { 'certificate_ready', bin_file_path() } | error_term().
-obtain_certificate_for( Domain, FsmPid, CertReqOptionMap )
-			when is_pid( FsmPid ), is_map( CertReqOptionMap ) ->
+-spec obtain_certificate_for( Domain :: domain_name(), leec_caller_state(),
+							  cert_req_option_map() ) -> obtain_outcome().
+obtain_certificate_for( Domain,
+		_LeecCallerState={ ChallengeType, FsmPid }, CertReqOptionMap )
+							when is_map( CertReqOptionMap ) ->
 
-	DefCertReqOpts = get_default_cert_request_options(),
+	BinDomain = text_utils:ensure_binary( Domain ),
+
+	DefCertReqOpts = get_default_cert_request_options( ChallengeType ),
 
 	% To ensure that all needed option entries are always defined:
 	ReadyCertReqOptMap = maps:merge( DefCertReqOpts,
@@ -610,7 +879,6 @@ obtain_certificate_for( Domain, FsmPid, CertReqOptionMap )
 	case ReadyCertReqOptMap of
 
 		#{ async := true } ->
-
 			% Still being in user process, bridge applies:
 			cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
 				"Requesting FSM ~w to generate asynchronously a certificate "
@@ -620,8 +888,9 @@ obtain_certificate_for( Domain, FsmPid, CertReqOptionMap )
 			% using the same bridge as set for this caller process:
 			%
 			_Pid = ?myriad_spawn_link( ?MODULE, obtain_cert_helper,
-				[ Domain, FsmPid, ReadyCertReqOptMap,
+				[ BinDomain, FsmPid, ReadyCertReqOptMap,
 				  trace_bridge:get_bridge_info() ] ),
+
 			async;
 
 		#{ async := false } ->
@@ -633,16 +902,10 @@ obtain_certificate_for( Domain, FsmPid, CertReqOptionMap )
 				"for domain '~ts'.", [ FsmPid, Domain ] ) ),
 
 			% Thus a direct synchronous return:
-			obtain_cert_helper( Domain, FsmPid, ReadyCertReqOptMap )
+			obtain_cert_helper( BinDomain, ChallengeType, FsmPid,
+								ReadyCertReqOptMap )
 
-	end;
-
-obtain_certificate_for( _Domain, FsmPid, CertReqOptionMap )
-								when is_pid( FsmPid ) ->
-	throw( { not_an_option_map, CertReqOptionMap } );
-
-obtain_certificate_for( _Domain, FsmPid, _CertReqOptionMap ) ->
-	throw( { not_pid, FsmPid } ).
+	end.
 
 
 
@@ -652,23 +915,20 @@ obtain_certificate_for( _Domain, FsmPid, _CertReqOptionMap ) ->
 %
 % @hidden
 %
--spec obtain_cert_helper( Domain :: domain(), fsm_pid(),
-						  cert_req_option_map() ) ->
-		{ 'certificate_ready', bin_file_path() } | error_term().
-obtain_cert_helper( Domain, FsmPid,
+-spec obtain_cert_helper( bin_domain(), challenge_type(), fsm_pid(),
+						  cert_req_option_map() ) -> obtained_outcome().
+obtain_cert_helper( BinDomain, _ChallengeType='http-01', FsmPid,
 					CertReqOptionMap=#{ async := Async,
 										netopts := NetOpts } ) ->
 
 	Timeout = maps:get( timeout, NetOpts, ?default_timeout ),
 
-	BinDomain = text_utils:ensure_binary( Domain ),
-
 	ServerRef = FsmPid,
 
 	% Expected to be in the 'idle' state, hence to trigger idle({create,
-	% BinDomain, Opts}, _, LEState):
+	% BinDomain, Opts}, _, LHState):
 	%
-	CreationRes = case gen_statem:call( ServerRef,
+	CreationOutcome = case gen_statem:call( ServerRef,
 			_Request={ create, BinDomain, CertReqOptionMap }, Timeout ) of
 
 		% State of FSM shall thus be 'idle' now:
@@ -698,19 +958,21 @@ obtain_cert_helper( Domain, FsmPid,
 
 					case wait_creation_completed( FsmPid, _Count=20 ) of
 
-						Reply={ certificate_ready, BinCertFilePath } ->
+						{ certificate_ready, BinCertFilePath,
+						  BinPrivKeyFilePath } ->
 							cond_utils:if_defined( leec_debug_fsm,
 								trace_bridge:debug_fmt( "Domain '~ts' "
 									"finalized for ~w, returning certificate "
-									"path '~ts'.",
-									[ Domain, FsmPid, BinCertFilePath ] ),
-								basic_utils:ignore_unused( BinCertFilePath ) ),
-							Reply;
+									"path '~ts' and its private key '~ts'.",
+									[ BinDomain, FsmPid, BinCertFilePath,
+									  BinPrivKeyFilePath ] ) ),
+							{ certificate_generation_success, BinCertFilePath,
+							  BinPrivKeyFilePath };
 
 						Error ->
 							trace_bridge:error_fmt( "Error for FSM ~w when "
 								"finalizing domain '~ts': ~p.",
-								[ FsmPid, Domain, Error ] ),
+								[ FsmPid, BinDomain, Error ] ),
 							Error
 
 					end;
@@ -720,7 +982,7 @@ obtain_cert_helper( Domain, FsmPid,
 					cond_utils:if_defined( leec_debug_fsm,
 						trace_bridge:debug_fmt( "Reset of FSM ~w for '~ts' "
 							"after error ~p.",
-							[ FsmPid, Domain, OtherError ] ) ),
+							[ FsmPid, BinDomain, OtherError ] ) ),
 					_ = gen_statem:call( _ServerRef=FsmPid, reset ),
 					OtherError
 
@@ -736,23 +998,87 @@ obtain_cert_helper( Domain, FsmPid,
 	Async andalso
 		begin
 			Callback = maps:get( callback, CertReqOptionMap,
-				_DefaultCallback=fun( Ret ) ->
+				_DefaultCallback=fun( CreatOutcome ) ->
 					trace_bridge:warning_fmt( "Default async callback called "
-						"for ~w regarding result ~p.", [ FsmPid, Ret ] )
+						"for ~w regarding http-01 creation outcome ~p.",
+						[ FsmPid, CreatOutcome ] )
 								 end ),
 
 			%trace_bridge:debug_fmt( "Async callback called "
-			%   "for ~w regarding result ~p.", [ FsmPid, CreationRes ] ),
+			%   "for ~w regarding creation outcome ~p.",
+			%   [ FsmPid, CreationOutcome ] ),
 
-			Callback( CreationRes )
+			Callback( CreationOutcome )
 
 		end,
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
-		"Return for domain '~ts' creation (FSM: ~w): ~p",
-		[ Domain, FsmPid, CreationRes ] ) ),
+		"Creation outcome for domain '~ts' (FSM: ~w): ~p",
+		[ BinDomain, FsmPid, CreationOutcome ] ) ),
 
-	CreationRes.
+	CreationOutcome;
+
+
+obtain_cert_helper( BinDomain, _ChallengeType='dns-01', FsmPid,
+					CertReqOptionMap=#{ async := Async } ) ->
+
+	DNSProvider = case maps:find( _K=dns_provider, CertReqOptionMap ) of
+
+		{ ok, Provider } ->
+			Provider;
+
+		error ->
+			trace_bridge:error_fmt( "No DNS provider set for domain '~ts'.",
+				[ BinDomain ] ),
+			throw( no_dns_provider_set )
+
+	end,
+
+	BinEmail = case maps:find( email, CertReqOptionMap ) of
+
+		{ ok, Email } ->
+			text_utils:ensure_binary( Email );
+
+		error ->
+			text_utils:bin_format( "leec-certificates@~ts",
+								   [ BinDomain ] )
+
+	end,
+
+
+	% Not using gen_statem yet, just ad hoc messaging to the bot:
+	case Async of
+
+		true ->
+			Callback = maps:get( callback, CertReqOptionMap,
+				_DefaultCallback=fun( CreationOutcome ) ->
+					trace_bridge:warning_fmt(
+						"Default async callback called for domain '~ts' "
+						"regarding dns-01 creation outcomeresult ~p.",
+						[ BinDomain, CreationOutcome ] )
+								 end ),
+
+			FsmPid ! { createCertificateAsync,
+					   [ BinDomain, DNSProvider, BinEmail, Callback ] },
+			async;
+
+		false ->
+			FsmPid ! { createCertificateSync,
+					   [ BinDomain, DNSProvider, BinEmail ], self() },
+
+			receive
+
+				{ certificate_generation_success, BinCertFilePath,
+				  BinPrivKeyFilePath } ->
+					{ certificate_ready, BinCertFilePath,
+					  BinPrivKeyFilePath };
+
+				{ certificate_generation_failure, Error } ->
+					{ error, Error }
+
+			end
+
+	end.
 
 
 
@@ -761,16 +1087,17 @@ obtain_cert_helper( Domain, FsmPid,
 %
 % @hidden
 %
--spec obtain_cert_helper( Domain :: domain(), fsm_pid(), cert_req_option_map(),
-						  maybe( trace_bridge:bridge_info() ) ) ->
-		{ 'certificate_ready', bin_file_path() } | error_term().
-obtain_cert_helper( Domain, FsmPid, CertReqOptionMap, MaybeBridgeInfo ) ->
+-spec obtain_cert_helper( Domain :: domain_name(), challenge_type(), fsm_pid(),
+			cert_req_option_map(), maybe( trace_bridge:bridge_info() ) ) ->
+				obtained_outcome().
+obtain_cert_helper( Domain, ChallengeType, FsmPid, CertReqOptionMap,
+					MaybeBridgeInfo ) ->
 
 	% Let's inherit the creator bridge first:
 	trace_bridge:set_bridge_info( MaybeBridgeInfo ),
 
 	% And then branch to the main logic:
-	obtain_cert_helper( Domain, FsmPid, CertReqOptionMap ).
+	obtain_cert_helper( Domain, ChallengeType, FsmPid, CertReqOptionMap ).
 
 
 
@@ -850,8 +1177,8 @@ terminate( FsmPid ) ->
 % Transitions to the 'idle' initial state.
 %
 -spec init( { [ start_option() ], json_utils:parser_state(),
-				maybe( trace_bridge:bridge_spec() ) } ) ->
-		{ 'ok', InitialStateName :: 'idle', InitialData :: le_state() }.
+			  maybe( bridge_spec() ) } ) ->
+		{ 'ok', InitialStateName :: 'idle', InitialData :: leec_http_state() }.
 init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 
 	% First action is to register this (unregistered by design) FSM to any
@@ -862,31 +1189,32 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"Initialising, with following options:~n  ~p.", [ StartOptions ] ) ),
 
-	InitLEState = #le_state{
+	InitLHState = #leec_http_state{
 		% Implied:
 		%cert_req_option_map=get_default_cert_request_options(),
 		json_parser_state=JsonParserState,
 		tcp_connection_cache=table:new() },
 
-	LEState = setup_mode( get_start_options( StartOptions, InitLEState ) ),
+	LHState = setup_interfacing_mode(
+		get_start_options( StartOptions, InitLHState ) ),
 
 	% To check for example verify_peer:
-	%trace_bridge:debug_fmt( "Initial LE state:~n ~p", [ LEState ] ),
+	%trace_bridge:debug_fmt( "Initial LE state:~n ~p", [ LHState ] ),
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
-		"[~w] Initial state:~n  ~p", [ self(), LEState ] ) ),
+		"[~w] Initial state:~n  ~p", [ self(), LHState ] ) ),
 
-	BinCertDirPath = LEState#le_state.cert_dir_path,
+	BinCertDirPath = LHState#leec_http_state.cert_dir_path,
 
-	% Creates the private key (a tls_private_tls_public_key()) of this LEEC
-	% agent, and initialises its JWS; in case of parallel creations, ensuring
-	% automatically the uniqueness of its filename is not trivial:
+	% Creates the private key pair of this LEEC agent, and initialises its JWS;
+	% in case of parallel creations, ensuring automatically the uniqueness of
+	% its filename is not trivial:
 	%
-	KeyFileInfo = case LEState#le_state.agent_key_file_info of
+	KeyFileInfo = case LHState#leec_http_state.agent_key_file_info of
 
 		% If a key is to be created:
 		undefined ->
-			% We prefer here devising out own agent filename, lest its automatic
+			% We prefer here devising our own agent filename, lest its automatic
 			% uniqueness is difficult to obtain (which is the case); we may use
 			% in the future any user-specified identifier (see user_id field);
 			% for now we stick to a simple approach based on the PID of this
@@ -894,7 +1222,7 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 			%
 			%UniqFilename = text_utils:format(
 			%  "leec-agent-private-~ts.key",
-			%  [ LEState#le_state.user_id ] ),
+			%  [ LHState#leec_http_state.user_id ] ),
 
 			% A prior run might have left a file with the same name, it will be
 			% overwritten (with a warning) in this case:
@@ -919,7 +1247,7 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 
 	KeyJws = leec_jws:init( AgentPrivateKey ),
 
-	OptionMap = LEState#le_state.cert_req_option_map,
+	OptionMap = LHState#leec_http_state.cert_req_option_map,
 
 	% Directory map is akin to:
 	%
@@ -942,11 +1270,11 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 	%   <<"revokeCert">> =>
 	%	  <<"ACME_BASE/acme/revoke-cert">>}
 
-	{ URLDirectoryMap, DirLEState } = leec_api:get_directory_map(
-		LEState#le_state.env, OptionMap, LEState ),
+	{ URLDirectoryMap, DirLHState } = leec_api:get_directory_map(
+		LHState#leec_http_state.environment, OptionMap, LHState ),
 
-	{ FirstNonce, NonceLEState } =
-		leec_api:get_nonce( URLDirectoryMap, OptionMap, DirLEState ),
+	{ FirstNonce, NonceLHState } =
+		leec_api:get_nonce( URLDirectoryMap, OptionMap, DirLHState ),
 
 	cond_utils:if_defined( leec_debug_fsm,
 		trace_bridge:debug_fmt( "[~w][state] Switching initially to 'idle'.",
@@ -956,10 +1284,10 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 	% obtain_certificate_for/{2,3}:
 	%
 	{ ok, _NewStateName=idle,
-	  NonceLEState#le_state{ directory_map=URLDirectoryMap,
-							 agent_private_key=AgentPrivateKey,
-							 jws=KeyJws,
-							 nonce=FirstNonce } }.
+	  NonceLHState#leec_http_state{ directory_map=URLDirectoryMap,
+									agent_private_key=AgentPrivateKey,
+									jws=KeyJws,
+									nonce=FirstNonce } }.
 
 
 
@@ -1011,7 +1339,6 @@ get_agent_key_path( FsmPid ) ->
 -spec get_ongoing_challenges( fsm_pid() ) ->
 					'error' | 'no_challenge' | thumbprint_map().
 get_ongoing_challenges( FsmPid ) ->
-
 	case catch gen_statem:call( _ServerRef=FsmPid,
 								_Request=get_ongoing_challenges ) of
 
@@ -1034,20 +1361,20 @@ get_ongoing_challenges( FsmPid ) ->
 
 % @doc Sends the ongoing challenges to the specified process.
 %
-% Typically useful in a slave operation mode, when the web handler cannot access
-% directly the PID of the LEEC FSM: this code is then called by a third-party
-% process (e.g. a certificate manager one, statically known of the web handler,
-% and triggered by it), and returns the requested challenged to the specified
-% target PID (most probably the one of the web handler itself).
+% Typically useful in a slave interfacing mode, when the web handler cannot
+% access directly the PID of the LEEC FSM: this code is then called by a
+% third-party process (e.g. a certificate manager one, statically known of the
+% web handler, and triggered by it), and returns the requested challenged to the
+% specified target PID (most probably the one of the web handler itself).
 %
 % (exported API helper)
 %
 -spec send_ongoing_challenges( fsm_pid(), pid() ) -> void().
 send_ongoing_challenges( FsmPid, TargetPid ) ->
-
 	% No error possibly reported:
 	gen_statem:cast( _ServerRef=FsmPid,
 					 _Msg={ send_ongoing_challenges, TargetPid } ).
+
 
 
 
@@ -1074,7 +1401,7 @@ send_ongoing_challenges( FsmPid, TargetPid ) ->
 %
 % idle(get_ongoing_challenges | send_ongoing_challenges): nothing done
 %
--spec idle( event_type(), event_content(), le_state() ) ->
+-spec idle( event_type(), event_content(), leec_http_state() ) ->
 				state_callback_result().
 % idle with request {create, BinDomain, CertReqOptionMap}: starts the
 % certificate creation procedure.
@@ -1099,8 +1426,9 @@ idle( _EventType=enter, _PreviousState, _Data ) ->
 
 idle( _EventType={ call, From },
 	  _EventContentMsg=_Request={ create, BinDomain, CertReqOptionMap },
-	  _Data=LEState=#le_state{ directory_map=DirMap, agent_private_key=PrivKey,
-							   jws=Jws, nonce=Nonce } ) ->
+	  _Data=LHState=#leec_http_state{ directory_map=DirMap,
+									  agent_private_key=AgentPrivKey,
+									  jws=Jws, nonce=Nonce } ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] While idle: received a certificate creation "
@@ -1122,8 +1450,8 @@ idle( _EventType={ call, From },
 	end,
 
 	{ { AccountDecodedJsonMap, AccountLocationUri, AccountNonce },
-	  CreateLEState } = leec_api:get_acme_account( DirMap, PrivKey,
-							Jws#jws{ nonce=Nonce }, CertReqOptionMap, LEState ),
+	  CreateLHState } = leec_api:get_acme_account( DirMap, AgentPrivKey,
+		Jws#jws{ nonce=Nonce }, CertReqOptionMap, LHState ),
 
 	% Payload decoded from JSON in AccountDecodedJsonMap will be like:
 	%
@@ -1174,8 +1502,8 @@ idle( _EventType={ call, From },
 
 	% Will transition to 'pending' to manage this request:
 	{ { OrderDecodedJsonMap, OrderLocationUri, OrderNonce }, ReqState } =
-		leec_api:request_new_certificate( DirMap, BinDomains, PrivKey,
-								AccountJws, CertReqOptionMap, CreateLEState ),
+		leec_api:request_new_certificate( DirMap, BinDomains, AgentPrivKey,
+			AccountJws, CertReqOptionMap, CreateLHState ),
 
 	case maps:get( <<"status">>, OrderDecodedJsonMap ) of
 
@@ -1195,13 +1523,13 @@ idle( _EventType={ call, From },
 	% We need to keep trace of order location:
 	LocOrder = OrderDecodedJsonMap#{ <<"location">> => OrderLocationUri },
 
-	AuthLEState = ReqState#le_state{ domain=BinDomain, jws=AccountJws,
+	AuthLHState = ReqState#leec_http_state{ domain=BinDomain, jws=AccountJws,
 		account_key=AccountKey, nonce=OrderNonce, sans=BinSans },
 
 	AuthUris = maps:get( <<"authorizations">>, OrderDecodedJsonMap ),
 
-	{ AuthPair, PerfLEState } = perform_authorization( ChallengeType, AuthUris,
-													   AuthLEState ),
+	{ AuthPair, PerfLHState } = perform_authorization( ChallengeType, AuthUris,
+													   AuthLHState ),
 
 	{ NewStateName, Reply, NewUriChallengeMap, FinalNonce } =
 			case AuthPair of
@@ -1215,24 +1543,25 @@ idle( _EventType={ call, From },
 
 	end,
 
-	FinalLEState = PerfLEState#le_state{ nonce=FinalNonce, order=LocOrder,
-										 challenges=NewUriChallengeMap },
+	FinalLHState = PerfLHState#leec_http_state{ nonce=FinalNonce,
+												order=LocOrder,
+												challenges=NewUriChallengeMap },
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w][state] Switching from 'idle' to '~ts'.",
 		[ self(), NewStateName ] ) ),
 
-	{ next_state, NewStateName, _NewData=FinalLEState,
+	{ next_state, NewStateName, _NewData=FinalLHState,
 	  _Action={ reply, From, Reply } };
 
 
 idle( _EventType={ call, FromPid },
-	  _EventContentMsg=_Request=get_ongoing_challenges, _Data=_LEState ) ->
+	  _EventContentMsg=_Request=get_ongoing_challenges, _Data=_LHState ) ->
 
 	trace_bridge:warning_fmt( "Received a get_ongoing_challenges request call "
 		"from ~w while being idle.", [ FromPid ] ),
 
-	% Clearer than {next_state, idle, LEState, {reply, FromPid,
+	% Clearer than {next_state, idle, LHState, {reply, FromPid,
 	% _Reply=no_challenge}}:
 	%
 	{ keep_state_and_data, { reply, FromPid, _Reply=no_challenge } };
@@ -1240,7 +1569,7 @@ idle( _EventType={ call, FromPid },
 
 idle( _EventType=cast,
 	  _EventContentMsg=_Request={ send_ongoing_challenges, TargetPid },
-	  _Data=_LEState ) ->
+	  _Data=_LHState ) ->
 
 	% Should be pending:
 	trace_bridge:warning_fmt( "Ignored a send_ongoing_challenges cast "
@@ -1251,10 +1580,10 @@ idle( _EventType=cast,
 
 % Possibly Request=stop:
 idle( _EventType={ call, ServerRef }, _EventContentMsg=Request,
-	  _Data=LEState ) ->
-	handle_call_for_all_states( ServerRef, Request, _StateName=idle, LEState );
+	  _Data=LHState ) ->
+	handle_call_for_all_states( ServerRef, Request, _StateName=idle, LHState );
 
-idle( EventType, EventContentMsg, _LEState ) ->
+idle( EventType, EventContentMsg, _LHState ) ->
 	throw( { unexpected_event, EventType, EventContentMsg, { state, idle } } ).
 
 
@@ -1275,23 +1604,23 @@ pending( _EventType=enter, _PreviousState, _Data ) ->
 % thumbprints, i.e. a thumbprint_map().
 %
 pending( _EventType={ call, From }, _EventContentMsg=get_ongoing_challenges,
-		 _Data=LEState=#le_state{ account_key=AccountKey,
-								  challenges=TypeChallengeMap } ) ->
+		 _Data=LHState=#leec_http_state{ account_key=AccountKey,
+										 challenges=TypeChallengeMap } ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Getting ongoing challenges.", [ self() ] ) ),
 
-	% get_key_authorization/3 not returning a le_state():
+	% get_key_authorization/3 not returning a leec_http_state():
 	ThumbprintMap = maps:from_list( [ { Token,
 		_Thumbprint=leec_jws:get_key_authorization( AccountKey, Token,
-													LEState ) }
+													LHState ) }
 			|| #{ <<"token">> := Token } <- maps:values( TypeChallengeMap ) ] ),
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Returning (get) from pending state challenge "
 		"thumbprint map ~p.", [ self(), ThumbprintMap ] ) ),
 
-	{ next_state, _SameState=pending, LEState,
+	{ next_state, _SameState=pending, LHState,
 	  _Action={ reply, From, _RetValue=ThumbprintMap } };
 
 
@@ -1300,16 +1629,16 @@ pending( _EventType={ call, From }, _EventContentMsg=get_ongoing_challenges,
 %
 pending( _EventType=cast,
 		 _EventContentMsg={ send_ongoing_challenges, TargetPid },
-		 _Data=LEState=#le_state{ account_key=AccountKey,
+		 _Data=LHState=#leec_http_state{ account_key=AccountKey,
 								  challenges=TypeChallengeMap } ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Ongoing challenges to be sent to ~w.", [ self(), TargetPid ] ) ),
 
-	% get_key_authorization/3 not returning a le_state():
+	% get_key_authorization/3 not returning a leec_http_state():
 	ThumbprintMap = maps:from_list( [ { Token,
 		_Thumbprint=leec_jws:get_key_authorization( AccountKey, Token,
-													LEState ) }
+													LHState ) }
 			|| #{ <<"token">> := Token } <- maps:values( TypeChallengeMap ) ] ),
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
@@ -1331,7 +1660,7 @@ pending( _EventType=cast,
 %  - 'valid' if all challenges are complete
 %
 pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
-		 _Data=LEState=#le_state{
+		 _Data=LHState=#leec_http_state{
 			order=#{ <<"authorizations">> := AuthorizationsUris },
 			nonce=InitialNonce, agent_private_key=PrivKey, jws=Jws,
 			cert_req_option_map=CertReqOptionMap } ) ->
@@ -1340,7 +1669,7 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 		"[~w] Checking whether challenges are completed.", [ self() ] ) ),
 
 	% Checking the status for each authorization URI (one per host/SAN):
-	{ NextStateName, ResultingNonce, FoldLEState } = lists:foldl(
+	{ NextStateName, ResultingNonce, FoldLHState } = lists:foldl(
 
 		fun( AuthUri, _Acc={ AccStateName, AccNonce, AccState } ) ->
 
@@ -1403,7 +1732,6 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 					AccStateName;
 
 				{ AnyOtherState, UnexpectedBinStatus } ->
-
 					trace_bridge:error_fmt( "[~w] For auth URI ~ts, "
 						"while in '~ts' state, received unexpected "
 						"status '~p'.",
@@ -1418,7 +1746,7 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 			{ NewStateName, NewNonce, ReqState }
 
 		end,
-		_Acc0={ _InitialNextStateName=valid, InitialNonce, LEState },
+		_Acc0={ _InitialNextStateName=valid, InitialNonce, LHState },
 		_List=AuthorizationsUris ),
 
 
@@ -1438,13 +1766,12 @@ pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 	end,
 
 	{ next_state, NextStateName,
-	  _NewData=FoldLEState#le_state{ nonce=ResultingNonce },
+	  _NewData=FoldLHState#leec_http_state{ nonce=ResultingNonce },
 	  _Action={ reply, From, _RetValue=NextStateName } };
 
 
 pending( _EventType={ call, From }, _EventContentMsg=Request=switchTofinalize,
-		 _Data=_LEState ) ->
-
+		 _Data=_LHState ) ->
 	%cond_utils:if_defined( leec_debug_exchanges,
 	trace_bridge:debug_fmt( "[~w] Received, while in 'pending' state, "
 		"request '~ts' from ~w, currently ignored.",
@@ -1456,12 +1783,11 @@ pending( _EventType={ call, From }, _EventContentMsg=Request=switchTofinalize,
 
 
 pending( _EventType={ call, ServerRef }, _EventContentMsg=Request,
-		 _Data=LEState ) ->
+		 _Data=LHState ) ->
 	handle_call_for_all_states( ServerRef, Request, _StateName=pending,
-								LEState );
+								LHState );
 
-pending( EventType, EventContentMsg, _LEState ) ->
-
+pending( EventType, EventContentMsg, _LHState ) ->
 	trace_bridge:warning_fmt( "[~w] Received, while in 'pending' state, "
 		"event type '~p' and content message '~p'.",
 		[ self(), EventType, EventContentMsg ] ),
@@ -1474,47 +1800,52 @@ pending( EventType, EventContentMsg, _LEState ) ->
 % @doc Manages the 'valid' state.
 %
 % When challenges have been successfully completed, finalizes the ACME order and
-% generates TLS certificate.
+% generates the TLS certificate.
 %
 % Returns Status, the order status.
 %
 % Transitions to 'finalize' state.
 %
 valid( _EventType=enter, _PreviousState, _Data ) ->
-
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Entering the 'valid' state.", [ self() ] ) ),
-
 	keep_state_and_data;
 
 valid( _EventType={ call, _ServerRef=From },
 	   _EventContentMsg=_Request=switchTofinalize,
-	   _Data=LEState=#le_state{ mode=Mode, domain=BinDomain, sans=SANs,
+	   _Data=LHState=#leec_http_state{ interfacing_mode=InterfMode,
+			domain=BinDomain, sans=SANs,
 			cert_dir_path=BinCertDirPath, order=OrderDirMap,
-			agent_private_key=PrivKey, jws=Jws, nonce=Nonce,
+			agent_private_key=AgentPrivKey, jws=Jws, nonce=Nonce,
 			cert_req_option_map=CertReqOptionMap } ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Trying to switch to finalize while being in the 'valid' state.",
 		[ self() ] ) ),
 
-	DestroyLEState = challenge_destroy( Mode, LEState ),
+	DestroyLHState = challenge_destroy( InterfMode, LHState ),
 
-	KeyFilename = text_utils:binary_to_string( BinDomain ) ++ ".key",
+	CertPrivKeyFilename = get_certificate_priv_key_filename( BinDomain ),
 
 	% To avoid a warning:
 	file_utils:remove_file_if_existing(
-		file_utils:join( BinCertDirPath, KeyFilename ) ),
+		file_utils:join( BinCertDirPath, CertPrivKeyFilename ) ),
 
 	% KeyFilePath is required for CSR generation:
-	CreatedTLSPrivKey = leec_tls:obtain_private_key( { new, KeyFilename },
-													 BinCertDirPath ),
+	CreatedTLSPrivKey = leec_tls:obtain_private_key(
+		{ new, CertPrivKeyFilename }, BinCertDirPath ),
+
+	BinCertPrivKeyFilePath = CreatedTLSPrivKey#tls_private_key.file_path,
+
+	cond_utils:if_defined( leec_debug_fsm,
+		basic_utils:assert_equal( BinCertPrivKeyFilePath,
+			file_utils:bin_join( BinCertDirPath, CertPrivKeyFilename ) ) ),
 
 	Csr = leec_tls:get_cert_request( BinDomain, BinCertDirPath, SANs ),
 
-	{ { FinOrderDirMap, _BinLocUri, FinNonce }, FinLEState } =
-		leec_api:finalize_order( OrderDirMap, Csr, PrivKey,
-			Jws#jws{ nonce=Nonce }, CertReqOptionMap, DestroyLEState ),
+	{ { FinOrderDirMap, _BinLocUri, FinNonce }, FinLHState } =
+		leec_api:finalize_order( OrderDirMap, Csr, AgentPrivKey,
+			Jws#jws{ nonce=Nonce }, CertReqOptionMap, DestroyLHState ),
 
 	BinStatus = maps:get( <<"status">>, FinOrderDirMap ),
 
@@ -1523,28 +1854,30 @@ valid( _EventType={ call, _ServerRef=From },
 
 	% Update location in finalized order:
 	LocOrderDirMap = FinOrderDirMap#{
-				<<"location">> => maps:get( <<"location">>, OrderDirMap ) },
+		<<"location">> => maps:get( <<"location">>, OrderDirMap ) },
 
-	LastLEState = FinLEState#le_state{ order=LocOrderDirMap,
-		cert_key_file=CreatedTLSPrivKey#tls_private_key.file_path,
+
+	LastLHState = FinLHState#leec_http_state{
+		order=LocOrderDirMap,
+		cert_priv_key_path=BinCertPrivKeyFilePath,
 		nonce=FinNonce },
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w][state] Switching from 'valid' to 'finalize' "
 		"(after having read '~ts').", [ self(), ReadStateName ] ) ),
 
-	{ next_state, _NewStateName=finalize, _NewData=LastLEState,
+	{ next_state, _NewStateName=finalize, _NewData=LastLHState,
 	  _Action={ reply, From, _Reply=ReadStateName } };
 
 
 valid( _EventType={ call, ServerRef }, _EventContentMsg=Request,
-	   _Data=LEState ) ->
+	   _Data=LHState ) ->
 	handle_call_for_all_states( ServerRef, Request, _StateName=valid,
-								LEState );
+								LHState );
 
-valid( EventType, EventContentMsg, _LEState ) ->
+valid( EventType, EventContentMsg, _LHState ) ->
 	throw( { unexpected_event, EventType, EventContentMsg,
-				{ state, valid }, self() } ).
+			{ state, valid }, self() } ).
 
 
 
@@ -1570,10 +1903,11 @@ finalize( _EventType=enter, _PreviousState, _Data ) ->
 
 finalize( _EventType={ call, _ServerRef=From },
 		  _EventContentMsg=_Request=manageCreation,
-		  _Data=LEState=#le_state{ order=OrderMap, domain=BinDomain,
-				%agent_key_file_path=KeyFilePath,
+		  _Data=LHState=#leec_http_state{ order=OrderMap,
+				domain=BinDomain,
 				cert_dir_path=BinCertDirPath,
-				agent_private_key=PrivKey, jws=Jws, nonce=Nonce,
+				cert_priv_key_path=BinCertPrivKeyPath,
+				agent_private_key=AgentPrivKey, jws=Jws, nonce=Nonce,
 				cert_req_option_map=CertReqOptionMap } ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
@@ -1581,19 +1915,19 @@ finalize( _EventType={ call, _ServerRef=From },
 		"based on order map:~n   ~p.", [ self(), OrderMap ] ) ),
 
 	%trace_bridge:debug_fmt( "[~w] Getting progress of creation procedure "
-	%						"based on order map.", [ self() ] ),
+	%                        "based on order map.", [ self() ] ),
 
 	Loc = maps:get( <<"location">>, OrderMap ),
 
 	{ { NewOrderMap, _NullLoc, OrderNonce }, OrderState } =
-		leec_api:get_order( Loc, PrivKey, Jws#jws{ nonce=Nonce },
-							CertReqOptionMap, LEState ),
+		leec_api:get_order( Loc, AgentPrivKey, Jws#jws{ nonce=Nonce },
+							CertReqOptionMap, LHState ),
 
 	BinStatus = maps:get( <<"status">>, NewOrderMap ),
 
 	ReadStatus = leec_api:binary_to_status( BinStatus ),
 
-	{ { Reply, NewStateName, NewNonce, NewJws }, ReadLEState } =
+	{ { Reply, NewStateName, NewNonce, NewJws }, ReadLHState } =
 			case ReadStatus of
 
 		processing ->
@@ -1603,6 +1937,7 @@ finalize( _EventType={ call, _ServerRef=From },
 				[ self() ] ) ),
 
 			{ { creation_in_progress, finalize, OrderNonce, Jws }, OrderState };
+
 
 		% Downloads certificate and saves it into file.
 		%
@@ -1616,10 +1951,9 @@ finalize( _EventType={ call, _ServerRef=From },
 
 			%BinKeyFilePath = text_utils:string_to_binary( KeyFilePath ),
 
-			% Downloads certificate:
-
-			{ { BinCert, DownloadNonce }, CertLEState } =
-				leec_api:get_certificate( OrderMap, PrivKey,
+			% Downloads the actual, final certificate:
+			{ { BinCert, DownloadNonce }, CertLHState } =
+				leec_api:get_certificate( OrderMap, AgentPrivKey,
 					Jws#jws{ nonce=OrderNonce }, CertReqOptionMap, OrderState ),
 
 			Domain = text_utils:binary_to_string( BinDomain ),
@@ -1640,19 +1974,20 @@ finalize( _EventType={ call, _ServerRef=From },
 			% creating a new account each time a new operation is performed (as
 			% ~90 days may elapse between two operations). So:
 			%
-			AgentKeyJws = leec_jws:init( PrivKey ),
+			AgentKeyJws = leec_jws:init( AgentPrivKey ),
 
 			% Safer, not wasting idle connections, bound to fail after some time
 			% anyway:
 			%
 			leec_api:close_tcp_connections(
-				OrderState#le_state.tcp_connection_cache ),
+				OrderState#leec_http_state.tcp_connection_cache ),
 
-			CloseLEState = CertLEState#le_state{
+			CloseLHState = CertLHState#leec_http_state{
 				tcp_connection_cache=table:new() },
 
-			{ { { certificate_ready, BinCertFilePath }, idle, DownloadNonce,
-				AgentKeyJws }, CloseLEState };
+			Result = { certificate_ready, BinCertFilePath, BinCertPrivKeyPath },
+
+			{ { Result, idle, DownloadNonce, AgentKeyJws }, CloseLHState };
 
 
 		% Like for 'processing', yet with a different trace:
@@ -1663,25 +1998,25 @@ finalize( _EventType={ call, _ServerRef=From },
 
 	end,
 
-	FinalLEState = ReadLEState#le_state{ order=NewOrderMap, jws=NewJws,
-										 nonce=NewNonce },
+	FinalLHState = ReadLHState#leec_http_state{ order=NewOrderMap, jws=NewJws,
+												nonce=NewNonce },
 
-	{ next_state, NewStateName, _NewData=FinalLEState,
+	{ next_state, NewStateName, _NewData=FinalLHState,
 	  _Action={ reply, From, Reply } };
 
 
 finalize( _EventType={ call, ServerRef }, _EventContentMsg=Request,
-		  _Data=LEState ) ->
+		  _Data=LHState ) ->
 	handle_call_for_all_states( ServerRef, Request, _StateName=finalize,
-								LEState );
+								LHState );
 
 
-finalize( UnexpectedEventType, EventContentMsg, _LEState ) ->
+finalize( UnexpectedEventType, EventContentMsg, _LHState ) ->
 
 	trace_bridge:error_fmt( "Unknown event ~p (content: ~p) in "
 		"finalize status.", [ UnexpectedEventType, EventContentMsg ] ),
 
-	%{ reply, { error, UnexpectedEventType }, finalize, LEState }.
+	%{ reply, { error, UnexpectedEventType }, finalize, LHState }.
 
 	throw( { unexpected_event, UnexpectedEventType, EventContentMsg,
 				{ state, finalize } } ).
@@ -1700,13 +2035,13 @@ finalize( UnexpectedEventType, EventContentMsg, _LEState ) ->
 %   state 'processing': still ongoing
 %   state 'valid'     : certificate is ready
 %
-invalid( _EventType=enter, _PreviousState, _Data=LEState ) ->
+invalid( _EventType=enter, _PreviousState, _Data=LHState ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Entering the 'invalid' state.", [ self() ] ) ),
 
 	trace_bridge:error_fmt( "[~w] Reached the (stable) 'invalid' state for "
-		"domain '~ts'.", [ self(), LEState#le_state.domain ] ),
+		"domain '~ts'.", [ self(), LHState#leec_http_state.domain ] ),
 
 	keep_state_and_data.
 
@@ -1721,9 +2056,9 @@ invalid( _EventType=enter, _PreviousState, _Data=LEState ) ->
 % (helper)
 %
 -spec handle_call_for_all_states( server_ref(), request(), state_name(),
-								  le_state() ) -> state_callback_result().
+		leec_http_state() ) -> state_callback_result().
 handle_call_for_all_states( ServerRef, _Request=get_status, StateName,
-							_LEState ) ->
+							_LHState ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Returning current status: '~ts'.", [ ServerRef, StateName ] ) ),
@@ -1734,9 +2069,9 @@ handle_call_for_all_states( ServerRef, _Request=get_status, StateName,
 
 
 handle_call_for_all_states( ServerRef, _Request=get_agent_key_path, StateName,
-							LEState ) ->
+							LHState ) ->
 
-	MaybeKeyPath = case LEState#le_state.agent_private_key of
+	MaybeAgentKeyPath = case LHState#leec_http_state.agent_private_key of
 
 		undefined ->
 			undefined;
@@ -1748,37 +2083,38 @@ handle_call_for_all_states( ServerRef, _Request=get_agent_key_path, StateName,
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Returning agent key path (while in state '~ts'): ~p.",
-		[ ServerRef, StateName, MaybeKeyPath ] ),
+		[ ServerRef, StateName, MaybeAgentKeyPath ] ),
 		basic_utils:ignore_unused( StateName ) ),
 
 	{ keep_state_and_data, _Actions={ reply, _From=ServerRef,
-									  _Res=MaybeKeyPath } };
+									  _Res=MaybeAgentKeyPath } };
 
 
 handle_call_for_all_states( ServerRef, _Request=stop, StateName,
-							LEState=#le_state{ mode=Mode } ) ->
+		LHState=#leec_http_state{ interfacing_mode=InterfMode } ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Received a stop request from ~ts state.",
 		[ ServerRef, StateName ] ),
 		basic_utils:ignore_unused( [ ServerRef, StateName ] ) ),
 
-	trace_bridge:warning_fmt( "FSM ~w is to stop, while in mode '~p'.",
-							  [ self(), Mode ] ),
+	trace_bridge:warning_fmt(
+		"FSM ~w is to stop, while in interfacing mode '~p'.",
+		[ self(), InterfMode ] ),
 
-	DestroyLEState = challenge_destroy( Mode, LEState ),
+	DestroyLHState = challenge_destroy( InterfMode, LHState ),
 
 	% Stopping is just returning back to idle (no action):
 
 	%{ stop_and_reply, _Reason, _Reply={ reply, ServerRef, ok },
-	%   _Data=LEState }.
+	%   _Data=LHState }.
 
 	trace_bridge:warning_fmt( "FSM ~w stopped, switching to idle'.",
-							  [ self(), Mode ] ),
-	{ next_state, _NextState=idle, _NewData=DestroyLEState };
+							  [ self(), InterfMode ] ),
+	{ next_state, _NextState=idle, _NewData=DestroyLHState };
 
 
-handle_call_for_all_states( ServerRef, Request, StateName, _LEState ) ->
+handle_call_for_all_states( ServerRef, Request, StateName, _LHState ) ->
 
 	trace_bridge:error_fmt( "[~w] Received an unexpected request, ~p, "
 		"while in state ~p.", [ ServerRef, Request, StateName ] ),
@@ -1797,9 +2133,9 @@ terminate( Reason, State, Data ) ->
 
 
 % @doc Standard "code change" callback.
-code_change( _, StateName, LEState, _ ) ->
+code_change( _, StateName, LHState, _ ) ->
 	trace_bridge:warning_fmt( "FSM ~w changing code.", [ self() ] ),
-	{ ok, StateName, LEState }.
+	{ ok, StateName, LHState }.
 
 
 
@@ -1811,9 +2147,9 @@ code_change( _, StateName, LEState, _ ) ->
 %
 % Available options are:
 %
-% - staging: runs in staging environment (otherwise running in production one)
+% - environment: to run against a production or staging ACME environment
 %
-% - mode: webroot, slave or standalone
+% - interfacing_mode: webroot, slave or standalone
 %
 % - agent_key_file_path: to reuse an existing agent TLS key
 %
@@ -1824,28 +2160,34 @@ code_change( _, StateName, LEState, _ ) ->
 % them
 %
 % - port: the TCP port at which the corresponding webserver shall be available,
-% in standalone mode
+% in standalone interfacing mode
 %
 % - http_timeout: timeout for ACME API requests (in milliseconds)
 %
-% Returns LEState (type record 'le_state') filled with corresponding, checked
-% option values.
+% Returns LHState (type record 'leec_http_state') filled with corresponding,
+% checked option values.
 %
--spec get_start_options( [ start_option() ], le_state() ) -> le_state().
-get_start_options( _Opts=[], LEState ) ->
-	LEState;
+-spec get_start_options( [ start_option() ], leec_http_state() ) ->
+								leec_http_state().
+get_start_options( _Opts=[], LHState ) ->
+	LHState;
 
-get_start_options( _Opts=[ staging | T ], LEState ) ->
-	get_start_options( T, LEState#le_state{ env=staging } );
+get_start_options( _Opts=[ { environment, Env } | T ], LHState ) ->
 
-get_start_options( _Opts=[ { mode, Mode } | T ], LEState ) ->
-	lists:member( Mode, [ webroot, slave, standalone ] ) orelse
-		throw( { invalid_leec_mode, Mode } ),
-	get_start_options( T, LEState#le_state{ mode=Mode } );
+	lists:member( Env, [ staging, production ] ) orelse
+		throw( { invalid_environment, Env } ),
+
+	get_start_options( T, LHState#leec_http_state{ environment=Env } );
+
+get_start_options( _Opts=[ { interfacing_mode, InterfMode } | T ], LHState ) ->
+	lists:member( InterfMode, [ webroot, slave, standalone ] ) orelse
+		throw( { invalid_leec_interfacing_mode, InterfMode } ),
+	get_start_options( T,
+					   LHState#leec_http_state{ interfacing_mode=InterfMode } );
 
 % To re-use a previously-stored agent private key:
 get_start_options( _Opts=[ { agent_key_file_path, KeyFilePath } | T ],
-				   LEState ) ->
+				   LHState ) ->
 
 	AgentKeyFilePath = text_utils:ensure_string( KeyFilePath ),
 
@@ -1862,7 +2204,7 @@ get_start_options( _Opts=[ { agent_key_file_path, KeyFilePath } | T ],
 							BinAgentKeyFilePath =
 								text_utils:string_to_binary( AgentKeyFilePath ),
 
-							get_start_options( T, LEState#le_state{
+							get_start_options( T, LHState#leec_http_state{
 								agent_key_file_info=BinAgentKeyFilePath } );
 
 						false ->
@@ -1880,19 +2222,19 @@ get_start_options( _Opts=[ { agent_key_file_path, KeyFilePath } | T ],
 		false ->
 			% No possible check yet:
 			get_start_options( T,
-				LEState#le_state{ agent_key_file_info=
+				LHState#leec_http_state{ agent_key_file_info=
 					text_utils:string_to_binary( AgentKeyFilePath ) } )
 
 	end;
 
 
-get_start_options( _Opts=[ { cert_dir_path, BinCertDirPath } | T ], LEState )
+get_start_options( _Opts=[ { cert_dir_path, BinCertDirPath } | T ], LHState )
 								when is_binary( BinCertDirPath ) ->
 	case file_utils:is_existing_directory_or_link( BinCertDirPath ) of
 
 		true ->
 			get_start_options( T,
-				LEState#le_state{ cert_dir_path=BinCertDirPath } );
+				LHState#leec_http_state{ cert_dir_path=BinCertDirPath } );
 
 		false ->
 			throw( { non_existing_certificate_directory,
@@ -1900,18 +2242,18 @@ get_start_options( _Opts=[ { cert_dir_path, BinCertDirPath } | T ], LEState )
 
 	end;
 
-get_start_options( _Opts=[ { cert_dir_path, CertDirPath } | T ], LEState ) ->
+get_start_options( _Opts=[ { cert_dir_path, CertDirPath } | T ], LHState ) ->
 	BinCertDirPath = text_utils:string_to_binary( CertDirPath ),
-	get_start_options( [ { cert_dir_path, BinCertDirPath } | T ], LEState );
+	get_start_options( [ { cert_dir_path, BinCertDirPath } | T ], LHState );
 
 
-get_start_options( _Opts=[ { webroot_dir_path, BinWebDirPath } | T ], LEState )
+get_start_options( _Opts=[ { webroot_dir_path, BinWebDirPath } | T ], LHState )
 								when is_binary( BinWebDirPath ) ->
 	case file_utils:is_existing_directory_or_link( BinWebDirPath ) of
 
 		true ->
 			get_start_options( T,
-				LEState#le_state{ webroot_dir_path=BinWebDirPath } );
+				LHState#leec_http_state{ webroot_dir_path=BinWebDirPath } );
 
 		false ->
 			throw( { non_existing_webroot_directory,
@@ -1919,47 +2261,49 @@ get_start_options( _Opts=[ { webroot_dir_path, BinWebDirPath } | T ], LEState )
 
 	end;
 
-get_start_options( _Opts=[ { webroot_dir_path, WebDirPath } | T ], LEState ) ->
+get_start_options( _Opts=[ { webroot_dir_path, WebDirPath } | T ], LHState ) ->
 	BinWebDirPath = text_utils:ensure_binary( WebDirPath ),
-	get_start_options( [ { webroot_dir_path, BinWebDirPath } | T ], LEState );
+	get_start_options( [ { webroot_dir_path, BinWebDirPath } | T ], LHState );
 
 
-get_start_options( _Opts=[ { port, Port } | T ], LEState )
+get_start_options( _Opts=[ { port, Port } | T ], LHState )
   when is_integer( Port ) ->
-	get_start_options( T, LEState#le_state{ port=Port } );
+	get_start_options( T, LHState#leec_http_state{ port=Port } );
 
-get_start_options( _Opts=[ { port, Port } | _T ], _LEState ) ->
+get_start_options( _Opts=[ { port, Port } | _T ], _LHState ) ->
 	throw( { invalid_standalone_tcp_port, Port } );
 
-get_start_options( _Opts=[ { http_timeout, Timeout } | T ], LEState )
+get_start_options( _Opts=[ { http_timeout, Timeout } | T ], LHState )
   when is_integer( Timeout ) ->
-	CertReqOptMap = LEState#le_state.cert_req_option_map,
+	CertReqOptMap = LHState#leec_http_state.cert_req_option_map,
 	NetOpts = maps:get( netopts, CertReqOptMap, _DefNetOpts=#{} ),
 	% Supersedes any prior value:
 	NetOptsWithTimeout = NetOpts#{ timeout => Timeout },
 	NewCertReqOptMap = CertReqOptMap#{ netopts => NetOptsWithTimeout },
 
-	get_start_options( T, LEState#le_state{
+	get_start_options( T, LHState#leec_http_state{
 								cert_req_option_map=NewCertReqOptMap } );
 
-get_start_options( _Opts=[ { http_timeout, Timeout } | _T ], _LEState ) ->
+get_start_options( _Opts=[ { http_timeout, Timeout } | _T ], _LHState ) ->
 	throw( { invalid_http_timeout, Timeout } );
 
-get_start_options( _Opts=[ Unexpected | _T ], _LEState ) ->
+get_start_options( _Opts=[ Unexpected | _T ], _LHState ) ->
 	trace_bridge:error_fmt( "Invalid LEEC option specified: ~p.",
 							[ Unexpected ] ),
 	throw( { invalid_leec_option, Unexpected } ).
 
 
 
-% @doc Setups the context of chosen mode.
--spec setup_mode( le_state() ) -> le_state().
-setup_mode( #le_state{ mode=webroot, webroot_dir_path=undefined } ) ->
+% @doc Setups the context of the chosen interfacing mode.
+-spec setup_interfacing_mode( leec_http_state() ) -> leec_http_state().
+setup_interfacing_mode( #leec_http_state{ interfacing_mode=webroot,
+										  webroot_dir_path=undefined } ) ->
 	trace_bridge:error( "Missing 'webroot_dir_path' parameter." ),
 	throw( webroot_dir_path_missing );
 
-setup_mode( LEState=#le_state{ mode=webroot,
-							   webroot_dir_path=BinWebrootPath } ) ->
+setup_interfacing_mode( LHState=#leec_http_state{
+								   interfacing_mode=webroot,
+								   webroot_dir_path=BinWebrootPath } ) ->
 
 	ChallengeDirPath =
 		file_utils:join( BinWebrootPath, ?webroot_challenge_path ),
@@ -1968,21 +2312,28 @@ setup_mode( LEState=#le_state{ mode=webroot,
 	file_utils:create_directory_if_not_existing( ChallengeDirPath,
 												 create_parents ),
 
-	LEState;
+	LHState;
 
 % Already checked:
-setup_mode( LEState=#le_state{ mode=standalone, port=Port } )
-						when is_integer( Port ) ->
+setup_interfacing_mode( LHState=#leec_http_state{
+		interfacing_mode=standalone, port=Port } ) when is_integer( Port ) ->
 	% TODO: check port is unused?
-	LEState;
+	LHState;
 
-setup_mode( LEState=#le_state{ mode=slave } ) ->
-	LEState;
+setup_interfacing_mode( LHState=#leec_http_state{ interfacing_mode=slave } ) ->
+	LHState;
 
 % Every other mode value is invalid:
-setup_mode( #le_state{ mode=Mode } ) ->
-	trace_bridge:error_fmt( "Invalid '~p' mode.", [ Mode ] ),
-	throw( { invalid_mode, Mode } ).
+setup_interfacing_mode( #leec_http_state{ interfacing_mode=undefined } ) ->
+
+	trace_bridge:error( "Interfacing mode not set "
+						"(see the 'interfacing_mode' start option)." ),
+
+	throw( interfacing_mode_not_set );
+
+setup_interfacing_mode( #leec_http_state{ interfacing_mode=InterfMode } ) ->
+	trace_bridge:error_fmt( "Invalid '~p' interfacing mode.", [ InterfMode ] ),
+	throw( { invalid_interfacing_mode, InterfMode } ).
 
 
 
@@ -2095,21 +2446,23 @@ wait_creation_completed( FsmPid, Count, Max ) ->
 	end.
 
 
+
 % @doc Performs ACME authorization based on selected challenge initialization.
--spec perform_authorization( challenge_type(), [ bin_uri() ], le_state() ) ->
-						{ { uri_challenge_map(), nonce() }, le_state() }.
+-spec perform_authorization( challenge_type(), [ bin_uri() ],
+							 leec_http_state() ) ->
+		{ { uri_challenge_map(), nonce() }, leec_http_state() }.
 perform_authorization( ChallengeType, AuthUris,
-					   LEState=#le_state{ mode=Mode } ) ->
+		LHState=#leec_http_state{ interfacing_mode=InterfMode } ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Starting authorization procedure with "
-		"challenge type '~ts' (mode: ~ts).",
-		[ self(), ChallengeType, Mode ] ) ),
+		"challenge type '~ts' (interfacing mode: ~ts).",
+		[ self(), ChallengeType, InterfMode ] ) ),
 
 	BinChallengeType = text_utils:atom_to_binary( ChallengeType ),
 
-	{ { UriChallengeMap, Nonce }, FirstLEState } = perform_authorization_step1(
-		AuthUris, BinChallengeType, LEState, _UriChallengeMap=#{} ),
+	{ { UriChallengeMap, Nonce }, FirstLHState } = perform_authorization_step1(
+		AuthUris, BinChallengeType, LHState, _UriChallengeMap=#{} ),
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
 		"[~w] URI challenge map after step 1:~n  ~p.",
@@ -2124,13 +2477,14 @@ perform_authorization( ChallengeType, AuthUris,
 	%     <<"url">> =>
 	%         <<"ACME_BASE/acme/chall-v3/142509381/-Axkdw">>}}.
 
-	init_for_challenge_type( ChallengeType, Mode, FirstLEState,
+	init_for_challenge_type( ChallengeType, InterfMode, FirstLHState,
 							 UriChallengeMap ),
 
-	{ NewNonce, SecondLEState } = perform_authorization_step2(
-		maps:to_list( UriChallengeMap ), FirstLEState#le_state{ nonce=Nonce } ),
+	{ NewNonce, SecondLHState } = perform_authorization_step2(
+		maps:to_list( UriChallengeMap ),
+		FirstLHState#leec_http_state{ nonce=Nonce } ),
 
-	{ { UriChallengeMap, NewNonce }, SecondLEState }.
+	{ { UriChallengeMap, NewNonce }, SecondLHState }.
 
 
 
@@ -2148,23 +2502,23 @@ perform_authorization( ChallengeType, AuthUris,
 %	- Nonce is a new valid replay-nonce
 %
 -spec perform_authorization_step1( [ bin_uri() ], bin_challenge_type(),
-		le_state(), uri_challenge_map() ) ->
-			{ { uri_challenge_map(), nonce() }, le_state() }.
+		leec_http_state(), uri_challenge_map() ) ->
+			{ { uri_challenge_map(), nonce() }, leec_http_state() }.
 perform_authorization_step1( _AuthUris=[], _BinChallengeType,
-		LEState=#le_state{ nonce=Nonce }, UriChallengeMap ) ->
-	{ { UriChallengeMap, Nonce }, LEState };
+		LHState=#leec_http_state{ nonce=Nonce }, UriChallengeMap ) ->
+	{ { UriChallengeMap, Nonce }, LHState };
 
 perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
-			LEState=#le_state{ nonce=Nonce, agent_private_key=PrivKey,
-							   jws=Jws, cert_req_option_map=CertReqOptionMap },
+			LHState=#leec_http_state{ nonce=Nonce,
+				agent_private_key=AgentPrivKey,
+				jws=Jws, cert_req_option_map=CertReqOptionMap },
 			UriChallengeMap ) ->
 
-	% For example AuthUri =
-	%  "ACME_BASE/acme/authz-v3/133572032"
+	% For example AuthUri = "ACME_BASE/acme/authz-v3/133572032"
 
-	{ { AuthMap, _LocUri, NewNonce }, ReqLEState } =
-		leec_api:request_authorization( AuthUri, PrivKey,
-							Jws#jws{ nonce=Nonce }, CertReqOptionMap, LEState ),
+	{ { AuthMap, _LocUri, NewNonce }, ReqLHState } =
+		leec_api:request_authorization( AuthUri, AgentPrivKey,
+			Jws#jws{ nonce=Nonce }, CertReqOptionMap, LHState ),
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
 		"[~w] Step 1: authmap returned for URI '~ts':~n  ~p.",
@@ -2220,7 +2574,7 @@ perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 		_List=maps:get( <<"challenges">>, AuthMap ) ),
 
 	perform_authorization_step1( T, BinChallengeType,
-		ReqLEState#le_state{ nonce=NewNonce },
+		ReqLHState#leec_http_state{ nonce=NewNonce },
 		UriChallengeMap#{ AuthUri => Challenge } ).
 
 
@@ -2232,17 +2586,18 @@ perform_authorization_step1( _AuthUris=[ AuthUri | T ], BinChallengeType,
 % updated nonce.
 %
 -spec perform_authorization_step2( [ { bin_uri(), challenge() } ],
-								   le_state()) -> { nonce(), le_state() }.
-perform_authorization_step2( _Pairs=[], LEState=#le_state{ nonce=Nonce } ) ->
-	{ Nonce, LEState };
+				leec_http_state()) -> { nonce(), leec_http_state() }.
+perform_authorization_step2( _Pairs=[],
+							 LHState=#leec_http_state{ nonce=Nonce } ) ->
+	{ Nonce, LHState };
 
 perform_authorization_step2( _Pairs=[ { Uri, Challenge } | T ],
-			LEState=#le_state{ nonce=Nonce, agent_private_key=AgentPrivKey,
-							jws=Jws, cert_req_option_map=CertReqOptionMap } ) ->
+		LHState=#leec_http_state{ nonce=Nonce, agent_private_key=AgentPrivKey,
+			jws=Jws, cert_req_option_map=CertReqOptionMap } ) ->
 
-	{ { Resp, _Location, NewNonce }, NotifLEState } =
+	{ { Resp, _Location, NewNonce }, NotifLHState } =
 		leec_api:notify_ready_for_challenge( Challenge, AgentPrivKey,
-			Jws#jws{ nonce=Nonce }, CertReqOptionMap, LEState ),
+			Jws#jws{ nonce=Nonce }, CertReqOptionMap, LHState ),
 
 	case maps:get( <<"status">>, Resp ) of
 
@@ -2259,23 +2614,24 @@ perform_authorization_step2( _Pairs=[ { Uri, Challenge } | T ],
 
 	end,
 
-	perform_authorization_step2( T, NotifLEState#le_state{ nonce=NewNonce } ).
+	perform_authorization_step2( T,
+		NotifLHState#leec_http_state{ nonce=NewNonce } ).
 
 
 
 % @doc Initializes the local configuration to serve the specified challenge
 % type.
 %
-% Depends on challenge type and mode.
+% Depends on challenge type and interfacing mode.
 %
--spec init_for_challenge_type( challenge_type(), le_mode(), le_state(),
-							   uri_challenge_map() ) -> void().
+-spec init_for_challenge_type( challenge_type(), web_interfacing_mode(),
+		leec_http_state(), uri_challenge_map() ) -> void().
 % Here we directly write challenges in a web root that is already being served
 % through other means:
 %
-init_for_challenge_type( _ChallengeType='http-01', _Mode=webroot,
-		LEState=#le_state{ webroot_dir_path=BinWebrootPath,
-						   account_key=AccountKey },
+init_for_challenge_type( _ChallengeType='http-01', _InterfMode=webroot,
+		LHState=#leec_http_state{ webroot_dir_path=BinWebrootPath,
+								  account_key=AccountKey },
 		UriChallengeMap ) ->
 
 	[ begin
@@ -2287,7 +2643,7 @@ init_for_challenge_type( _ChallengeType='http-01', _Mode=webroot,
 		ChlgWebPath = file_utils:join( ChlgWebDir, Token ),
 
 		Thumbprint = leec_jws:get_key_authorization( AccountKey, Token,
-													 LEState ),
+													 LHState ),
 
 		% The default modes are fine:
 		file_utils:write_whole( ChlgWebPath, Thumbprint )
@@ -2298,7 +2654,7 @@ init_for_challenge_type( _ChallengeType='http-01', _Mode=webroot,
 % Here we never write challenges, we trigger the user-specified callback
 % whenever challenges are ready:
 %
-init_for_challenge_type( _ChallengeType, _Mode=slave, _LEState,
+init_for_challenge_type( _ChallengeType, _InterfMode=slave, _LHState,
 						 _UriChallengeMap ) ->
 	ok;
 
@@ -2306,8 +2662,10 @@ init_for_challenge_type( _ChallengeType, _Mode=slave, _LEState,
 % Here we spawn a dedicated (elli-based) webserver in order to host the
 % challenges to be downloaded by the ACME server:
 %
-init_for_challenge_type( ChallengeType, _Mode=standalone,
-		LEState=#le_state{ port=Port, domain=Domain, account_key=AccntKey },
+init_for_challenge_type( ChallengeType, _InterfMode=standalone,
+		LHState=#leec_http_state{ port=Port,
+								  domain=Domain,
+								  account_key=AccntKey },
 		UriChallengeMap ) ->
 
 	cond_utils:if_defined( leec_debug_exchanges, trace_bridge:debug_fmt(
@@ -2326,7 +2684,7 @@ init_for_challenge_type( ChallengeType, _Mode=standalone,
 			% Iterating on values:
 			Thumbprints = maps:from_list(
 				[ { Token, leec_jws:get_key_authorization( AccntKey,
-														Token, LEState ) }
+														   Token, LHState ) }
 						|| #{ <<"token">> := Token }
 								<- maps:values( UriChallengeMap ) ] ),
 
@@ -2357,10 +2715,11 @@ init_for_challenge_type( ChallengeType, _Mode=standalone,
 % - 'standalone' mode: stop internal webserver
 % - 'slave' mode: nothing to do
 %
--spec challenge_destroy( le_mode(), le_state() ) -> le_state().
-challenge_destroy( _Mode=webroot,
-				   LEState=#le_state{ webroot_dir_path=BinWPath,
-									  challenges=UriChallengeMap } ) ->
+-spec challenge_destroy( web_interfacing_mode(), leec_http_state() ) ->
+									leec_http_state().
+challenge_destroy( _InterfMode=webroot,
+				   LHState=#leec_http_state{ webroot_dir_path=BinWPath,
+											 challenges=UriChallengeMap } ) ->
 
 	[ begin
 
@@ -2371,14 +2730,64 @@ challenge_destroy( _Mode=webroot,
 
 	  end || #{ <<"token">> := Token } <- maps:values( UriChallengeMap ) ],
 
-	LEState#le_state{ challenges=#{} };
+	LHState#leec_http_state{ challenges=#{} };
 
 
-challenge_destroy( _Mode=standalone, LEState ) ->
+challenge_destroy( _InterfMode=standalone, LHState ) ->
 	% Stop http server:
 	elli:stop( leec_elli_listener ),
-	LEState#le_state{ challenges=#{} };
+	LHState#leec_http_state{ challenges=#{} };
 
 
-challenge_destroy( _Mode=slave, LEState ) ->
-	LEState#le_state{ challenges=#{} }.
+challenge_destroy( _InterfMode=slave, LHState ) ->
+	LHState#leec_http_state{ challenges=#{} }.
+
+
+
+
+% Section specific to the dns-01 challenge.
+
+
+% @doc Returns a textual representation of the specified DNS provider.
+-spec dns_provider_to_string( dns_provider() ) -> ustring().
+dns_provider_to_string( _DNSProvider=ovh ) ->
+	"ovh";
+
+dns_provider_to_string( DNSProvider ) ->
+	throw( { unsupported_dns_provider, DNSProvider } ).
+
+
+
+% @doc Returns a file path corresponding to the specified domain name managed by
+% the specified DNS provider, in the specified credentials directory, made based
+% on the proposed LEEC conventions.
+%
+-spec get_credentials_path_for( dns_provider(), domain_name(),
+								any_directory_path() ) -> credentials_path().
+get_credentials_path_for( DNSProvider, DomainName, AnyCredBasePath ) ->
+
+	Filename = text_utils:format( "leec-~ts-credentials-for-~ts.txt",
+		[ dns_provider_to_string( DNSProvider ), DomainName ] ),
+
+	file_utils:ensure_path_is_absolute(
+		file_utils:bin_join( AnyCredBasePath, Filename ) ).
+
+
+
+% @doc Returns the filename of the private key of the certificate for the
+% specified domain.
+%
+-spec get_certificate_priv_key_filename( domain_name() ) -> file_name().
+get_certificate_priv_key_filename( DomainName ) ->
+	text_utils:format( "~ts.key", [ DomainName ] ).
+
+
+
+% @doc Returns a textual representation of the specified LEEC state.
+-spec state_to_string( leec_state() ) -> ustring().
+state_to_string( #leec_http_state{} ) ->
+	"LEEC http state";
+
+state_to_string( #leec_dns_state{ certbot_path=CertbotPath } ) ->
+	text_utils:format( "LEEC dns state, using executable '~ts'",
+					   [ CertbotPath ] ).

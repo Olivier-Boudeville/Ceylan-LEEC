@@ -1,4 +1,4 @@
-% Copyright (C) 2020-2020 Olivier Boudeville
+% Copyright (C) 2020-2023 Olivier Boudeville
 %
 % This file is part of the LEEC (Let's Encrypt Erlang with Ceylan) library.
 %
@@ -18,8 +18,8 @@
 % Creation date: Wednesday, October 28, 2020.
 
 
-% @doc Very <b>basic usage example for Ceylan-LEEC</b>, based on irrelevant
-% settings.
+% @doc Very <b>basic usage example for Ceylan-LEEC</b>, mainly for the http-01
+% challenge, based on mostly irrelevant settings.
 %
 % Allows to check that LEEC can be used directly, out of a rebar3 context.
 %
@@ -38,7 +38,7 @@ run() ->
 	test_facilities:display( "Testing LEEC." ),
 
 	% Not in an OTP context here, yet we need OTP applications such as LEEC to
-	% work (ex: w.r.t. their .app being found, etc.):
+	% work (e.g. w.r.t. their .app being found, etc.):
 
 	% Base build root directory from which prerequisite applications may be
 	% found:
@@ -70,10 +70,12 @@ run() ->
 					 { webroot_dir_path, WebrootDirPath },
 					 { cert_dir_path, CertDirPath } ],
 
-	% Not agent private key specified, it will be generated (with a generated
+	ChallengeType = 'http-01',
+
+	% No agent private key specified, it will be generated (with a generated
 	% name); expected to succeed:
 	%
-	FirstLeecFsmPid = case leec:start( BaseLEECOpts ) of
+	FirstLeecFsmPid = case leec:start( ChallengeType, BaseLEECOpts ) of
 
 		{ ok, FirstFsmPid } ->
 			FirstFsmPid;
@@ -101,7 +103,7 @@ run() ->
 	% For the second LEEC FSM, to rely on the same account:
 	SecondLEECOpts = [ { agent_key_file_path, BinKeyPath } | BaseLEECOpts ],
 
-	_SecondLeecFsmPid = case leec:start( SecondLEECOpts ) of
+	_SecondLeecFsmPid = case leec:start( ChallengeType, SecondLEECOpts ) of
 
 		{ ok, SecondFsmPid }  ->
 			SecondFsmPid;
@@ -138,7 +140,7 @@ run() ->
 
 		true ->
 			case leec:obtain_certificate_for( DomainName, FirstLeecFsmPid,
-				leec:get_default_cert_request_options( _Async=false ) ) of
+					leec:get_default_cert_request_options( _Async=false ) ) of
 
 				{ certificate_ready, BinCertFilePath } ->
 					throw( { not_expected_to_succeed, BinCertFilePath } );
