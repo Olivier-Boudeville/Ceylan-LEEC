@@ -87,17 +87,6 @@
 
 
 
-% Resulting certificate:
-%-record( certificate, {
-%
-%	% The (public) certificate obtained:
-%	cert :: leec:bin_certificate(),
-%
-%	% Its associated private key (kept locally):
-%	key :: leec:bin_key() } ).
-
-
-
 % For internal use only:
 
 
@@ -181,8 +170,7 @@
 	challenges = #{} :: leec:uri_challenge_map(),
 
 	% Certificate request options.
-	cert_req_option_map =
-		leec:get_default_cert_request_options() :: leec:cert_req_option_map(),
+	cert_req_option_map :: leec:cert_req_option_map(),
 
 	% Useful to be able to switch JSON parsers at runtime, yet to avoid repeated
 	% initializations thereof:

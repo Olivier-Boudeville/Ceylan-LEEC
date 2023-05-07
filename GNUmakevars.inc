@@ -76,7 +76,7 @@ ifeq ($(ENABLE_DEBUG),true)
 	#LEEC_DEBUG_FLAGS += -Dleec_debug_exchanges
 	#LEEC_DEBUG_FLAGS += -Dleec_debug_codec
 	#LEEC_DEBUG_FLAGS += -Dleec_debug_sni
-	LEEC_DEBUG_FLAGS += -Dleec_debug_bot
+	#LEEC_DEBUG_FLAGS += -Dleec_debug_bot
 endif
 
 # Defining check flags:

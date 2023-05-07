@@ -65,6 +65,7 @@
 
 % Public API:
 -export([ get_ordered_prerequisites/0,
+		  can_perform_dns_challenges/0,
 		  start/2, start/3,
 		  get_default_cert_request_options/1,
 		  get_default_cert_request_options/2,
@@ -341,6 +342,11 @@
 % Certificate request options.
 
 
+-type creation_callback() :: fun( (creation_outcome() ) -> void() ).
+% A function executed when a domain certificate has been successfully obtained
+% asynchronously.
+
+
 -type cert_req_option_map() :: table( cert_req_option_id(), term() ).
 % Storing certificate request options.
 %
@@ -354,8 +360,8 @@
 %       - if false, blocks until completed, and returns the path to the
 %       generated certificate
 %
-%    - callback :: fun/1: the function executed when Async is true, once the
-%      domain certificate has been successfully obtained
+%    - callback :: creation_callback() -> void(): the function executed when
+%    Async is true, once the domain certificate has been successfully obtained
 %
 %  - options for http-01 certificate requests:
 %    - netopts :: map() => #{ timeout => milliseconds(),
@@ -472,9 +478,6 @@
 -type jws() :: #jws{}.
 
 
-%-type certificate() :: #certificate{}.
-% A record containing the public and private elements of a certificate.
-
 -type leec_state() :: leec_http_state() | leec_dns_state().
 % Any type of LEEC state.
 
@@ -504,7 +507,7 @@
 
 			   dns_provider/0, credentials_path/0,
 
-			   cert_req_option_id/0, cert_req_option_map/0,
+			   cert_req_option_id/0, cert_req_option_map/0, creation_callback/0,
 			   acme_operation/0, directory_map/0, nonce/0,
 			   san/0, bin_san/0, any_san/0,
 			   json_map_decoded/0, agent_key_file_info/0,
@@ -631,6 +634,13 @@ get_ordered_prerequisites() ->
 						  [ shotgun ], _ThenNativeHttpc=[] ).
 
 
+% @doc Tells whether LEEC has a chance to run successfully a dns-01 challenge.
+-spec can_perform_dns_challenges() -> boolean().
+can_perform_dns_challenges() ->
+	% Not a sufficient guarantee (and 'true' not returned):
+	executable_utils:lookup_executable( "certbot" ) =/= false.
+
+
 
 % @doc Starts a (non-bridged) instance of the LEEC service FSM, meant to rely on
 % the specified type of challenge.
@@ -715,7 +725,8 @@ start( ChallengeType='http-01', StartOptions, MaybeBridgeSpec ) ->
 	% (the FSM shall use any bridge as well)
 	%
 	{ ok, FSMPid } = gen_statem:start_link( ?MODULE,
-		_InitParams={ StartOptions, JsonParserState, MaybeBridgeSpec },
+		_InitParams={ ChallengeType, StartOptions, JsonParserState,
+					  MaybeBridgeSpec },
 		_Opts=[] ),
 
 	{ ok, { ChallengeType, FSMPid } };
@@ -1176,10 +1187,10 @@ terminate( FsmPid ) ->
 %
 % Transitions to the 'idle' initial state.
 %
--spec init( { [ start_option() ], json_utils:parser_state(),
+-spec init( { challenge_type(), [ start_option() ], json_utils:parser_state(),
 			  maybe( bridge_spec() ) } ) ->
 		{ 'ok', InitialStateName :: 'idle', InitialData :: leec_http_state() }.
-init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
+init( { ChallengeType, StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 
 	% First action is to register this (unregistered by design) FSM to any
 	% specified trace bridge:
@@ -1190,8 +1201,7 @@ init( { StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 		"Initialising, with following options:~n  ~p.", [ StartOptions ] ) ),
 
 	InitLHState = #leec_http_state{
-		% Implied:
-		%cert_req_option_map=get_default_cert_request_options(),
+		cert_req_option_map=get_default_cert_request_options( ChallengeType ),
 		json_parser_state=JsonParserState,
 		tcp_connection_cache=table:new() },
 
@@ -1311,8 +1321,9 @@ callback_mode() ->
 %
 % (exported API helper)
 %
--spec get_agent_key_path( fsm_pid() ) -> 'error' | maybe( bin_file_path() ).
-get_agent_key_path( FsmPid ) ->
+-spec get_agent_key_path( leec_caller_state() ) ->
+			'error' | maybe( bin_file_path() ).
+get_agent_key_path( _CallerState={ _ChalType, FsmPid } ) ->
 
 	case catch gen_statem:call( _ServerRef=FsmPid,
 								_Request=get_agent_key_path ) of
@@ -2785,9 +2796,9 @@ get_certificate_priv_key_filename( DomainName ) ->
 
 % @doc Returns a textual representation of the specified LEEC state.
 -spec state_to_string( leec_state() ) -> ustring().
-state_to_string( #leec_http_state{} ) ->
-	"LEEC http state";
+state_to_string( LHS=#leec_http_state{} ) ->
+	text_utils:format( "LEEC http state: ~p", [ LHS ]);
 
-state_to_string( #leec_dns_state{ certbot_path=CertbotPath } ) ->
-	text_utils:format( "LEEC dns state, using executable '~ts'",
-					   [ CertbotPath ] ).
+state_to_string( LDS=#leec_dns_state{ certbot_path=CertbotPath } ) ->
+	text_utils:format( "LEEC dns state, using executable '~ts': ~p",
+					   [ CertbotPath, LDS ] ).

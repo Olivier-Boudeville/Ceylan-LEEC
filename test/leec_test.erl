@@ -65,8 +65,8 @@ run() ->
 	CertDirPath = "/tmp",
 
 	% The options retained for the first LEEC FSM:
-	BaseLEECOpts = [ staging,
-					 { mode, webroot },
+	BaseLEECOpts = [ { environment, staging },
+					 { interfacing_mode, webroot },
 					 { webroot_dir_path, WebrootDirPath },
 					 { cert_dir_path, CertDirPath } ],
 
@@ -75,20 +75,20 @@ run() ->
 	% No agent private key specified, it will be generated (with a generated
 	% name); expected to succeed:
 	%
-	FirstLeecFsmPid = case leec:start( ChallengeType, BaseLEECOpts ) of
+	FirstLeecCallerState = case leec:start( ChallengeType, BaseLEECOpts ) of
 
-		{ ok, FirstFsmPid } ->
-			FirstFsmPid;
+		{ ok, FirstLCS } ->
+			FirstLCS;
 
 		OtherFirstStartRes ->
 			throw( { leec_first_start_failed, OtherFirstStartRes } )
 
 	 end,
 
-	BinKeyPath = case leec:get_agent_key_path( FirstLeecFsmPid ) of
+	BinKeyPath = case leec:get_agent_key_path( FirstLeecCallerState ) of
 
 		undefined ->
-			throw( { no_agent_key_path_obtained, FirstLeecFsmPid } );
+			throw( { no_agent_key_path_obtained, FirstLeecCallerState } );
 
 		BinKPath ->
 			trace_utils:info_fmt( "Obtained agent key path '~ts'.",
@@ -103,10 +103,10 @@ run() ->
 	% For the second LEEC FSM, to rely on the same account:
 	SecondLEECOpts = [ { agent_key_file_path, BinKeyPath } | BaseLEECOpts ],
 
-	_SecondLeecFsmPid = case leec:start( ChallengeType, SecondLEECOpts ) of
+	_SecondLeecCallerState = case leec:start( ChallengeType, SecondLEECOpts ) of
 
-		{ ok, SecondFsmPid }  ->
-			SecondFsmPid;
+		{ ok, SecondLCS }  ->
+			SecondLCS;
 
 		OtherSecondStartRes ->
 			throw( { leec_second_start_failed, OtherSecondStartRes } )
@@ -139,7 +139,7 @@ run() ->
 	case ContinueTest of
 
 		true ->
-			case leec:obtain_certificate_for( DomainName, FirstLeecFsmPid,
+			case leec:obtain_certificate_for( DomainName, FirstLeecCallerState,
 					leec:get_default_cert_request_options( _Async=false ) ) of
 
 				{ certificate_ready, BinCertFilePath } ->

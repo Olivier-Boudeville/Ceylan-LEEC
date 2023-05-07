@@ -168,9 +168,11 @@ create_certificate( BinDomainName, DNSProvider, BinEmailAddress,
 	case system_utils:run_executable( BinCertbotExecPath, DryRunArgs ) of
 
 		{ _DryRetCode=0, DryCmdOutput } ->
-			cond_utils:if_defined( leec_debug_bot, trace_bridge:debug_fmt(
-				"Dry run of '~ts' succeeded (returned '~ts').",
-				[ BinCertbotExecPath, DryCmdOutput ] ) );
+			cond_utils:if_defined( leec_debug_bot,
+				trace_bridge:debug_fmt(
+					"Dry run of '~ts' succeeded (returned '~ts').",
+					[ BinCertbotExecPath, DryCmdOutput ] ),
+				basic_utils:ignore_unused( DryCmdOutput ) );
 
 		{ DryRetCode, DryCmdOutput } ->
 			trace_bridge:error_fmt( "Dry run for '~ts' failed: error code #~B, "
@@ -211,11 +213,14 @@ create_certificate( BinDomainName, DNSProvider, BinEmailAddress,
 		[ ActualArgs ] ) ),
 
 	case system_utils:run_executable( BinCertbotExecPath, ActualArgs ) of
+	%case { 0, "Testing!" } of
 
 		{ _RetCode=0, CmdOutput } ->
-			cond_utils:if_defined( leec_debug_bot, trace_bridge:debug_fmt(
-				"Actual run of '~ts' succeeded (returned '~ts').",
-				[ BinCertbotExecPath, CmdOutput ] ) ),
+			cond_utils:if_defined( leec_debug_bot,
+				trace_bridge:debug_fmt(
+					"Actual run of '~ts' succeeded (returned '~ts').",
+					[ BinCertbotExecPath, CmdOutput ] ),
+				basic_utils:ignore_unused( CmdOutput ) ),
 
 			ExpectedBinDir = file_utils:bin_join(
 				[ BinCertDir, "live", BinDomainName ] ),
