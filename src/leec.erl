@@ -80,7 +80,7 @@
 
 % Facilities:
 -export([ dns_provider_to_string/1, get_credentials_path_for/3,
-		  get_certificate_priv_key_filename/1 ]).
+		  get_certificate_priv_key_filename/1, caller_state_to_string/1 ]).
 
 
 % For spawn purpose:
@@ -229,6 +229,7 @@
 
 
 -export_type([ pem_file_path/0, cert_file_path/0, cert_priv_key_file_path/0,
+			   leec_caller_state/0,
 			   start_outcome/0, obtain_outcome/0, obtained_outcome/0,
 			   creation_outcome/0 ]).
 
@@ -1147,8 +1148,8 @@ stop( FsmPid ) ->
 % Not to be mixed up with the terminate/3 function known as a gen_statem
 % callback.
 %
--spec terminate( fsm_pid() ) -> void().
-terminate( FsmPid ) ->
+-spec terminate( leec_caller_state() ) -> void().
+terminate( _LEECCallerState={ _ChalType, FsmPid } ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"Requesting FSM ~w to terminate.", [ FsmPid ] ) ),
@@ -1380,6 +1381,7 @@ get_ongoing_challenges( FsmPid ) ->
 %
 % (exported API helper)
 %
+TODO CALLER STATE
 -spec send_ongoing_challenges( fsm_pid(), pid() ) -> void().
 send_ongoing_challenges( FsmPid, TargetPid ) ->
 	% No error possibly reported:
@@ -2794,7 +2796,7 @@ get_certificate_priv_key_filename( DomainName ) ->
 
 
 
-% @doc Returns a textual representation of the specified LEEC state.
+% @doc Returns a textual description of the specified LEEC (internal) state.
 -spec state_to_string( leec_state() ) -> ustring().
 state_to_string( LHS=#leec_http_state{} ) ->
 	text_utils:format( "LEEC http state: ~p", [ LHS ]);
@@ -2802,3 +2804,10 @@ state_to_string( LHS=#leec_http_state{} ) ->
 state_to_string( LDS=#leec_dns_state{ certbot_path=CertbotPath } ) ->
 	text_utils:format( "LEEC dns state, using executable '~ts': ~p",
 					   [ CertbotPath, LDS ] ).
+
+
+% @doc Returns a textual description of the specified LEEC caller state.
+-spec caller_state_to_string( leec_caller_state() ) -> ustring().
+caller_state_to_string( _LEECCallerState={ ChalType, LeecFsmPid } ) ->
+	text_utils:format( "LEEC caller state of challenge ~ts and FSM ~w",
+					   [ ChalType, LeecFsmPid ] ).
