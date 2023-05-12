@@ -87,7 +87,7 @@
 -export([ obtain_cert_helper/5 ]).
 
 
-% FSM gen_statem base API:
+% FSM gen_statem based API:
 -export([ init/1, callback_mode/0, terminate/3, code_change/4 ]).
 
 
@@ -103,16 +103,17 @@
 
 % Design notes:
 %
-% For all challenges, starting LEEC returns the PID of a process in charge of
-% the certificate creation, typically a FSM.
+% For all challenges, starting LEEC returns a caller state, which contains
+% notably the PID of a process in charge of the certificate creation, typically
+% a FSM.
 %
 % This is indeed a FSM (gen_statem) for the http-01 challenge but, at least
 % currently, it is a mere intermediary process for the dns-01 challenge, which
 % is only in charge of running certbot.
 %
 % The idea is that if, in the future, a full implementation of dns-01 is done
-% (like for http-01), then certbot will be dropped but the LEEC API may not
-% change.
+% (like for http-01), then certbot will be dropped but the LEEC API may
+% (hopefully) not change.
 
 
 
@@ -659,12 +660,12 @@ start( ChallengeType, StartOptions ) ->
 %
 % Note that for most challenges to succeed, LEEC must be started from the domain
 % of interest, as a webserver there must be controlled (for the http-01
-% challenge) or its DNS zone must be updated, from an authorised IP address (for
-% the dns-01 challenge).
+% challenge) or its DNS zone must be updated, generally from one of the
+% authorised IP addresses (for the dns-01 challenge).
 %
 % Note also that some challenges (especially the dns-01 one) will take
 % significant time to succeed (typically as a few minutes will have to be waited
-% to account for DNS changes to propagate).
+% for DNS changes to propagate).
 %
 -spec start( challenge_type(), [ start_option() ], maybe( bridge_spec() ) ) ->
 										start_outcome().
@@ -730,7 +731,7 @@ start( ChallengeType='http-01', StartOptions, MaybeBridgeSpec ) ->
 					  MaybeBridgeSpec },
 		_Opts=[] ),
 
-	{ ok, { ChallengeType, FSMPid } };
+	{ ok, _LCS={ ChallengeType, FSMPid } };
 
 
 start( ChallengeType='dns-01', StartOptions, MaybeBridgeSpec ) ->
@@ -1052,8 +1053,7 @@ obtain_cert_helper( BinDomain, _ChallengeType='dns-01', FsmPid,
 			text_utils:ensure_binary( Email );
 
 		error ->
-			text_utils:bin_format( "leec-certificates@~ts",
-								   [ BinDomain ] )
+			text_utils:bin_format( "leec-certificates@~ts", [ BinDomain ] )
 
 	end,
 
@@ -1099,7 +1099,7 @@ obtain_cert_helper( BinDomain, _ChallengeType='dns-01', FsmPid,
 %
 % @hidden
 %
--spec obtain_cert_helper( Domain :: domain_name(), challenge_type(), fsm_pid(),
+-spec obtain_cert_helper( domain_name(), challenge_type(), fsm_pid(),
 			cert_req_option_map(), maybe( trace_bridge:bridge_info() ) ) ->
 				obtained_outcome().
 obtain_cert_helper( Domain, ChallengeType, FsmPid, CertReqOptionMap,
@@ -1116,8 +1116,8 @@ obtain_cert_helper( Domain, ChallengeType, FsmPid, CertReqOptionMap,
 % @doc Stops the specified instance of LEEC service; switches it to idle (does
 % not terminate it for good).
 %
--spec stop( fsm_pid() ) -> void().
-stop( FsmPid ) ->
+-spec stop( leec_caller_state() ) -> void().
+stop( _LCS={ _ChalType, FsmPid } ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"Requesting FSM ~w to stop.", [ FsmPid ] ) ),
@@ -1381,9 +1381,8 @@ get_ongoing_challenges( FsmPid ) ->
 %
 % (exported API helper)
 %
-TODO CALLER STATE
--spec send_ongoing_challenges( fsm_pid(), pid() ) -> void().
-send_ongoing_challenges( FsmPid, TargetPid ) ->
+-spec send_ongoing_challenges( leec_caller_state(), pid() ) -> void().
+send_ongoing_challenges( _LCS={ _ChalType, FsmPid }, TargetPid ) ->
 	% No error possibly reported:
 	gen_statem:cast( _ServerRef=FsmPid,
 					 _Msg={ send_ongoing_challenges, TargetPid } ).
