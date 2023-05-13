@@ -310,7 +310,7 @@ obtain_ca_cert_file( TargetDir, _CertProvider=letsencrypt, HttpOptions ) ->
 
 			trace_bridge:info_fmt( "No certificate authority certificate "
 				"file found (no '~ts'), downloading it from ~ts, "
-				"with HTTP options ~p.",
+				"with following HTTP options:~n  ~p",
 				[ FilePath, CAUrl, HttpOptions ] ),
 
 			% Expected to be equal to FilePath:
