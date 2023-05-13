@@ -901,7 +901,7 @@ obtain_certificate_for( Domain,
 			% using the same bridge as set for this caller process:
 			%
 			_Pid = ?myriad_spawn_link( ?MODULE, obtain_cert_helper,
-				[ BinDomain, FsmPid, ReadyCertReqOptMap,
+				[ BinDomain, ChallengeType, FsmPid, ReadyCertReqOptMap,
 				  trace_bridge:get_bridge_info() ] ),
 
 			async;
