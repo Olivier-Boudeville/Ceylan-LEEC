@@ -65,7 +65,9 @@
 
 % Public API:
 -export([ get_ordered_prerequisites/0,
+		  is_known_challenge_type/1,
 		  can_perform_dns_challenges/0,
+		  is_supported_dns_provider/1,
 		  start/2, start/3,
 		  get_default_cert_request_options/1,
 		  get_default_cert_request_options/2,
@@ -221,14 +223,6 @@
 % Typical names for such files may be "privkey.pem" or "MYDOMAIN.key".
 
 
--type creation_outcome() ::
-	{ 'certificate_generation_success', cert_file_path(),
-	  cert_priv_key_file_path() }
-  | { 'certificate_generation_failure', error_reason() }.
-% The value returned by an attempt of certification creation.
-
-
-
 -export_type([ pem_file_path/0, cert_file_path/0, cert_priv_key_file_path/0,
 			   leec_caller_state/0,
 			   start_outcome/0, obtain_outcome/0, obtained_outcome/0,
@@ -308,15 +302,16 @@
 
 	% The default certificate directory is the current directory.
 	%
-  | { 'cert_dir_path', any_directory_path() }.
+  | { 'cert_dir_path', any_directory_path() }
+
+  | { 'http_timeout', milliseconds() }.
 % Options common to all challenge types.
 
 
 -type start_http_01_option() ::
 	{ 'interfacing_mode', web_interfacing_mode() }
   | { 'webroot_dir_path', any_directory_path() }
-  | { 'port', tcp_port() }
-  | { 'http_timeout', milliseconds() }.
+  | { 'port', tcp_port() }.
 % Options associated to the http-01 challenge, for single-domain certificates.
 
 
@@ -344,7 +339,7 @@
 % Certificate request options.
 
 
--type creation_callback() :: fun( (creation_outcome() ) -> void() ).
+-type creation_callback() :: fun( (obtain_outcome() ) -> void() ).
 % A function executed when a domain certificate has been successfully obtained
 % asynchronously.
 
@@ -570,14 +565,27 @@
 % In practice, for all challenges: either an error or {ok, LeecCallerState}.
 
 
--type obtained_outcome() ::
-	{ 'certificate_ready', cert_file_path(), cert_priv_key_file_path() }
-  | tagged_error().
-% Returned value after having sent a request to obtain a certificate.
 
+-type creation_outcome() ::
+	{ 'certificate_ready', cert_file_path(), cert_priv_key_file_path() }
+  | tagged_error(). % That is: {'error', term()}
+% The (internal) value returned by a FSM / a bot about an attempt of
+% certification creation.
+
+
+-type obtained_outcome() ::
+	{ 'certificate_generation_success', cert_file_path(),
+	  cert_priv_key_file_path() }
+  | { 'certificate_generation_failure', error_reason() }.
+% Returned user-targeted value (either as a message or as the argument of a
+% callback) after having sent a request to obtain a certificate.
+%
+% Defined to differentiate from creation_outcome() and gather all possible error
+% terms.
 
 -type obtain_outcome() :: 'async' | obtained_outcome().
 % Returned value once requesting a certificate.
+
 
 
 
@@ -636,11 +644,42 @@ get_ordered_prerequisites() ->
 						  [ shotgun ], _ThenNativeHttpc=[] ).
 
 
+
+% @doc Tells whether the specified atom is a known challenge type.
+%
+% Does not guarantee that this LEEC instance is able to handle it.
+%
+-spec is_known_challenge_type( atom() ) -> boolean().
+is_known_challenge_type( _ChalType='http-01' ) ->
+	true;
+
+is_known_challenge_type( _ChalType='dns-01' ) ->
+	true;
+
+is_known_challenge_type( _ChalType ) ->
+	false.
+
+
+
 % @doc Tells whether LEEC has a chance to run successfully a dns-01 challenge.
 -spec can_perform_dns_challenges() -> boolean().
 can_perform_dns_challenges() ->
 	% Not a sufficient guarantee (and 'true' not returned):
 	executable_utils:lookup_executable( "certbot" ) =/= false.
+
+
+
+% @doc Tells whether LEEC supports the specified DNS provider.
+%
+% It is a necessary yet not sufficient condition (e.g. proper provider-specific
+% credentials will be needed as well).
+%
+-spec is_supported_dns_provider( atom() ) -> boolean().
+is_supported_dns_provider( _DNSProvider=ovh ) ->
+	true;
+
+is_supported_dns_provider( _DNSProvider ) ->
+	false.
 
 
 
@@ -747,38 +786,39 @@ start( ChallengeType='dns-01', StartOptions, MaybeBridgeSpec ) ->
 	BinCertbotPath = text_utils:string_to_binary(
 		leec_bot:get_certbot_executable_path() ),
 
-	BinCredBasePath = case maps:find( _K=cred_dir_path, StartOptions ) of
+	BinCredBasePath = case list_table:lookup_entry( _K=cred_dir_path,
+													StartOptions ) of
 
-		{ ok, CredBaseDir } ->
+		{ value, CredBaseDir } ->
 			file_utils:is_existing_directory_or_link( CredBaseDir ) orelse
 				throw( { non_existing_credentials_directory, CredBaseDir } ),
 			text_utils:ensure_binary( CredBaseDir );
 
-		error ->
+		key_not_found ->
 			throw( no_credentials_directory_set )
 
 	end,
 
-	BinWorkDir = case maps:find( work_dir_path, StartOptions ) of
+	BinWorkDir = case list_table:lookup_entry( work_dir_path, StartOptions ) of
 
-		{ ok, WorkDir } ->
+		{ value, WorkDir } ->
 			file_utils:is_existing_directory_or_link( WorkDir ) orelse
 				throw( { non_existing_work_directory, WorkDir } ),
 			text_utils:ensure_binary( WorkDir );
 
-		error ->
+		key_not_found ->
 			file_utils:get_bin_current_directory()
 
 	end,
 
-	BinCertDir = case maps:find( cert_dir_path, StartOptions ) of
+	BinCertDir = case list_table:lookup_entry( cert_dir_path, StartOptions ) of
 
-		{ ok, CertDir } ->
+		{ value, CertDir } ->
 			file_utils:is_existing_directory_or_link( CertDir ) orelse
 				throw( { non_existing_certificate_directory, CertDir } ),
 			text_utils:ensure_binary( CertDir );
 
-		error ->
+		key_not_found ->
 			file_utils:get_bin_current_directory()
 
 	end,
@@ -941,14 +981,14 @@ obtain_cert_helper( BinDomain, _ChallengeType='http-01', FsmPid,
 	% Expected to be in the 'idle' state, hence to trigger idle({create,
 	% BinDomain, Opts}, _, LHState):
 	%
-	CreationOutcome = case gen_statem:call( ServerRef,
+	ObtainOutcome = case gen_statem:call( ServerRef,
 			_Request={ create, BinDomain, CertReqOptionMap }, Timeout ) of
 
 		% State of FSM shall thus be 'idle' now:
 		ErrorTerm={ creation_failed, Error } ->
 			trace_bridge:error_fmt( "Creation error reported by FSM ~w: ~p.",
 									[ FsmPid, Error ] ),
-			{ error, ErrorTerm };
+			{ certificate_generation_failure, ErrorTerm };
 
 		% State of FSM shall thus be 'pending' now; should then transition after
 		% some delay to 'valid'; we wait for it:
@@ -986,7 +1026,7 @@ obtain_cert_helper( BinDomain, _ChallengeType='http-01', FsmPid,
 							trace_bridge:error_fmt( "Error for FSM ~w when "
 								"finalizing domain '~ts': ~p.",
 								[ FsmPid, BinDomain, Error ] ),
-							Error
+							{ certificate_generation_failure, Error }
 
 					end;
 
@@ -997,39 +1037,39 @@ obtain_cert_helper( BinDomain, _ChallengeType='http-01', FsmPid,
 							"after error ~p.",
 							[ FsmPid, BinDomain, OtherError ] ) ),
 					_ = gen_statem:call( _ServerRef=FsmPid, reset ),
-					OtherError
+					{ certificate_generation_failure, OtherError }
 
 			end;
 
 		Other ->
 			trace_bridge:error_fmt( "Unexpected return after create for ~w: ~p",
 									[ FsmPid, Other ] ),
-			throw( { unexpected_create, Other, FsmPid } )
+			throw( { unexpected_create_return, Other, FsmPid } )
 
 	end,
 
 	Async andalso
 		begin
 			Callback = maps:get( callback, CertReqOptionMap,
-				_DefaultCallback=fun( CreatOutcome ) ->
+				_DefaultCallback=fun( ObtOutcome ) ->
 					trace_bridge:warning_fmt( "Default async callback called "
 						"for ~w regarding http-01 creation outcome ~p.",
-						[ FsmPid, CreatOutcome ] )
+						[ FsmPid, ObtOutcome ] )
 								 end ),
 
 			%trace_bridge:debug_fmt( "Async callback called "
 			%   "for ~w regarding creation outcome ~p.",
 			%   [ FsmPid, CreationOutcome ] ),
 
-			Callback( CreationOutcome )
+			Callback( ObtainOutcome )
 
 		end,
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
-		"Creation outcome for domain '~ts' (FSM: ~w): ~p",
-		[ BinDomain, FsmPid, CreationOutcome ] ) ),
+		"Obtain outcome for domain '~ts' (FSM: ~w): ~p",
+		[ BinDomain, FsmPid, ObtainOutcome ] ) ),
 
-	CreationOutcome;
+	ObtainOutcome;
 
 
 obtain_cert_helper( BinDomain, _ChallengeType='dns-01', FsmPid,
@@ -1066,7 +1106,7 @@ obtain_cert_helper( BinDomain, _ChallengeType='dns-01', FsmPid,
 				_DefaultCallback=fun( CreationOutcome ) ->
 					trace_bridge:warning_fmt(
 						"Default async callback called for domain '~ts' "
-						"regarding dns-01 creation outcomeresult ~p.",
+						"regarding dns-01 creation outcome result ~p.",
 						[ BinDomain, CreationOutcome ] )
 								 end ),
 
@@ -1080,13 +1120,12 @@ obtain_cert_helper( BinDomain, _ChallengeType='dns-01', FsmPid,
 
 			receive
 
-				{ certificate_generation_success, BinCertFilePath,
-				  BinPrivKeyFilePath } ->
-					{ certificate_ready, BinCertFilePath,
-					  BinPrivKeyFilePath };
+				T={ certificate_generation_success, _BinCertFilePath,
+					 _BinPrivKeyFilePath } ->
+					T;
 
-				{ certificate_generation_failure, Error } ->
-					{ error, Error }
+				T={ certificate_generation_failure, _Error } ->
+					T
 
 			end
 
@@ -1149,23 +1188,35 @@ stop( _LCS={ _ChalType, FsmPid } ) ->
 % callback.
 %
 -spec terminate( leec_caller_state() ) -> void().
-terminate( _LEECCallerState={ _ChalType, FsmPid } ) ->
+terminate( _LEECCallerState={ _ChalType='http-01', FsmPid } ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
-		"Requesting FSM ~w to terminate.", [ FsmPid ] ) ),
+		"Requesting LEEC FSM ~w to terminate.", [ FsmPid ] ) ),
 
-	trace_bridge:warning_fmt( "Terminating FSM ~w.", [ FsmPid ] ),
+	trace_bridge:warning_fmt( "Terminating LEEC FSM ~w.", [ FsmPid ] ),
 
 	% May exit the calling process with an exception 'timeout'
 	% (e.g. {timeout,{gen_statem,call,[<0.676.0>,stop,15000]}}):
 	%
 	gen_statem:stop( FsmPid, _Reason=normal, _Timeout=5000 ),
 
-	trace_bridge:warning_fmt( "FSM ~w terminated.", [ FsmPid ] ),
+	trace_bridge:warning_fmt( "LEEC FSM ~w terminated.", [ FsmPid ] ),
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
-		"FSM ~w terminated.", [ FsmPid ] ) ).
+		"LEEC FSM ~w terminated.", [ FsmPid ] ) );
 
+
+terminate( _LEECCallerState={ _ChalType='dns-01', BotPid } ) ->
+
+	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
+		"Requesting LEEC bot ~w to terminate.", [ BotPid ] ) ),
+
+	trace_bridge:warning_fmt( "Terminating LEEC bot ~w.", [ BotPid ] ),
+
+	BotPid ! stop,
+
+	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
+		"LEEC bot ~w (supposedly) terminated.", [ BotPid ] ) ).
 
 
 
@@ -2053,7 +2104,9 @@ invalid( _EventType=enter, _PreviousState, _Data=LHState ) ->
 		"[~w] Entering the 'invalid' state.", [ self() ] ) ),
 
 	trace_bridge:error_fmt( "[~w] Reached the (stable) 'invalid' state for "
-		"domain '~ts'.", [ self(), LHState#leec_http_state.domain ] ),
+		"domain '~ts'. The ACME server must not have found a suitable "
+		"answer to its challenge.",
+		[ self(), LHState#leec_http_state.domain ] ),
 
 	keep_state_and_data.
 
@@ -2406,8 +2459,10 @@ wait_challenges_valid( FsmPid, Count, MaxCount ) ->
 
 
 
--type wait_creation_result() :: { 'certificate_ready', bin_file_path() }
-							  | {'error', 'timeout' }.
+-type wait_creation_result() ::
+	{ 'certificate_ready', bin_file_path(), bin_file_path() }
+  | { 'error', 'timeout' }.
+% As returned by a FSM.
 
 
 % @doc Waits until the certification creation is reported as completed.
@@ -2436,11 +2491,14 @@ wait_creation_completed( FsmPid, Count, Max ) ->
 	case gen_statem:call( _ServerRef=FsmPid, _Req=manageCreation,
 						  ?base_timeout ) of
 
-		Reply={ certificate_ready, BinCertFilePath } ->
+		Reply={ certificate_ready, BinCertFilePath, BinCertPrivKeyPath } ->
 			cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
-				"End of waiting for creation of '~ts': read target status "
-				"'finalize' for ~w.", [ BinCertFilePath, FsmPid ] ),
-				basic_utils:ignore_unused( BinCertFilePath ) ),
+				"End of waiting for creation of certificate '~ts' "
+				"(whose private key is '~ts'): read target status "
+				"'finalize' for ~w.",
+				[ BinCertFilePath, BinCertPrivKeyPath, FsmPid ] ),
+				basic_utils:ignore_unused(
+				  [ BinCertFilePath, BinCertPrivKeyPath ] ) ),
 			Reply;
 
 		creation_in_progress ->
