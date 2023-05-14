@@ -120,8 +120,9 @@ obtain_private_key( _KeyFileInfo={ new, KeyFilename }, BinCertDirPath ) ->
 		trace_bridge:warning_fmt( "A '~ts' key file was already existing, "
 			"overwriting it.", [ KeyFilePath ] ),
 
-	Cmd = executable_utils:get_default_openssl_executable_path()
-		++ " genrsa -out '" ++ KeyFilePath ++ "' 4096",
+	Cmd = text_utils:format( "~ts genrsa -out '~ts' 4096",
+		[ executable_utils:get_default_openssl_executable_path(),
+		  KeyFilePath ] ),
 
 	case system_utils:run_command( Cmd ) of
 
@@ -227,8 +228,9 @@ obtain_dh_key( CertDir ) ->
 				"creating it; note that it is a longer operation.",
 				[ DhFilePath ] ),
 
-			Cmd = executable_utils:get_default_openssl_executable_path()
-				++ " dhparam -out '" ++ DhFilePath ++ "' 3072",
+			Cmd = text_utils:format( "~ts dhparam -out '~ts' 3072",
+				[ executable_utils:get_default_openssl_executable_path(),
+				  DhFilePath ] ),
 
 			case system_utils:run_command( Cmd ) of
 
@@ -449,7 +451,7 @@ generate_certificate( CertType, BinDomain, OutCertPath, PrivKeyFilePath,
 
 
 
-% @doc Writes specified certificate, overwriting any prior one.
+% @doc Writes the specified certificate, overwriting any prior one.
 %
 % Domain certificate only.
 %
