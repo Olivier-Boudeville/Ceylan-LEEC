@@ -24,7 +24,7 @@
 % For example a path like
 % "/etc/xdg/universal-server/leec-ovh-credentials-for-foobar.org.txt".
 
--type dns_provider() :: 'ovh'.
+-type dns_provider() :: leec:dns_provider().
 % A currently supported DNS provider.
 
 
@@ -119,7 +119,7 @@ bot_main_loop( LDState ) ->
 		{ createCertificateSync, [ BinDomain, DNSProvider, BinEmail ],
 		  CallerPid } ->
 			cond_utils:if_defined( leec_debug_bot, trace_bridge:debug_fmt(
-				"Bot requested to create a certificate "
+				"LEEC bot requested to create a certificate "
 				"for the '~ts' domain, synchronously for caller ~w.",
 				[ BinDomain, CallerPid ] ) ),
 
@@ -132,12 +132,12 @@ bot_main_loop( LDState ) ->
 
 
 		stop ->
-			trace_bridge:info( "Bot requested to stop." );
+			trace_bridge:info( "LEEC bot has been requested to stop." );
 
 
 		Unexpected ->
-			trace_bridge:warning_fmt( "Bot ignored following unexpected "
-									  "message:~n ~p.", [ Unexpected ] ),
+			trace_bridge:warning_fmt( "LEEC bot ignored the following "
+				"unexpected message:~n ~p.", [ Unexpected ] ),
 			bot_main_loop( LDState )
 
 	end.
@@ -213,11 +213,13 @@ create_certificate( BinDomainName, DNSProvider, BinEmailAddress,
 		[ ActualArgs ] ) ),
 
 	case system_utils:run_executable( BinCertbotExecPath, ActualArgs ) of
+	% For mock-up calls:
 	%case { 0, "Testing!" } of
 
 		{ _RetCode=0, CmdOutput } ->
 			cond_utils:if_defined( leec_debug_bot,
-				trace_bridge:debug_fmt(
+				%trace_bridge:debug_fmt(
+				trace_bridge:notice_fmt(
 					"Actual run of '~ts' succeeded (returned '~ts').",
 					[ BinCertbotExecPath, CmdOutput ] ),
 				basic_utils:ignore_unused( CmdOutput ) ),
@@ -228,11 +230,11 @@ create_certificate( BinDomainName, DNSProvider, BinEmailAddress,
 			case file_utils:is_existing_directory( ExpectedBinDir ) of
 
 				true ->
-					BinCertFilePath = file_utils:bin_join( ExpectedBinDir,
-														   "fullchain.pem" ),
+					BinCertFilePath =
+						file_utils:bin_join( ExpectedBinDir, "fullchain.pem" ),
 
-					BinPrivKeyfilePath = file_utils:bin_join( ExpectedBinDir,
-															  "privkey.pem" ),
+					BinPrivKeyfilePath =
+						file_utils:bin_join( ExpectedBinDir, "privkey.pem" ),
 
 					% Actually always symlinks:
 					case file_utils:is_existing_file_or_link(
@@ -248,18 +250,20 @@ create_certificate( BinDomainName, DNSProvider, BinEmailAddress,
 
 								false ->
 									{ certificate_generation_failure,
-									  no_private_key_generated }
+									  { no_private_key_generated,
+										BinPrivKeyfilePath } }
 
 							end;
 
 						false ->
 							{ certificate_generation_failure,
-							  no_certificate_generated }
+							  { no_certificate_generated, BinCertFilePath } }
 
 					end;
 
 				false ->
-					{ certificate_generation_failure, no_output_directory }
+					{ certificate_generation_failure,
+					  { no_output_directory, ExpectedBinDir } }
 
 			end;
 
@@ -322,6 +326,7 @@ get_dns_provider_options( DNSProvider, BinDomainName, BinCredDir ) ->
 	case DNSProvider of
 
 		ovh ->
+			% Relying on the default max propagation duration:
 			[ "--dns-ovh", "--dns-ovh-credentials", CredFilePath ]
 
 	end.
