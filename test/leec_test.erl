@@ -142,10 +142,12 @@ run() ->
 			case leec:obtain_certificate_for( DomainName, FirstLeecCallerState,
 					leec:get_default_cert_request_options( _Async=false ) ) of
 
-				{ certificate_ready, BinCertFilePath } ->
-					throw( { not_expected_to_succeed, BinCertFilePath } );
+				{ certificate_generation_success, BinCertFilePath,
+				  BinPrivKeyFilePath } ->
+					throw( { not_expected_to_succeed, BinCertFilePath,
+							 BinPrivKeyFilePath } );
 
-				{ error, Error } ->
+				{ certificate_generation_failure, Error } ->
 					test_facilities:display_fmt(
 						"As expected, an error is raised: ~p", [ Error ] )
 
