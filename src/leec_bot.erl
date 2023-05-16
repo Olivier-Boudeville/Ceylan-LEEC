@@ -68,6 +68,7 @@
 -type creation_outcome() :: leec:creation_outcome().
 
 
+
 % @doc Initialises the LEEC bot for the dns-01 challenge.
 %
 % Returns the PID of (currently) a pseudo-FSM process (can be seen as a
@@ -79,7 +80,7 @@ init_bot( LDState, MaybeBridgeSpec ) ->
 	trace_bridge:register_if_not_already( MaybeBridgeSpec ),
 
 	cond_utils:if_defined( leec_debug_bot, trace_bridge:debug_fmt(
-		"Started bot with ~ts.", [ leec:state_to_string( LDState ) ] ) ),
+		"Started LEEC bot with ~ts.", [ leec:state_to_string( LDState ) ] ) ),
 
 	bot_main_loop( LDState ).
 
@@ -92,7 +93,7 @@ bot_main_loop( LDState ) ->
 	receive
 
 		% We could mimic as much as possible the message exhange patterns of
-		% http-01:
+		% http-01 with:
 		%
 		%{ '$gen_call', _GenStatemIds={ _CallerPid, _ILAlias },
 		%   { create, BinDomain, CertReqOptionMap } } ->
@@ -100,9 +101,9 @@ bot_main_loop( LDState ) ->
 		{ createCertificateAsync,
 				[ BinDomain, DNSProvider, BinEmail, Callback ] } ->
 			cond_utils:if_defined( leec_debug_bot, trace_bridge:debug_fmt(
-				"Bot requested to create a certificate "
-				"for the '~ts' domain, asynchronously and with the "
-				"following options:~n  ~p.", [ BinDomain ] ) ),
+				"LEEC bot requested to create a certificate "
+				"for the '~ts' domain, asynchronously with the "
+				"following callback:~n  ~p.", [ BinDomain, Callback ] ) ),
 
 			CreationOutcome = create_certificate( BinDomain, DNSProvider,
 				BinEmail, LDState ),
@@ -154,6 +155,7 @@ bot_main_loop( LDState ) ->
 						  leec_dns_state() ) -> creation_outcome().
 create_certificate( BinDomainName, DNSProvider, BinEmailAddress,
 					#leec_dns_state{ environment=Env,
+									 state_dir_path=BinStateDir,
 									 work_dir_path=BinWorkDir,
 									 cert_dir_path=BinCertDir,
 									 certbot_path=BinCertbotExecPath,
@@ -203,9 +205,9 @@ create_certificate( BinDomainName, DNSProvider, BinEmailAddress,
 
 	% --quiet implies --non-interactive:
 	ActualArgs = [ "certonly" | EnvOpts ]
-		++ [ "--non-interactive", "--agree-tos", "--config-dir", BinCertDir,
-			 "--work-dir", BinWorkDir,
-			 "--logs-dir", BinWorkDir  ] ++ DNSProviderOpts
+		++ [ "--non-interactive", "--agree-tos", "--config-dir", BinStateDir,
+			 "--work-dir", BinWorkDir, "--logs-dir", BinWorkDir  ]
+		++ DNSProviderOpts
 		++ [ "--email", BinEmailAddress, DirectDomainOpt, WildcardDomainOpt ],
 
 	cond_utils:if_defined( leec_debug_bot, trace_bridge:debug_fmt(

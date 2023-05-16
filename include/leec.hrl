@@ -189,6 +189,9 @@
 	% The selected ACME environment:
 	environment = production :: leec:environment(),
 
+	% Directory where certbot is to store its state:
+	state_dir_path :: file_utils:bin_directory_path(),
+
 	% Directory where work data is to be written:
 	work_dir_path :: file_utils:bin_directory_path(),
 
