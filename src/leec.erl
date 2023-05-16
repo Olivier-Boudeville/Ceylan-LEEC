@@ -298,8 +298,8 @@
 	%
   | { 'agent_key_file_path', any_file_path() }
 
-	% The directory in which the obtained certificates will be stored.
-
+	% The directory in which the obtained certificates will be made available.
+	%
 	% The default certificate directory is the current directory.
 	%
   | { 'cert_dir_path', any_directory_path() }
@@ -512,7 +512,7 @@
 			   key_integer/0, rsa_private_key/0,
 			   jws_algorithm/0, binary_b64/0, key_auth/0,
 			   tls_private_key/0, tls_public_key/0, tls_csr/0,
-			   jws/0, %certificate/0,
+			   jws/0,
 			   leec_state/0, leec_http_state/0, leec_dns_state/0,
 			   status/0, request/0 ]).
 
@@ -526,6 +526,13 @@
 
 % Base time-out, in milliseconds:
 -define( base_timeout, ?default_timeout div 2 ).
+
+% Where certbot is to store its internal state (i.e. where it creates the
+% 'renewal-hooks', 'renewal', 'accounts', 'archive' and 'live' directories):
+%
+% (a specific name for clarity and to avoid removing any non-LEEC data)
+%
+-define( certbot_state_dir, <<"leec-certbot-internal-state">> ).
 
 
 -type server_ref() :: gen_statem:server_ref().
@@ -823,7 +830,24 @@ start( ChallengeType='dns-01', StartOptions, MaybeBridgeSpec ) ->
 
 	end,
 
+	% The place where certbot is to store its state:
+	BinStateDir = file_utils:bin_join( BinCertDir, ?certbot_state_dir ),
+
+	% Wipes out any previous certbot state tree, to force the recreation of
+	% certificates (otherwise re-using preexisting ones may lead them to expire
+	% before any renewal triggered through LEEC):
+	%
+
+	trace_utils:warning( "Not wiping out certbot state to avoid the risk of "
+		"exceeding the ACME certificate issuing maximum rate "
+		"(5 over 168 hours for a given domain)." ),
+	%file_utils:remove_directory_if_existing( BinStateDir ),
+
+	% Hence existing, empty, with hoepefully adequate owner and permissions:
+	file_utils:create_directory_if_not_existing( BinStateDir ),
+
 	LDState = #leec_dns_state{
+		state_dir_path=BinStateDir,
 		work_dir_path=BinWorkDir,
 		certbot_path=BinCertbotPath,
 		credentials_dir_path=BinCredBasePath,
@@ -1009,6 +1033,7 @@ obtain_cert_helper( BinDomain, _ChallengeType='http-01', FsmPid,
 					_LastReadStatus = gen_statem:call( ServerRef,
 						_Req=switchTofinalize, Timeout ),
 
+					% With exponential backoff:
 					case wait_creation_completed( FsmPid, _Count=20 ) of
 
 						{ certificate_ready, BinCertFilePath,
@@ -1452,10 +1477,10 @@ send_ongoing_challenges( _LCS={ _ChalType, FsmPid }, TargetPid ) ->
 % or {next_state, NextState, NewData}.
 
 % 4 states are defined in turn below:
-% - idle
+% - idle (the initial state, after init/1)
 % - pending
 % - valid
-% - finalize
+% - finalize (hopefully the final state)
 
 
 
@@ -1553,7 +1578,8 @@ idle( _EventType={ call, From },
 		"[~w] ACME account key obtained.", [ self() ] ) ),
 
 	% Apparently a different JWS then:
-	AccountJws = #jws{ alg=Jws#jws.alg, kid=AccountLocationUri,
+	AccountJws = #jws{ alg=Jws#jws.alg,
+					   kid=AccountLocationUri,
 					   nonce=AccountNonce },
 
 	% Subject Alternative Names:
@@ -1584,15 +1610,15 @@ idle( _EventType={ call, From },
 	end,
 
 	% We need to keep trace of order location:
-	LocOrder = OrderDecodedJsonMap#{ <<"location">> => OrderLocationUri },
+	LocOrderMap = OrderDecodedJsonMap#{ <<"location">> => OrderLocationUri },
 
 	AuthLHState = ReqState#leec_http_state{ domain=BinDomain, jws=AccountJws,
 		account_key=AccountKey, nonce=OrderNonce, sans=BinSans },
 
 	AuthUris = maps:get( <<"authorizations">>, OrderDecodedJsonMap ),
 
-	{ AuthPair, PerfLHState } = perform_authorization( ChallengeType, AuthUris,
-													   AuthLHState ),
+	{ AuthPair, PerfLHState } =
+		perform_authorization( ChallengeType, AuthUris, AuthLHState ),
 
 	{ NewStateName, Reply, NewUriChallengeMap, FinalNonce } =
 			case AuthPair of
@@ -1607,7 +1633,7 @@ idle( _EventType={ call, From },
 	end,
 
 	FinalLHState = PerfLHState#leec_http_state{ nonce=FinalNonce,
-												order=LocOrder,
+												order=LocOrderMap,
 												challenges=NewUriChallengeMap },
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
@@ -1725,7 +1751,9 @@ pending( _EventType=cast,
 pending( _EventType={ call, From }, _EventContentMsg=check_challenges_completed,
 		 _Data=LHState=#leec_http_state{
 			order=#{ <<"authorizations">> := AuthorizationsUris },
-			nonce=InitialNonce, agent_private_key=PrivKey, jws=Jws,
+			nonce=InitialNonce,
+			agent_private_key=PrivKey,
+			jws=Jws,
 			cert_req_option_map=CertReqOptionMap } ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
@@ -1876,10 +1904,15 @@ valid( _EventType=enter, _PreviousState, _Data ) ->
 
 valid( _EventType={ call, _ServerRef=From },
 	   _EventContentMsg=_Request=switchTofinalize,
-	   _Data=LHState=#leec_http_state{ interfacing_mode=InterfMode,
-			domain=BinDomain, sans=SANs,
-			cert_dir_path=BinCertDirPath, order=OrderDirMap,
-			agent_private_key=AgentPrivKey, jws=Jws, nonce=Nonce,
+	   _Data=LHState=#leec_http_state{
+			interfacing_mode=InterfMode,
+			domain=BinDomain,
+			sans=SANs,
+			cert_dir_path=BinCertDirPath,
+			order=OrderDirMap,
+			agent_private_key=AgentPrivKey,
+			jws=Jws,
+			nonce=Nonce,
 			cert_req_option_map=CertReqOptionMap } ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
@@ -1915,10 +1948,9 @@ valid( _EventType={ call, _ServerRef=From },
 	% Expected to be 'finalize' sooner or later:
 	ReadStateName = leec_api:binary_to_status( BinStatus ),
 
-	% Update location in finalized order:
+	% Puts back 'location' in finalized order:
 	LocOrderDirMap = FinOrderDirMap#{
 		<<"location">> => maps:get( <<"location">>, OrderDirMap ) },
-
 
 	LastLHState = FinLHState#leec_http_state{
 		order=LocOrderDirMap,
@@ -1966,7 +1998,8 @@ finalize( _EventType=enter, _PreviousState, _Data ) ->
 
 finalize( _EventType={ call, _ServerRef=From },
 		  _EventContentMsg=_Request=manageCreation,
-		  _Data=LHState=#leec_http_state{ order=OrderMap,
+		  _Data=LHState=#leec_http_state{
+				order=OrderMap,
 				domain=BinDomain,
 				cert_dir_path=BinCertDirPath,
 				cert_priv_key_path=BinCertPrivKeyPath,
@@ -1980,13 +2013,23 @@ finalize( _EventType={ call, _ServerRef=From },
 	%trace_bridge:debug_fmt( "[~w] Getting progress of creation procedure "
 	%                        "based on order map.", [ self() ] ),
 
+	trace_utils:warning_fmt( "Order map from finalize: ~n  ~p", [ OrderMap ] ),
+
+	% Apparently some rare error cases used to lead to this key not existing,
+	% most probably because the next returned NewOrderMap did not have this
+	% 'location' key anymore before iterating on it again, knowing this request
+	% is polled by the waiting client (now this key is put back):
+	%
 	Loc = maps:get( <<"location">>, OrderMap ),
 
 	{ { NewOrderMap, _NullLoc, OrderNonce }, OrderState } =
 		leec_api:get_order( Loc, AgentPrivKey, Jws#jws{ nonce=Nonce },
 							CertReqOptionMap, LHState ),
 
-	BinStatus = maps:get( <<"status">>, NewOrderMap ),
+	% So now we put back the location (see previous comment):
+	LocNewOrderMap = NewOrderMap#{ <<"location">> => Loc },
+
+	BinStatus = maps:get( <<"status">>, LocNewOrderMap ),
 
 	ReadStatus = leec_api:binary_to_status( BinStatus ),
 
@@ -2061,7 +2104,8 @@ finalize( _EventType={ call, _ServerRef=From },
 
 	end,
 
-	FinalLHState = ReadLHState#leec_http_state{ order=NewOrderMap, jws=NewJws,
+	FinalLHState = ReadLHState#leec_http_state{ order=LocNewOrderMap,
+												jws=NewJws,
 												nonce=NewNonce },
 
 	{ next_state, NewStateName, _NewData=FinalLHState,
@@ -2498,12 +2542,13 @@ wait_creation_completed( FsmPid, Count, Max ) ->
 				"'finalize' for ~w.",
 				[ BinCertFilePath, BinCertPrivKeyPath, FsmPid ] ),
 				basic_utils:ignore_unused(
-				  [ BinCertFilePath, BinCertPrivKeyPath ] ) ),
+					[ BinCertFilePath, BinCertPrivKeyPath ] ) ),
 			Reply;
 
 		creation_in_progress ->
 			cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 				"Still waiting for creation from ~w.", [ FsmPid ] ) ),
+			% Thus each time waiting for half a second more:
 			timer:sleep( 500 * ( Max - Count + 1 ) ),
 			wait_creation_completed( FsmPid, Count-1, Max );
 
