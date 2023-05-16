@@ -822,7 +822,7 @@ request_authorization( AuthUri, PrivKey, Jws, CertReqOptionMap, LHState ) ->
 								  _Content=undefined, LHState ),
 
 	{ #{ json := RespMap, location := LocationUri, nonce := Nonce,
-	   status_code := StatusCode }, NewLHState } = request( _Method=post,
+		 status_code := StatusCode }, NewLHState } = request( _Method=post,
 			AuthUri, _Headers=#{}, _MaybeBinContent=B64AuthReq,
 			CertReqOptionMap#{ json=> true }, LHState ),
 
@@ -890,7 +890,7 @@ finalize_order( _OrderDirMap=#{ <<"finalize">> := FinUri }, Csr, PrivKey, Jws,
 							   LHState ),
 
 	{ #{ json := FinOrderDirMap, location := BinLocUri, nonce := Nonce,
-	   status_code := StatusCode }, NewLHState } = request( _Method=post,
+		 status_code := StatusCode }, NewLHState } = request( _Method=post,
 			FinUri, _Headers=#{}, _MaybeBinContent=JWSBody,
 			CertReqOptionMap#{ json => true }, LHState ),
 
