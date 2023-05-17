@@ -68,6 +68,7 @@
 		  is_known_challenge_type/1,
 		  can_perform_dns_challenges/0,
 		  is_supported_dns_provider/1,
+		  reset_state/2,
 		  start/2, start/3,
 		  get_default_cert_request_options/1,
 		  get_default_cert_request_options/2,
@@ -690,6 +691,57 @@ is_supported_dns_provider( _DNSProvider ) ->
 
 
 
+% @doc Resets the LEEC state, typically prior to starting any (first) LEEC
+% instance.
+%
+% This may be useful for example with a certbot-based dns-01 challenge, in order
+% to wipe out the state of certbot to ensure that new certificates are obtained
+% (as opposed to former ones being reused, whereas their expiration timestamp
+% will not be specifically read).
+%
+% Otherwise tries to preserve state (e.g. any former certificate obtained
+% through http-01), as during the (potentially lengthy) renewal process, no
+% functional certificate (hence HTTPS access) would exist.
+%
+% Returns whether a state deletion was done.
+%
+% Not integrated to start/{2,3} as multiple LEEC instances can be used, and one
+% should not interfere with the others, through their common state
+% (e.g. regarding the one of certbot). Also, this may be useful only at the
+% first LEEC initialisation, not for the next automatic renewals.
+%
+-spec reset_state( challenge_type(), any_directory_path() ) -> boolean().
+reset_state( _ChallengeType='dns-01', AnyCertDir ) ->
+
+	% Wipes out any previous certbot state tree, to force the recreation of
+	% certificates (otherwise re-using preexisting ones may lead them to expire
+	% before any renewal triggered through LEEC):
+
+	% May be disabled for testing/troubleshooting; then a notification instead:
+	%
+	trace_utils:warning( "Currently not wiping out certbot state "
+		"to avoid the risk of exceeding the ACME certificate issuing "
+		"maximum rate (5 over 168 hours for a given domain)." ),
+
+	cond_utils:if_defined( leec_debug_mode, trace_bridge:notice_fmt(
+		"Resetting LEEC state, for the dns-01 challenge and "
+		"the certificate directory '~ts'.", [ AnyCertDir ] ) ),
+
+	BinStateDir = file_utils:bin_join( AnyCertDir, ?certbot_state_dir ),
+
+	%file_utils:remove_directory_if_existing( BinStateDir ),
+
+	% Hence existing, empty, with hopefully adequate owner and permissions:
+	file_utils:create_directory_if_not_existing( BinStateDir ),
+
+	true;
+
+% Nothing to do, typically for http-01:
+reset_state( _ChallengeType, _AnyCertDir ) ->
+	false.
+
+
+
 % @doc Starts a (non-bridged) instance of the LEEC service FSM, meant to rely on
 % the specified type of challenge.
 %
@@ -833,18 +885,12 @@ start( ChallengeType='dns-01', StartOptions, MaybeBridgeSpec ) ->
 	% The place where certbot is to store its state:
 	BinStateDir = file_utils:bin_join( BinCertDir, ?certbot_state_dir ),
 
-	% Wipes out any previous certbot state tree, to force the recreation of
-	% certificates (otherwise re-using preexisting ones may lead them to expire
-	% before any renewal triggered through LEEC):
-	%
-
-	trace_utils:warning( "Not wiping out certbot state to avoid the risk of "
-		"exceeding the ACME certificate issuing maximum rate "
-		"(5 over 168 hours for a given domain)." ),
-	%file_utils:remove_directory_if_existing( BinStateDir ),
-
-	% Hence existing, empty, with hoepefully adequate owner and permissions:
-	file_utils:create_directory_if_not_existing( BinStateDir ),
+	% As a result, any prior certbot state will be reused. We do not offer the
+	% possibility of wiping it out here, as multiple (more or less concurrent)
+	% LEEC instances may coexist, so none should not erase this common
+	% state. Use reset_state/2 once, before any actual start of LEEC, if wanting
+	% to start from scratch (which is recommended at least for the dns-01
+	% challenge to properly expiration timestamps).
 
 	LDState = #leec_dns_state{
 		state_dir_path=BinStateDir,
@@ -1218,14 +1264,10 @@ terminate( _LEECCallerState={ _ChalType='http-01', FsmPid } ) ->
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"Requesting LEEC FSM ~w to terminate.", [ FsmPid ] ) ),
 
-	trace_bridge:warning_fmt( "Terminating LEEC FSM ~w.", [ FsmPid ] ),
-
 	% May exit the calling process with an exception 'timeout'
 	% (e.g. {timeout,{gen_statem,call,[<0.676.0>,stop,15000]}}):
 	%
 	gen_statem:stop( FsmPid, _Reason=normal, _Timeout=5000 ),
-
-	trace_bridge:warning_fmt( "LEEC FSM ~w terminated.", [ FsmPid ] ),
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"LEEC FSM ~w terminated.", [ FsmPid ] ) );
@@ -1235,8 +1277,6 @@ terminate( _LEECCallerState={ _ChalType='dns-01', BotPid } ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"Requesting LEEC bot ~w to terminate.", [ BotPid ] ) ),
-
-	trace_bridge:warning_fmt( "Terminating LEEC bot ~w.", [ BotPid ] ),
 
 	BotPid ! stop,
 
