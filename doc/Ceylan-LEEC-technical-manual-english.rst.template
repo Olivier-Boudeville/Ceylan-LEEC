@@ -296,7 +296,7 @@ This entails a few consequences:
 LEEC (Preliminary) Support of Wildcard Certificates
 ---------------------------------------------------
 
-At least currently, LEEC supports wildcard certificates only very superficially, through the third-party (yet considered reliable, and free software) solution that is used, directly or not, by the vast majority of server installations - namely `certbot <https://certbot.eff.org/>`_. Care has been taken to streamline and secure the operation as much as possible (for example with as little permissions given as possible, not to jeopardise one's server).
+At least currently, LEEC supports wildcard certificates only very superficially, through the third-party (yet considered reliable and trustable, and free software) solution that is used, directly or not, by the vast majority of server installations - namely `certbot <https://certbot.eff.org/>`_. Care has been taken to streamline and secure the operation as much as possible (for example with as little permissions given as possible, not to jeopardise one's server).
 
 .. Note::
 
@@ -313,6 +313,10 @@ Additionally to the intrinsic advantages of wildcard certificates, with this app
 - (probably) from a leaf certificate to a more flexible full-chain one
 - from a 4096-bit RSA algorithm to a more recent, supposedly stronger, smaller 256-bit id-ecPublicKey (ASN1 OID: prime256v1 / NIST CURVE: P-256) one
 
+One should nevertheless note that:
+
+- rate limits still apply, and moreover certbot instances are not able to run concurrently (reporting "*Another instance of Certbot is already running*"), most probably because they cannot edit collaboratively the certbot state on the filesystem; as a consequence, we use our task ring to avoid any overlapping, but then, on startup, the duration before all domains are ready may become large (as dns-01 challenges are long to resolve because of DNS propagation)
+- certbot manages by itself the certificates that it produces, reading their expiration date to decide at each launch whether they shall be then updated; as a result, when a LEEC-using program (like US-Web) starts, should it do not check their remaining lifespan, it shall better wipe out its local certbot persistent state (see ``leec:reset_state/2``), so that it gets fresh certificates (otherwise such programs may plan a renewal too late for any "already used" certificate)
 
 
 Software Installation
