@@ -732,7 +732,10 @@ reset_state( _ChallengeType='dns-01', AnyCertDir ) ->
 	% Enabled by default:
 	file_utils:remove_directory_if_existing( BinStateDir ),
 
-	% Hence existing, empty, with hopefully adequate owner and permissions:
+	% Hence existing, empty, with presumably adequate owner and permissions
+	% (knowing that the internal directories created in ?certbot_state_dir by
+	% certbot have proper, strict permissions - and certbot always checks them):
+	%
 	file_utils:create_directory_if_not_existing( BinStateDir ),
 
 	true;
@@ -2452,8 +2455,8 @@ setup_interfacing_mode( #leec_http_state{ interfacing_mode=webroot,
 	throw( webroot_dir_path_missing );
 
 setup_interfacing_mode( LHState=#leec_http_state{
-								   interfacing_mode=webroot,
-								   webroot_dir_path=BinWebrootPath } ) ->
+							interfacing_mode=webroot,
+							webroot_dir_path=BinWebrootPath } ) ->
 
 	ChallengeDirPath =
 		file_utils:join( BinWebrootPath, ?webroot_challenge_path ),
