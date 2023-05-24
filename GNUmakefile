@@ -1,7 +1,7 @@
 LEEC_TOP = .
 
 
-.PHONY: all all-rebar3 help help-intro help-leec                         \
+.PHONY: all all-rebar3 help  help-leec                                   \
 		all register-version-in-header register-leec test-leec           \
 		list-beam-dirs add-prerequisite-plts link-plt                    \
 		send-release release release-zip release-bz2 release-xz          \
@@ -36,10 +36,6 @@ all-rebar3:
 
 # First target for default:
 help: help-intro help-leec
-
-
-help-intro:
-	@echo " Following main make targets are available for package $(PACKAGE_NAME):"
 
 
 help-leec:
