@@ -719,9 +719,9 @@ reset_state( _ChallengeType='dns-01', AnyCertDir ) ->
 
 	% May be disabled for testing/troubleshooting; then a notification instead:
 	%
-	trace_utils:warning( "Currently not wiping out certbot state "
-		"to avoid the risk of exceeding the ACME certificate issuing "
-		"maximum rate (5 over 168 hours for a given domain)." ),
+	%trace_utils:warning( "Currently not wiping out certbot state "
+	%	"to avoid the risk of exceeding the ACME certificate issuing "
+	%	"maximum rate (5 over 168 hours for a given domain)." ),
 
 	cond_utils:if_defined( leec_debug_mode, trace_bridge:notice_fmt(
 		"Resetting LEEC state, for the dns-01 challenge and "
@@ -729,7 +729,7 @@ reset_state( _ChallengeType='dns-01', AnyCertDir ) ->
 
 	BinStateDir = file_utils:bin_join( AnyCertDir, ?certbot_state_dir ),
 
-	%file_utils:remove_directory_if_existing( BinStateDir ),
+	file_utils:remove_directory_if_existing( BinStateDir ),
 
 	% Hence existing, empty, with hopefully adequate owner and permissions:
 	file_utils:create_directory_if_not_existing( BinStateDir ),
