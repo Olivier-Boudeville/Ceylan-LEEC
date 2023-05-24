@@ -157,7 +157,7 @@ create_certificate( BinDomainName, DNSProvider, BinEmailAddress,
 					#leec_dns_state{ environment=Env,
 									 state_dir_path=BinStateDir,
 									 work_dir_path=BinWorkDir,
-									 cert_dir_path=BinCertDir,
+									 %cert_dir_path=BinCertDir,
 									 certbot_path=BinCertbotExecPath,
 									 credentials_dir_path=BinCredDir } ) ->
 
@@ -227,7 +227,7 @@ create_certificate( BinDomainName, DNSProvider, BinEmailAddress,
 				basic_utils:ignore_unused( CmdOutput ) ),
 
 			ExpectedBinDir = file_utils:bin_join(
-				[ BinCertDir, "live", BinDomainName ] ),
+				[ BinStateDir, "live", BinDomainName ] ),
 
 			case file_utils:is_existing_directory( ExpectedBinDir ) of
 
