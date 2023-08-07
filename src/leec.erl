@@ -723,9 +723,11 @@ reset_state( _ChallengeType='dns-01', AnyCertDir ) ->
 	%   "to avoid the risk of exceeding the ACME certificate issuing "
 	%   "maximum rate (5 over 168 hours for a given domain)." ),
 
-	cond_utils:if_defined( leec_debug_mode, trace_bridge:notice_fmt(
+	% Preferring not masking it:
+	%cond_utils:if_defined( leec_debug_mode,
+	trace_bridge:notice_fmt(
 		"Resetting LEEC state, for the dns-01 challenge and "
-		"the certificate directory '~ts'.", [ AnyCertDir ] ) ),
+		"the certificate directory '~ts'.", [ AnyCertDir ] ), % ),
 
 	BinStateDir = file_utils:bin_join( AnyCertDir, ?certbot_state_dir ),
 
