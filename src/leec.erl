@@ -83,7 +83,8 @@
 
 % Facilities:
 -export([ dns_provider_to_string/1, get_credentials_path_for/3,
-		  get_certificate_priv_key_filename/1, caller_state_to_string/1 ]).
+		  get_certificate_priv_key_filename/1,
+		  caller_state_to_string/1, maybe_caller_state_to_string/1 ]).
 
 
 % For spawn purpose:
@@ -1507,9 +1508,10 @@ get_ongoing_challenges( FsmPid ) ->
 send_ongoing_challenges( _LCS={ _ChalType, FsmPid }, TargetPid ) ->
 	% No error possibly reported:
 	gen_statem:cast( _ServerRef=FsmPid,
-					 _Msg={ send_ongoing_challenges, TargetPid } ).
+					 _Msg={ send_ongoing_challenges, TargetPid } );
 
-
+send_ongoing_challenges( InvalidLCS, _TargetPid ) ->
+	throw( { invalid_leec_caller_state, InvalidLCS } ).
 
 
 
@@ -2959,3 +2961,12 @@ state_to_string( LDS=#leec_dns_state{ certbot_path=CertbotPath } ) ->
 caller_state_to_string( _LEECCallerState={ ChalType, LeecFsmPid } ) ->
 	text_utils:format( "LEEC caller state of challenge ~ts and FSM ~w",
 					   [ ChalType, LeecFsmPid ] ).
+
+
+% @doc Returns a textual description of the specified maybe-LEEC caller state.
+-spec maybe_caller_state_to_string( maybe( leec_caller_state() ) ) -> ustring().
+maybe_caller_state_to_string( _MaybeLEECCallerState=undefined ) ->
+	"no LEEC caller state/FSM";
+
+maybe_caller_state_to_string( LEECCallerState ) ->
+	caller_state_to_string( LEECCallerState ).
