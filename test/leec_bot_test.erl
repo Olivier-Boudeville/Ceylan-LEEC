@@ -46,10 +46,10 @@ run_actual_test() ->
 	file_utils:create_directory_if_not_existing( TestCertDir ),
 
 	% The options retained for the LEEC FSM:
-	BaseLEECOpts = #{ environment   => staging,
-					  cred_dir_path => TestCredDir,
-					  work_dir_path => TestWorkDir,
-					  cert_dir_path => TestCertDir },
+	BaseLEECOpts = [ { environment, staging },
+					 { cred_dir_path, TestCredDir },
+					 { work_dir_path, TestWorkDir },
+					 { cert_dir_path, TestCertDir } ],
 
 	ChallengeType = 'dns-01',
 
