@@ -1,11 +1,11 @@
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-<meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
-<title>Welcome to the Ceylan-LEEC documentation</title>
+<meta name="generator" content="Docutils 0.20.1: https://docutils.sourceforge.io/" />
 <meta content="LEEC, X509, certificate, SSL, https, Erlang" name="keywords" />
+<title>Welcome to the Ceylan-LEEC documentation</title>
 <link rel="stylesheet" href="pygments-default.css" type="text/css" />
 <link rel="stylesheet" href="leec.css" type="text/css" />
 <link href="leec-icon.png" rel="icon">
@@ -23,15 +23,15 @@
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field"><th class="field-name">Organisation:</th><td class="field-body">Copyright (C) 2020-2023 Olivier Boudeville</td>
+<tr class="field"><th class="field-name">Organisation:</th><td class="field-body">Copyright (C) 2020-2024 Olivier Boudeville</td>
 </tr>
 <tr class="field"><th class="field-name">Contact:</th><td class="field-body">about (dash) leec (at) esperide (dot) com</td>
 </tr>
 <tr class="field"><th class="field-name">Creation date:</th><td class="field-body">Wednesday, November 11, 2020</td>
 </tr>
-<tr class="field"><th class="field-name">Lastly updated:</th><td class="field-body">Sunday, March 19, 2023</td>
+<tr class="field"><th class="field-name">Lastly updated:</th><td class="field-body">Thursday, January 4, 2024</td>
 </tr>
-<tr class="field"><th class="field-name">Version:</th><td class="field-body">1.1.9</td>
+<tr class="field"><th class="field-name">Version:</th><td class="field-body">1.2.2</td>
 </tr>
 <tr class="field"><th class="field-name">Status:</th><td class="field-body">Stable</td>
 </tr>
@@ -59,31 +59,54 @@
 </ul>
 </li>
 <li><a class="reference internal" href="#building" id="toc-entry-7">Building</a></li>
-<li><a class="reference internal" href="#usage-example" id="toc-entry-8">Usage Example</a></li>
-<li><a class="reference internal" href="#design-notes" id="toc-entry-9">Design Notes</a><ul>
-<li><a class="reference internal" href="#multiple-domains-having-each-multiple-hostnames" id="toc-entry-10">Multiple Domains Having Each Multiple Hostnames</a></li>
-<li><a class="reference internal" href="#concurrent-certificate-operations" id="toc-entry-11">Concurrent Certificate Operations</a></li>
-<li><a class="reference internal" href="#let-s-encrypt-accounts" id="toc-entry-12">Let's Encrypt Accounts</a></li>
+<li><a class="reference internal" href="#usage-example" id="toc-entry-8">Usage Example</a><ul>
+<li><a class="reference internal" href="#single-domain-certificates-with-the-http-01-challenge" id="toc-entry-9">Single-Domain Certificates with the <tt class="docutils literal"><span class="pre">http-01</span></tt> Challenge</a></li>
+<li><a class="reference internal" href="#wildcard-domain-certificates-with-the-dns-01-challenge" id="toc-entry-10">Wildcard-Domain Certificates with the <tt class="docutils literal"><span class="pre">dns-01</span></tt> Challenge</a><ul>
+<li><a class="reference internal" href="#limits-of-the-single-domain-certificates" id="toc-entry-11">Limits of the Single-Domain Certificates</a></li>
+<li><a class="reference internal" href="#wildcard-certificates-pros-and-cons" id="toc-entry-12">Wildcard Certificates: Pros and Cons</a></li>
+<li><a class="reference internal" href="#leec-preliminary-support-of-wildcard-certificates" id="toc-entry-13">LEEC (Preliminary) Support of Wildcard Certificates</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#getting-information-about-the-generated-certificates" id="toc-entry-13">Getting Information about the Generated Certificates</a></li>
-<li><a class="reference internal" href="#other-files-of-interest" id="toc-entry-14">Other Files of Interest</a></li>
-<li><a class="reference internal" href="#troubleshooting-https-certificate-related-issues" id="toc-entry-15">Troubleshooting HTTPS Certificate-related Issues</a></li>
-<li><a class="reference internal" href="#licence" id="toc-entry-16">Licence</a></li>
-<li><a class="reference internal" href="#support" id="toc-entry-17">Support</a></li>
-<li><a class="reference internal" href="#possible-enhancements" id="toc-entry-18">Possible Enhancements</a></li>
-<li><a class="reference internal" href="#please-react" id="toc-entry-19">Please React!</a></li>
-<li><a class="reference internal" href="#ending-word" id="toc-entry-20">Ending Word</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#design-notes" id="toc-entry-14">Design Notes</a><ul>
+<li><a class="reference internal" href="#multiple-domains-having-each-multiple-hostnames" id="toc-entry-15">Multiple Domains Having Each Multiple Hostnames</a></li>
+<li><a class="reference internal" href="#concurrent-certificate-operations" id="toc-entry-16">Concurrent Certificate Operations</a></li>
+<li><a class="reference internal" href="#let-s-encrypt-accounts" id="toc-entry-17">Let's Encrypt Accounts</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#getting-information-about-the-generated-certificates" id="toc-entry-18">Getting Information about the Generated Certificates</a></li>
+<li><a class="reference internal" href="#other-files-of-interest" id="toc-entry-19">Other Files of Interest</a></li>
+<li><a class="reference internal" href="#troubleshooting-https-certificate-related-issues" id="toc-entry-20">Troubleshooting HTTPS Certificate-related Issues</a></li>
+<li><a class="reference internal" href="#licence" id="toc-entry-21">Licence</a></li>
+<li><a class="reference internal" href="#support" id="toc-entry-22">Support</a></li>
+<li><a class="reference internal" href="#possible-enhancements" id="toc-entry-23">Possible Enhancements</a></li>
+<li><a class="reference internal" href="#please-react" id="toc-entry-24">Please React!</a></li>
+<li><a class="reference internal" href="#ending-word" id="toc-entry-25">Ending Word</a></li>
 </ul>
 </div>
 <p></p>
 <div class="section" id="overview">
 <h1><a class="toc-backref" href="#toc-entry-1">Overview</a></h1>
 <p>The LEEC library is the Ceylan fork of the original and much appreciated <a class="reference external" href="https://github.com/gbour/letsencrypt-erlang">letsencrypt-erlang</a>, which is a <a class="reference external" href="https://letsencrypt.org/">Let's Encrypt</a> client library for Erlang, whose author is Guillaume Bour.</p>
-<p>LEEC's purpose is to obtain proper X.509 security certificates from <tt class="docutils literal">Let's Encrypt</tt> - or more generally <a class="reference external" href="https://en.wikipedia.org/wiki/Automated_Certificate_Management_Environment">ACME servers</a> (version 2), typically in order to secure one's webservers so that they can offer a solid HTTPS connectivity, which is pretty much standard nowadays.</p>
-<p>Each certificate covers a single domain or subdomain (possibly a virtual host, and is obtained by proving its ownership by the requester.</p>
-<p>At least currently no wildcard certificate is supported (more complex challenges would have to be implemented).</p>
-<p>These certificates last for 90 days, so they shall be renewed regularly.</p>
+<p>LEEC's purpose is to obtain proper X.509 security certificates from <tt class="docutils literal">Let's Encrypt</tt> - or more generally from any <a class="reference external" href="https://en.wikipedia.org/wiki/Automated_Certificate_Management_Environment">ACME server</a> (version 2) - to perform <em>Domain Validation</em>.</p>
+<p>Such certificates are typically used in order to secure one's webserver so that it can offer a solid HTTPS connectivity, which is pretty much standard nowadays; yet they may also used for mail servers, FTP servers, and many more <a class="footnote-reference" href="#footnote-1" id="footnote-reference-1">[1]</a>.</p>
+<table class="docutils footnote" frame="void" id="footnote-1" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#footnote-reference-1">[1]</a></td><td>For Email encryption and code signing, one may refer to <a class="reference external" href="https://howtos.esperide.org/Cybersecurity.html#openpgp">this section regarding OpenPGP</a>.</td></tr>
+</tbody>
+</table>
+<p>Three levels of certificates can be considered:</p>
+<ul class="simple">
+<li><strong>pure single-domain certificates</strong>; for example a certificate applying only to <tt class="docutils literal">foobar.org</tt></li>
+<li><strong>single-domain certificates with SANs</strong> (<em>Subject Alternative Name</em>); for example a certificate applying only to a domain (e.g. <tt class="docutils literal">foobar.org</tt>) and related extra, predetermined DNS names (like <tt class="docutils literal">alpha.foobar.org</tt>, <tt class="docutils literal">beta.foobar.org</tt>, etc.)</li>
+<li><strong>wildcard certificates</strong>; for example a certificate applying to a domain (e.g. <tt class="docutils literal">foobar.org</tt>) and to <em>any</em> subdomain thereof (e.g. <tt class="docutils literal">*.foobar.org</tt>)</li>
+</ul>
+<p>Subdomains may be managed by different hosts or may correspond to virtual hosts, i.e. be managed by a single host that is able to multiplex the accesses that are made to them, based on the pseudo-host that the requester specified (then for example serving different web contents based on it).</p>
+<p>Each certificate is obtained by proving to its ACME server of the issuer the ownership/control of a webserver or of a DNS entry.</p>
+<p>At least currently, no wildcard certificate is managed as in-depth as it is done for per-domain certificates (more complex challenges would have to be implemented), yet it is <a class="reference external" href="#wildcard-certificate">nevertheless supported</a>.</p>
+<p>To ensure freshness, these certificates have intentionally a short lifespan (e.g. they last for 90 days); they shall therefore be renewed regularly and automatically from the certificate authority.</p>
 <p>LEEC is notably used in the context of <a class="reference external" href="http://us-web.esperide.org/">US-Web</a>.</p>
 </div>
 <div class="section" id="differences-introduced-by-this-fork">
@@ -109,6 +132,7 @@
 </ul>
 </li>
 <li>SSL-based verification of the ACME peer, to avoid any man-in-the-middle attack (quite relevant when fetching security elements)</li>
+<li>first basic support of wildcard certificates</li>
 </ul>
 <p>So, even if LEEC can be seen mostly as a &quot;reckless&quot; fork (in the sense that it became quickly obvious that retaining upstream compatibility could hardly be achieved) - with so many source-level differences (in terms of conventions, Myriad integration, whitespace cleanup) that a pull request can difficultly be considered - yet, in spite of the appearances, it remained quite close to the original (mainly differences of form) and followed the same structure.</p>
 <p>By some ways, this LEEC fork is safer and more robust than the original, by others not (e.g. test coverage, autonomous use, continuous integration). A key goal was to make it easier to understand and maintain.</p>
@@ -165,22 +189,24 @@ $<span class="w"> </span>rebar3<span class="w"> </span>upgrade<span class="w"> <
 </div>
 <div class="section" id="usage-example">
 <h1><a class="toc-backref" href="#toc-entry-8">Usage Example</a></h1>
-<p>The main example of LEEC in action can be found in link with <a class="reference external" href="https://us-web.esperide.org/">US-Web</a>, whose sources can be found <a class="reference external" href="https://github.com/Olivier-Boudeville/us-web/src">here</a>; see notably <a class="reference external" href="https://github.com/Olivier-Boudeville/us-web/blob/master/src/class_USCertificateManager.erl">class_USCertificateManager.erl</a> and <a class="reference external" href="https://github.com/Olivier-Boudeville/us-web/blob/master/src/us_web_letsencrypt_handler.erl">us_web_letsencrypt_handler.erl</a> <a class="footnote-reference" href="#footnote-1" id="footnote-reference-1">[1]</a>.</p>
-<table class="docutils footnote" frame="void" id="footnote-1" rules="none">
-<colgroup><col class="label" /><col /></colgroup>
-<tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#footnote-reference-1">[1]</a></td><td>By the way, if you are currently reading <a class="reference external" href="https://leec.esperide.org">LEEC's official website</a>, then your browser already checked LEEC-obtained certificates!</td></tr>
-</tbody>
-</table>
-<p>This mode of operation, described <a class="reference external" href="https://us-web.esperide.org/#managing-public-key-certificates">in this section</a>, is typical of the use case where an Erlang-based webserver (in this case based on <a class="reference external" href="https://github.com/ninenines/cowboy">Cowboy</a>) has to renew certificates corresponding to the various virtual hosts (possibly dispatched under various domains) that it is making available.</p>
-<p>A first part is to create as many LEEC FSMs as domains of interest, which will connect to the target ACME servers (most probably Let's Encrypt ones). Each FSM is a LEEC agent that will generate its own (strong) RSA key, create automatically its throwaway ACME account on the server, secure properly the communication (with TLS signatures, nonces, etc.), and wait for further user request regarding its domain of interest (e.g. <tt class="docutils literal">foobar.org</tt>).</p>
-<p>Such a request is bound to ask the ACME server to generate (as a Certificate Authority) a X.509 certificate covering, thanks to SAN, a set of subdomains (FQDN) to secure (e.g. <tt class="docutils literal">hello.foobar.org</tt>, <tt class="docutils literal">hurricane.foobar.org</tt>) - knowing that no wildcard certificate can be obtained with the <tt class="docutils literal"><span class="pre">http-01</span></tt> challenge being used here. The ACME server will send challenges to LEEC so that it can prove that it controls indeed all these subdomains.</p>
-<p>A second part of the LEEC action is to ensure that these answers are available indeed, as tokens. In practice the ACME server will attempt to read them at specific URLs (prefixed with <tt class="docutils literal"><span class="pre">.well-known/acme-challenge/</span></tt>) expected to be served for these subdomains (most probably thanks to virtual hosting). If the ACME server is able to query and read, directly from a domain, the right tokens corresponding to the challenges it sent for this domain, then the proof of actual control by the requester is established, and the ACME server can thus issue a corresponding certificate and transmit it appropriately to LEEC.</p>
-<p>The overall webserver of the user shall thus track the transitions of these FSMs until (hopefully) they successfully complete their procedure and obtain from their ACME server the corresponding certificate. Then only the user webserver will be able to fire its https support with these brand new certificates <a class="footnote-reference" href="#footnote-2" id="footnote-reference-2">[2]</a>.</p>
+<p>The main example of LEEC in action can be found in link with <a class="reference external" href="https://us-web.esperide.org/">US-Web</a>, whose sources can be found <a class="reference external" href="https://github.com/Olivier-Boudeville/us-web/src">here</a>; see notably <a class="reference external" href="https://github.com/Olivier-Boudeville/us-web/blob/master/src/class_USCertificateManager.erl">class_USCertificateManager.erl</a> and <a class="reference external" href="https://github.com/Olivier-Boudeville/us-web/blob/master/src/us_web_letsencrypt_handler.erl">us_web_letsencrypt_handler.erl</a> <a class="footnote-reference" href="#footnote-2" id="footnote-reference-2">[2]</a>.</p>
 <table class="docutils footnote" frame="void" id="footnote-2" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#footnote-reference-2">[2]</a></td><td>Before, even if suitable certificates were pre-existing, at least the ACME URL prefix was to remain over http instead of being automatically promoted to https as all others.</td></tr>
+<tr><td class="label"><a class="fn-backref" href="#footnote-reference-2">[2]</a></td><td>By the way, if you are currently reading <a class="reference external" href="https://leec.esperide.org">LEEC's official website</a>, then your browser already checked LEEC-obtained certificates!</td></tr>
+</tbody>
+</table>
+<div class="section" id="single-domain-certificates-with-the-http-01-challenge">
+<h2><a class="toc-backref" href="#toc-entry-9">Single-Domain Certificates with the <tt class="docutils literal"><span class="pre">http-01</span></tt> Challenge</a></h2>
+<p>This mode of operation, described <a class="reference external" href="https://us-web.esperide.org/#managing-public-key-certificates">in this section</a>, is typical of the use case where an Erlang-based webserver (in this case based on <a class="reference external" href="https://github.com/ninenines/cowboy">Cowboy</a>) has to automatically renew certificates corresponding to the various virtual hosts (possibly dispatched under various domains) that it is making available.</p>
+<p>A first part is to create as many LEEC FSMs as domains of interest, which will connect to the target ACME servers (most probably Let's Encrypt ones). Each FSM is a LEEC agent that will generate its own (strong) RSA key, create automatically its throwaway ACME account on the server, secure properly the communication (with TLS signatures, nonces, etc.), and wait for further user request regarding its domain of interest (e.g. <tt class="docutils literal">foobar.org</tt>).</p>
+<p>Such a request is bound to ask the ACME server to generate (as a Certificate Authority) a X.509 certificate covering, thanks to SAN, a set of subdomains (as FQDNs) to secure (e.g. <tt class="docutils literal">hello.foobar.org</tt>, <tt class="docutils literal">hurricane.foobar.org</tt>) - knowing that no wildcard certificate can be obtained with the <tt class="docutils literal"><span class="pre">http-01</span></tt> challenge being used here. The ACME server will send challenges to LEEC so that it can prove that it controls indeed each of these subdomains.</p>
+<p>A second part of the LEEC action is to ensure that these answers are available indeed, as tokens. In practice the ACME server will attempt to read the information it communicated at the previous step from specific URLs (prefixed with <tt class="docutils literal"><span class="pre">.well-known/acme-challenge/</span></tt>) expected to be served for these subdomains (most probably thanks to virtual hosting). If the ACME server is able to query and read, directly from a domain, the right tokens corresponding to the challenges it sent for this domain, then the proof of actual control by the requester is established, and the ACME server can thus issue a corresponding certificate and transmit it appropriately to LEEC.</p>
+<p>The overall webserver of the user shall thus track the transitions of these FSMs until (hopefully) they successfully complete their procedure and obtain from their ACME server the corresponding certificate. Then only the user webserver will be able to fire its https support with these brand new certificates <a class="footnote-reference" href="#footnote-3" id="footnote-reference-3">[3]</a>.</p>
+<table class="docutils footnote" frame="void" id="footnote-3" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#footnote-reference-3">[3]</a></td><td>Before, even if suitable certificates were pre-existing, at least the ACME URL prefix must remain over http instead of being automatically promoted to https as all others, otherwise no challenge could succeed.</td></tr>
 </tbody>
 </table>
 <p>Finally, a task scheduler may be used to trigger renewals on time (not too soon, not too late, as ACME rules apply and, of course, each FQDN shall be covered by a valid certificate at any time), and a task ring may be used to (paradoxically) ensure that the webserver as a whole does not interact too much in parallel (through its various LEEC FSMs) with the ACME server (despite hosting potentially a large number of FQDNs), knowing that severe rate limits (example in <a class="reference external" href="https://letsencrypt.org/docs/rate-limits/">production</a>) apply.</p>
@@ -194,39 +220,279 @@ $<span class="w"> </span>rebar3<span class="w"> </span>upgrade<span class="w"> <
 </ol>
 <p>For US-Web, (1), (2) and (4) are managed by <a class="reference external" href="https://github.com/Olivier-Boudeville/us-web/blob/master/src/class_USCertificateManager.erl">class_USCertificateManager.erl</a> (see respectively <tt class="docutils literal">init_leec/5</tt>, <tt class="docutils literal">request_certificate/1</tt> and the <tt class="docutils literal">onCertificateRequestOutcome/2</tt> callback). (3) is taken in charge by <a class="reference external" href="https://github.com/Olivier-Boudeville/us-web/blob/master/src/us_web_letsencrypt_handler.erl">us_web_letsencrypt_handler.erl</a> (see <tt class="docutils literal">init/2</tt>).</p>
 </div>
-<div class="section" id="design-notes">
-<h1><a class="toc-backref" href="#toc-entry-9">Design Notes</a></h1>
-<div class="section" id="multiple-domains-having-each-multiple-hostnames">
-<h2><a class="toc-backref" href="#toc-entry-10">Multiple Domains Having Each Multiple Hostnames</a></h2>
-<p>At least the ACME servers from Let's Encrypt enforce various rate limits (both in <a class="reference external" href="https://letsencrypt.org/docs/rate-limits/">production environment</a> and in <a class="reference external" href="https://letsencrypt.org/docs/staging-environment/">staging</a> one) that are fairly low, which leads to preferring requesting certificates only on a per-domain basis (e.g. globally for <tt class="docutils literal">foobar.org</tt>) rather than on a per-hostname host basis (e.g. one for <tt class="docutils literal">baz.foobar.org</tt>, another one for <tt class="docutils literal">hurrican.foobar.org</tt>, etc., these hosts being virtual ones or not), as such requests would quickly become too numerous to respect these rate thresholds.</p>
-<p>A per-domain certificate should then include directly its various hostnames as <em>Subject Alternative Names</em> (SAN entries).</p>
-<p>With the <tt class="docutils literal"><span class="pre">http-01</span></tt> challenge type, no wildcard for such SAN hosts (e.g. <tt class="docutils literal">*.foobar.org</tt>) can be specified, so all the wanted ones have to be explicitly listed <a class="footnote-reference" href="#footnote-3" id="footnote-reference-3">[3]</a>.</p>
-<table class="docutils footnote" frame="void" id="footnote-3" rules="none">
+<div class="section" id="wildcard-domain-certificates-with-the-dns-01-challenge">
+<span id="wildcard-certificate"></span><h2><a class="toc-backref" href="#toc-entry-10">Wildcard-Domain Certificates with the <tt class="docutils literal"><span class="pre">dns-01</span></tt> Challenge</a></h2>
+<div class="section" id="limits-of-the-single-domain-certificates">
+<h3><a class="toc-backref" href="#toc-entry-11">Limits of the Single-Domain Certificates</a></h3>
+<p>As discussed in the previous section, obtaining single-domain certificates thanks to the <tt class="docutils literal"><span class="pre">http-01</span></tt> challenge is not straightforward, and has some drawbacks:</p>
+<ul class="simple">
+<li>as dedicated key pairs will be needed for each actual domain name (for <tt class="docutils literal">foo.bar.org</tt>, <tt class="docutils literal">buzz.bar.org</tt>, etc.), whenever having to host a fair number of websites (a few dozens?), you will have to generate as many of them; this will multiply the chances of experimenting failures and hitting the rate limits enforced by your ACME provider (typically Let's Encrypt); yet using SANs (<em>Subject Alt Names</em>) is a sure way to reduce considerably the number of certificates to be issued (only one for each of your &quot;top-level&quot; domains, regardless of the number of the virtual hosts they each federate)</li>
+<li>anyone curious enough will be able to access the SAN  information listed in one's resulting SSL certificate (this is trivially done with most browsers) and collect all the DNS Names listed there, thus revealing them - whereas your DNS configuration may be set not to disclose them <a class="footnote-reference" href="#footnote-4" id="footnote-reference-4">[4]</a>; moreover, without this SAN information (needed in this scheme but then publicly available), we do not believe anyone could easily guess what are the domains that have been defined (and thus what are the websites that are hosted by a given &quot;root&quot; domain; this corresponds in our example to the <tt class="docutils literal">foo</tt> and <tt class="docutils literal">buzz</tt> domains of the <tt class="docutils literal">bar.org</tt> root one <a class="footnote-reference" href="#footnote-5" id="footnote-reference-5">[5]</a>)</li>
+</ul>
+<table class="docutils footnote" frame="void" id="footnote-4" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#footnote-reference-3">[3]</a></td><td>As a result, the certificate may disclose virtual hosts that would be otherwise invisible from the Internet (as not even declared in the DNS entries for that domain that would act as wildcard name resolvers).</td></tr>
+<tr><td class="label"><a class="fn-backref" href="#footnote-reference-4">[4]</a></td><td>Note that, regardless of the settings in terms of DNS and certificates, with SNI (i.e. <em>Server Name Indication</em>, the method to multiplex virtual hosts onto a single actual host), the specific visited virtual hostname (e.g. <tt class="docutils literal">foo</tt>, in <tt class="docutils literal">foo.bar.org</tt>) is not encrypted, and thus might be known of an eavesdropper.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="footnote-5" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#footnote-reference-5">[5]</a></td><td>Note that there is no need to specify explicitly in a DNS zone one's subdomain CNAME (e.g. <tt class="docutils literal">&quot;foo IN CNAME bar.org.&quot;</tt>): a wildcard entry (<tt class="docutils literal">&quot;* IN CNAME bar.org.&quot;</tt>) can be preferred (more flexible, and not disclosing any subdomain). It is quite complementary to wildcard certificates, in the sense that, then, subdomains have never to be listed outside of one's server.</td></tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="wildcard-certificates-pros-and-cons">
+<h3><a class="toc-backref" href="#toc-entry-12">Wildcard Certificates: Pros and Cons</a></h3>
+<p>A more satisfactory solution is to rely on the more flexible wildcard certificates, that are certificates that can apply to <em>any</em> subdomain (e.g. <tt class="docutils literal">*.bar.org</tt>) of a given root one. Fortunately, ACME providers like Let's Encrypt now offer them as well <a class="footnote-reference" href="#footnote-6" id="footnote-reference-6">[6]</a>.</p>
+<table class="docutils footnote" frame="void" id="footnote-6" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#footnote-reference-6">[6]</a></td><td>Of course such certificates may be purchased instead, but they tend to be quite expensive. Moreover one may prefer to favour a free Internet, able to operate as much as possible without black-box, commercial solutions.</td></tr>
+</tbody>
+</table>
+<p>This implies far fewer keys and, ultimately, less information publicly disseminated; this implies also switching from a <tt class="docutils literal"><span class="pre">http-01</span></tt> challenge (where you prove that you control a webserver corresponding to a given domain) to a <tt class="docutils literal"><span class="pre">dns-01</span></tt> one (where you prove that you control the corresponding DNS zone entry).</p>
+<p>This entails a few consequences:</p>
+<ul class="simple">
+<li>such a certificate generation mechanism has to update a DNS entry, which is probably more complex than updating a website accordingly</li>
+<li>this requires that the DNS provider for that domain supports such an automated update, through an API - bound to be specific to this provider</li>
+<li>modifying one's DNS entries automatically is fraught with security risks: the needed credentials shall not be accessed by third parties, otherwise they could complete a dns-01 challenge on their own to acquire new certificates for the associated domains and/or revoke your own existing certificates; yet various measures (credential file protection, IP-based restriction) can help reducing these risks</li>
+</ul>
+</div>
+<div class="section" id="leec-preliminary-support-of-wildcard-certificates">
+<h3><a class="toc-backref" href="#toc-entry-13">LEEC (Preliminary) Support of Wildcard Certificates</a></h3>
+<p>At least currently, LEEC supports wildcard certificates only very superficially, through the third-party (yet considered reliable and trustable, and free software) solution that is used, directly or not, by the vast majority of server installations - namely <a class="reference external" href="https://certbot.eff.org/">certbot</a>. Care has been taken to streamline and secure the operation as much as possible (for example with as little permissions given as possible, not to jeopardise one's server).</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>A better approach would have been to instead recode all exchanges directly from Erlang, with direct REST requests, like already done for the single-domain certificates.</p>
+<p class="last">Although fully possible (moreover many LEEC existing elements could be re-used for this new validation challenge), this ideal approach would require significant development time, dedication and efforts. Any contribution welcome!</p>
+</div>
+<p>So, for the time being, LEEC merely integrates the well-known procedures described by many sources (for instance, in French: <a class="reference external" href="https://wiki-tech.io/S%C3%A9curit%C3%A9/Chiffrement/Wildcard">[1]</a>, <a class="reference external" href="https://docs.khroners.fr/books/debian/page/generer-un-certificat-wildcard">[2]</a>, <a class="reference external" href="https://remiflandrois.fr/2020/03/26/creation-certificat-wildcard-ovh/">[3]</a>). This is done here on Arch Linux, and for the OVH DNS provider (to which of course we are not affiliated in any way).</p>
+<p>Additionally to the intrinsic advantages of wildcard certificates, with this approach we moved:</p>
+<ul class="simple">
+<li>(probably) from a leaf certificate to a more flexible full-chain one</li>
+<li>from a 4096-bit RSA algorithm to a more recent, supposedly stronger, smaller 256-bit id-ecPublicKey (ASN1 OID: prime256v1 / NIST CURVE: P-256) one</li>
+</ul>
+<p>One should nevertheless note that:</p>
+<ul class="simple">
+<li>rate limits still apply, and moreover certbot instances are not able to run concurrently (reporting &quot;<em>Another instance of Certbot is already running</em>&quot;), most probably because they cannot edit collaboratively the certbot state on the filesystem; as a consequence, we use our task ring to avoid any overlapping, but then, on startup, the duration before all domains are ready may become large (as dns-01 challenges are long to resolve because of DNS propagation)</li>
+<li>certbot manages by itself the certificates that it produces, reading their expiration date to decide at each launch whether they shall be then updated; as a result, when a LEEC-using program (like US-Web) starts, should it do not check their remaining lifespan, it shall better wipe out its local certbot persistent state (see <tt class="docutils literal">leec:reset_state/2</tt>), so that it gets fresh certificates (otherwise such programs may plan a renewal too late for any &quot;already used&quot; certificate)</li>
+</ul>
+<div class="section" id="software-installation">
+<h4>Software Installation</h4>
+<p>The certbot mechanism will have to use the API that is specific to one's DNS provider, in our case it will be <a class="reference external" href="https://certbot-dns-ovh.readthedocs.io/en/stable/">certbot-dns-ovh</a>.</p>
+<p>Installation can be done with <tt class="docutils literal">pacman <span class="pre">-Sy</span> certbot <span class="pre">certbot-dns-ovh</span></tt>.</p>
+</div>
+<div class="section" id="dns-configuration">
+<h4>DNS Configuration</h4>
+<p>The goal here is to be able to update automatically (by program) the relevant DNS settings of one's target domain (so that the ACME challenge can be written there).</p>
+<p>For that, once a key has been created (through the web interface of the DNS provider - here, OVH), all operations (including key management) are to take place through REST calls that one can issue once for all, before having certbot be able to operate on its own.</p>
+<div class="section" id="creation-of-an-api-key">
+<h5>Creation of an API Key</h5>
+<p>For each domain, the credentials can then be obtained thanks to, here, the <a class="reference external" href="https://api.ovh.com/createToken/">OVH createToken API function</a>. The <tt class="docutils literal">Create API Keys</tt> form will request:</p>
+<ul class="simple">
+<li>an application name (e.g. &quot;LEEC for foobar.org&quot;)</li>
+<li>an application description (e.g. &quot;LEEC YYYYMMDD update token for foobar.org&quot;)</li>
+<li>a validity duration (<tt class="docutils literal">Unlimited</tt> if wanting to automate)</li>
+<li>the GET/POST/DELETE operations to enable for this token (replace below <tt class="docutils literal">YOUR_DOMAIN</tt> by your actual domain, like <tt class="docutils literal">foobar.org</tt>):</li>
+</ul>
+<table border="1" class="docutils">
+<colgroup>
+<col width="33%" />
+<col width="67%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">HTTP Request Type</th>
+<th class="head">Parameter</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>GET</td>
+<td>/domain/zone/</td>
+</tr>
+<tr><td>GET</td>
+<td>/domain/zone/YOUR_DOMAIN/</td>
+</tr>
+<tr><td>GET</td>
+<td>/domain/zone/YOUR_DOMAIN/status</td>
+</tr>
+<tr><td>GET</td>
+<td>/domain/zone/YOUR_DOMAIN/record</td>
+</tr>
+<tr><td>GET</td>
+<td>/domain/zone/YOUR_DOMAIN/record/*</td>
+</tr>
+<tr><td>POST</td>
+<td>/domain/zone/YOUR_DOMAIN/record</td>
+</tr>
+<tr><td>POST</td>
+<td>/domain/zone/YOUR_DOMAIN/refresh</td>
+</tr>
+<tr><td>DELETE</td>
+<td>/domain/zone/YOUR_DOMAIN/record/*</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>Due to the aforementioned DNS security risks, we strongly recommend that a set of allowed IP addresses is specified in order to constrain the origin of the API request calls. By design one has already a fixed public IP for one's server, isn't it?</p>
+<p class="last">However, should one's server be hacked, the attacker may then control both one of the allowed IPs and also any local credential file...</p>
+</div>
+</div>
+<div class="section" id="deletion-of-an-api-key">
+<h5>Deletion of an API Key</h5>
+<p>Unused keys/tokens (especially those of unlimited validity) shall be deleted. This cannot be done here directly from a dedicated, user-friendly account-based web interface, so REST calls will have to be issued (from an allowed IP, typically the one of the server of interest).</p>
+<p>For that the <tt class="docutils literal">ApplicationID</tt> of the target token to delete shall then be obtained thanks to... another token, and a relevant one (otherwise: &quot;This call has not been granted&quot;).</p>
+<p>So the first step is to create a suitable (limited-time) token, by pointing one's browser to <a class="reference external" href="https://eu.api.ovh.com/createToken/?GET=/me/api/application&amp;GET=/me/api/application/*&amp;DELETE=/me/api/application/*">this URL</a> to request such a token.</p>
+<p>Once the form filled and the token generated, the returned credentials information may then be temporarily stored in one's environment; for example (of course these are bogus values):</p>
+<pre class="code bash literal-block">
+<span class="c1"># Never recording credentials in the shell history of this (UNIX) user:
+</span>$<span class="w"> </span><span class="nb">unset</span><span class="w"> </span>HISTFILE<span class="w">
+
+</span><span class="c1"># Application Key:
+</span>$<span class="w"> </span><span class="nv">AK</span><span class="o">=</span><span class="s2">&quot;3a2b42bc0caeb7d4&quot;</span><span class="w">
+
+</span><span class="c1"># Application Secret:
+</span>$<span class="w"> </span><span class="nv">AS</span><span class="o">=</span><span class="s2">&quot;fb7472abcd8f9980210571ca502d793c&quot;</span><span class="w">
+
+</span><span class="c1"># Consumer Key (attached to one's account):
+</span>$<span class="w"> </span><span class="nv">CK</span><span class="o">=</span><span class="s2">&quot;5b1226df0d5ea12192ae2c9642cf7b60&quot;</span>
+</pre>
+<p>Then the actual deletion can be done, by fetching the target <tt class="docutils literal">applicationId</tt> token (alternatively the <a class="reference external" href="https://eu.api.ovh.com/console/#/me/api/application/%7BapplicationId%7D~GET">API web interface</a> can be used):</p>
+<pre class="code bash literal-block">
+<span class="c1"># As a one-liner, to ensure that timestamp is fresh enough (otherwise: &quot;Query
+# out of time&quot;):
+#
+</span>$<span class="w"> </span><span class="nv">METHOD</span><span class="o">=</span>GET<span class="p">;</span><span class="w"> </span><span class="nv">QUERY</span><span class="o">=</span><span class="s2">&quot;https://eu.api.ovh.com/1.0/me/api/application&quot;</span><span class="p">;</span><span class="w"> </span><span class="se">\
+</span><span class="w"> </span><span class="nv">BODY</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">;</span><span class="w"> </span><span class="nv">TIMESTAMP</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>date<span class="w"> </span>+%s<span class="k">)</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="se">\
+</span><span class="w"> </span><span class="nv">SHA</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">echo</span><span class="w"> </span>-n<span class="w"> </span><span class="si">${</span><span class="nv">AS</span><span class="si">}</span>+<span class="si">${</span><span class="nv">CK</span><span class="si">}</span>+<span class="si">${</span><span class="nv">METHOD</span><span class="si">}</span>+<span class="si">${</span><span class="nv">QUERY</span><span class="si">}</span>+<span class="si">${</span><span class="nv">BODY</span><span class="si">}</span>+<span class="si">${</span><span class="nv">TIMESTAMP</span><span class="si">}</span><span class="w"> </span><span class="se">\
+</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>shasum<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="w"> </span><span class="s1">' '</span><span class="w"> </span>-f<span class="w"> </span><span class="m">1</span><span class="k">)</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="nv">SIGNATURE</span><span class="o">=</span><span class="s2">&quot;\$1\$</span><span class="si">${</span><span class="nv">SHA</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="se">\
+</span><span class="w"> </span>curl<span class="w"> </span>-X<span class="w"> </span><span class="si">${</span><span class="nv">METHOD</span><span class="si">}</span><span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Content-type: application/json&quot;</span><span class="w"> </span><span class="se">\
+</span><span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;X-Ovh-Application: </span><span class="si">${</span><span class="nv">AK</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\
+</span><span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;X-Ovh-Consumer: </span><span class="si">${</span><span class="nv">CK</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;X-Ovh-Signature: </span><span class="si">${</span><span class="nv">SIGNATURE</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\
+</span><span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;X-Ovh-Timestamp: </span><span class="si">${</span><span class="nv">TIMESTAMP</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="si">${</span><span class="nv">QUERY</span><span class="si">}</span><span class="w">
+</span><span class="o">[</span><span class="m">212174</span>,212168<span class="o">]</span><span class="w">
+
+</span><span class="c1"># Presumably the oldest one:
+</span>$<span class="w"> </span><span class="nv">TOKEN_TO_DELETE</span><span class="o">=</span><span class="m">212168</span><span class="w">
+
+</span><span class="c1"># Checking the target token (validity not returned by this call):
+</span>$<span class="w"> </span><span class="nv">METHOD</span><span class="o">=</span>GET<span class="p">;</span><span class="w"> </span><span class="se">\
+</span><span class="nv">QUERY</span><span class="o">=</span><span class="s2">&quot;https://eu.api.ovh.com/1.0/me/api/application/</span><span class="si">${</span><span class="nv">TOKEN_TO_DELETE</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="se">\
+</span><span class="nv">BODY</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">;</span><span class="w"> </span><span class="nv">TIMESTAMP</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>date<span class="w"> </span>+%s<span class="k">)</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="se">\
+</span><span class="nv">SHA</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">echo</span><span class="w"> </span>-n<span class="w"> </span><span class="si">${</span><span class="nv">AS</span><span class="si">}</span>+<span class="si">${</span><span class="nv">CK</span><span class="si">}</span>+<span class="si">${</span><span class="nv">METHOD</span><span class="si">}</span>+<span class="si">${</span><span class="nv">QUERY</span><span class="si">}</span>+<span class="si">${</span><span class="nv">BODY</span><span class="si">}</span>+<span class="si">${</span><span class="nv">TIMESTAMP</span><span class="si">}</span><span class="w"> </span><span class="se">\
+</span><span class="p">|</span><span class="w"> </span>shasum<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="w"> </span><span class="s1">' '</span><span class="w"> </span>-f<span class="w"> </span><span class="m">1</span><span class="k">)</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="se">\
+</span><span class="nv">SIGNATURE</span><span class="o">=</span><span class="s2">&quot;\$1\$</span><span class="si">${</span><span class="nv">SHA</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span>curl<span class="w"> </span>-X<span class="w"> </span><span class="si">${</span><span class="nv">METHOD</span><span class="si">}</span><span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Content-type: application/json&quot;</span><span class="w"> </span><span class="se">\
+</span>-H<span class="w"> </span><span class="s2">&quot;X-Ovh-Application: </span><span class="si">${</span><span class="nv">AK</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\
+</span>-H<span class="w"> </span><span class="s2">&quot;X-Ovh-Consumer: </span><span class="si">${</span><span class="nv">CK</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;X-Ovh-Signature: </span><span class="si">${</span><span class="nv">SIGNATURE</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\
+</span>-H<span class="w"> </span><span class="s2">&quot;X-Ovh-Timestamp: </span><span class="si">${</span><span class="nv">TIMESTAMP</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="si">${</span><span class="nv">QUERY</span><span class="si">}</span><span class="w">
+</span><span class="o">{</span><span class="s2">&quot;applicationId&quot;</span>:212168,<span class="s2">&quot;name&quot;</span>:<span class="s2">&quot;LEEC-for foobar.org&quot;</span>,<span class="w">
+ </span><span class="s2">&quot;description&quot;</span>:<span class="s2">&quot;LEEC foobar.org updater&quot;</span>,<span class="s2">&quot;status&quot;</span>:<span class="s2">&quot;active&quot;</span>,<span class="w">
+ </span><span class="s2">&quot;applicationKey&quot;</span>:<span class="s2">&quot;3a2b42bc0caeb7d4&quot;</span><span class="o">}</span><span class="w">
+
+</span><span class="c1"># Deletion:
+</span>$<span class="w"> </span><span class="nv">METHOD</span><span class="o">=</span>DELETE<span class="p">;</span><span class="w"> </span><span class="se">\
+</span><span class="nv">QUERY</span><span class="o">=</span><span class="s2">&quot;https://eu.api.ovh.com/1.0/me/api/application/</span><span class="si">${</span><span class="nv">TOKEN_TO_DELETE</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="se">\
+</span><span class="nv">BODY</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">;</span><span class="w"> </span><span class="nv">TIMESTAMP</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>date<span class="w"> </span>+%s<span class="k">)</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="se">\
+</span><span class="nv">SHA</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">echo</span><span class="w"> </span>-n<span class="w"> </span><span class="si">${</span><span class="nv">AS</span><span class="si">}</span>+<span class="si">${</span><span class="nv">CK</span><span class="si">}</span>+<span class="si">${</span><span class="nv">METHOD</span><span class="si">}</span>+<span class="si">${</span><span class="nv">QUERY</span><span class="si">}</span>+<span class="si">${</span><span class="nv">BODY</span><span class="si">}</span>+<span class="si">${</span><span class="nv">TIMESTAMP</span><span class="si">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>shasum<span class="w"> </span><span class="se">\
+</span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="w"> </span><span class="s1">' '</span><span class="w"> </span>-f<span class="w"> </span><span class="m">1</span><span class="k">)</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="nv">SIGNATURE</span><span class="o">=</span><span class="s2">&quot;\$1\$</span><span class="si">${</span><span class="nv">SHA</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="se">\
+</span>curl<span class="w"> </span>-X<span class="w"> </span><span class="si">${</span><span class="nv">METHOD</span><span class="si">}</span><span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Content-type: application/json&quot;</span><span class="w"> </span><span class="se">\
+</span>-H<span class="w"> </span><span class="s2">&quot;X-Ovh-Application: </span><span class="si">${</span><span class="nv">AK</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;X-Ovh-Consumer: </span><span class="si">${</span><span class="nv">CK</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\
+</span>-H<span class="w"> </span><span class="s2">&quot;X-Ovh-Signature: </span><span class="si">${</span><span class="nv">SIGNATURE</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;X-Ovh-Timestamp: </span><span class="si">${</span><span class="nv">TIMESTAMP</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="si">${</span><span class="nv">QUERY</span><span class="si">}</span><span class="w">
+</span>null<span class="w">
+
+</span><span class="c1"># Checking the deletion:
+</span>$<span class="w"> </span><span class="nv">METHOD</span><span class="o">=</span>GET<span class="p">;</span><span class="w"> </span><span class="nv">QUERY</span><span class="o">=</span><span class="s2">&quot;https://eu.api.ovh.com/1.0/me/api/application&quot;</span><span class="p">;</span><span class="w"> </span><span class="se">\
+</span><span class="nv">BODY</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">;</span><span class="w"> </span><span class="nv">TIMESTAMP</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>date<span class="w"> </span>+%s<span class="k">)</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="se">\
+</span><span class="nv">SHA</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">echo</span><span class="w"> </span>-n<span class="w"> </span><span class="si">${</span><span class="nv">AS</span><span class="si">}</span>+<span class="si">${</span><span class="nv">CK</span><span class="si">}</span>+<span class="si">${</span><span class="nv">METHOD</span><span class="si">}</span>+<span class="si">${</span><span class="nv">QUERY</span><span class="si">}</span>+<span class="si">${</span><span class="nv">BODY</span><span class="si">}</span>+<span class="si">${</span><span class="nv">TIMESTAMP</span><span class="si">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>shasum<span class="w"> </span><span class="se">\
+</span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="w"> </span><span class="s1">' '</span><span class="w"> </span>-f<span class="w"> </span><span class="m">1</span><span class="k">)</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="nv">SIGNATURE</span><span class="o">=</span><span class="s2">&quot;\$1\$</span><span class="si">${</span><span class="nv">SHA</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="se">\
+</span>curl<span class="w"> </span>-X<span class="w"> </span><span class="si">${</span><span class="nv">METHOD</span><span class="si">}</span><span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Content-type: application/json&quot;</span><span class="w"> </span><span class="se">\
+</span>-H<span class="w"> </span><span class="s2">&quot;X-Ovh-Application: </span><span class="si">${</span><span class="nv">AK</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;X-Ovh-Consumer: </span><span class="si">${</span><span class="nv">CK</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\
+</span>-H<span class="w"> </span><span class="s2">&quot;X-Ovh-Signature: </span><span class="si">${</span><span class="nv">SIGNATURE</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;X-Ovh-Timestamp: </span><span class="si">${</span><span class="nv">TIMESTAMP</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="si">${</span><span class="nv">QUERY</span><span class="si">}</span><span class="w">
+</span><span class="o">[</span><span class="m">213174</span><span class="o">]</span>
+</pre>
+</div>
+</div>
+<div class="section" id="certbot-configuration">
+<h4>Certbot Configuration</h4>
+<p>Now that, for a given domain, we have a suitable token and credentials, these latter ones will have to be made available to certbot.</p>
+<p>We do not want this third-party code to run as root, we prefer running it as a LEEC-specific user: typically, for any usage like <a class="reference external" href="http://us-web.esperide.org/">US-Web</a>, the specific user running the webserver.</p>
+<p id="credentials-file">We therefore create in a directory of choice (for example <tt class="docutils literal"><span class="pre">/etc/xdg/universal-server/</span></tt>) a <tt class="docutils literal"><span class="pre">leec-ovh-credentials-for-foobar.org.txt</span></tt> file whose content is:</p>
+<pre class="code bash literal-block">
+<span class="nv">dns_ovh_endpoint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>ovh-eu<span class="w">
+</span><span class="nv">dns_ovh_application_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>3a2b42bc0caeb7d4<span class="w">
+</span><span class="nv">dns_ovh_application_secret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>fb7472abcd8f9980210571ca502d793c<span class="w">
+</span><span class="nv">dns_ovh_consumer_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>5b1226df0d5ea12192ae2c9642cf7b60
+</pre>
+<p>and assign to it proper permissions, for example:</p>
+<pre class="code bash literal-block">
+$<span class="w"> </span>chmod<span class="w"> </span><span class="m">400</span><span class="w"> </span>leec-ovh-credentials-for-foobar.org.txt<span class="w">
+</span>$<span class="w"> </span>chown<span class="w"> </span>web-srv:us-srv<span class="w"> </span>leec-ovh-credentials-for-foobar.org.txt<span class="w">
+</span>$<span class="w"> </span>chattr<span class="w"> </span>+i<span class="w"> </span>leec-ovh-credentials-for-foobar.org.txt
+</pre>
+</div>
+<div class="section" id="certbot-execution">
+<h4>Certbot Execution</h4>
+<p>Then an interactive test can be conducted, for example first as root, with:</p>
+<pre class="code bash literal-block">
+$<span class="w"> </span>certbot<span class="w"> </span>certonly<span class="w"> </span>--dns-ovh<span class="w"> </span>--dns-ovh-credentials<span class="w"> </span><span class="se">\
+</span>/etc/xdg/universal-server/leec-ovh-credentials-for-foobar.org.txt<span class="w"> </span><span class="se">\
+</span>-d<span class="w"> </span>foobar.org<span class="w"> </span>-d<span class="w"> </span>*.foobar.org
+</pre>
+<p>This should succeed in creating the <tt class="docutils literal">/etc/letsencrypt/live/foobar.org/fullchain.pem</tt> (the certificate file used by most server software) and the <tt class="docutils literal">/etc/letsencrypt/live/foobar.org/privkey.pem</tt> symlink to the actual credentials (the private key associated to this certificate).</p>
+<p>A second more involved test could be as the final user (e.g. <tt class="docutils literal"><span class="pre">web-srv</span></tt>), from the target directory (e.g. <tt class="docutils literal"><span class="pre">/opt/universal-server/us_web-data/certificates</span></tt>):</p>
+<pre class="code bash literal-block">
+$<span class="w"> </span>sudo<span class="w"> </span>-u<span class="w"> </span>web-srv<span class="w"> </span>certbot<span class="w"> </span>certonly<span class="w"> </span>--config-dir<span class="w"> </span>.<span class="w"> </span>--work-dir<span class="w"> </span>.<span class="w"> </span><span class="se">\
+</span>--logs-dir<span class="w"> </span>.<span class="w"> </span>--non-interactive<span class="w"> </span>--agree-tos<span class="w"> </span>--email<span class="w"> </span>you&#64;foobar.org<span class="w"> </span><span class="se">\
+</span>--dns-ovh<span class="w"> </span>--dns-ovh-credentials<span class="w"> </span><span class="se">\
+</span>/etc/xdg/universal-server/leec-ovh-credentials-for-foobar.org.txt<span class="w"> </span><span class="se">\
+</span>-d<span class="w"> </span>foobar.org<span class="w"> </span>-d<span class="w"> </span>*.foobar.org
+</pre>
+<p>The following actual (PEM-encoded) files of interest that are then obtained (in <tt class="docutils literal"><span class="pre">/etc/letsencrypt/{live,archive}/foobar.org</span></tt>) are:</p>
+<ul class="simple">
+<li><tt class="docutils literal">cert.pem</tt>: the public key certificate file</li>
+<li><tt class="docutils literal">privkey.pem</tt>: the private key certificate file</li>
+<li><tt class="docutils literal">chain.pem</tt>: the certificate chain file</li>
+<li><tt class="docutils literal">fullchain.pem</tt>: the concatenation of <tt class="docutils literal">cert.pem</tt> and <tt class="docutils literal">chain.pem</tt></li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="section" id="design-notes">
+<h1><a class="toc-backref" href="#toc-entry-14">Design Notes</a></h1>
+<div class="section" id="multiple-domains-having-each-multiple-hostnames">
+<h2><a class="toc-backref" href="#toc-entry-15">Multiple Domains Having Each Multiple Hostnames</a></h2>
+<p>At least the ACME servers from Let's Encrypt enforce various rate limits (both in <a class="reference external" href="https://letsencrypt.org/docs/rate-limits/">production environment</a> and in <a class="reference external" href="https://letsencrypt.org/docs/staging-environment/">staging</a> one) that are fairly low, which leads to preferring requesting certificates only on a per-domain basis (e.g. globally for <tt class="docutils literal">foobar.org</tt>) rather than on a per-hostname host basis (e.g. one for <tt class="docutils literal">baz.foobar.org</tt>, another one for <tt class="docutils literal">hurrican.foobar.org</tt>, etc., these hosts being virtual ones or not), as such requests would quickly become too numerous to respect these rate thresholds.</p>
+<p>A per-domain certificate should then include directly its various hostnames as <em>Subject Alternative Names</em> (SAN entries).</p>
+<p>With the <tt class="docutils literal"><span class="pre">http-01</span></tt> challenge type, no wildcard for such SAN hosts (e.g. <tt class="docutils literal">*.foobar.org</tt>) can be specified, so all the wanted ones have to be explicitly listed <a class="footnote-reference" href="#footnote-7" id="footnote-reference-7">[7]</a>.</p>
+<table class="docutils footnote" frame="void" id="footnote-7" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#footnote-reference-7">[7]</a></td><td>As a result, the certificate may disclose virtual hosts that would be otherwise invisible from the Internet (as not even declared in the DNS entries for that domain that would act as wildcard name resolvers).</td></tr>
 </tbody>
 </table>
 <p>So for example, with LEEC, the certificate for <tt class="docutils literal">foobar.org</tt> (that would be managed by a dedicated LEEC agent) should list following SAN entries: <tt class="docutils literal">baz.foobar.org</tt>, <tt class="docutils literal">hurrican.foobar.org</tt>, etc.</p>
+<p>For more flexibility a <a class="reference internal" href="#wildcard-certificate">wildcard certificate</a> may be preferred.</p>
 </div>
 <div class="section" id="concurrent-certificate-operations">
-<h2><a class="toc-backref" href="#toc-entry-11">Concurrent Certificate Operations</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-16">Concurrent Certificate Operations</a></h2>
 <p>LEEC implemented independent (<tt class="docutils literal">gen_statem</tt>) FSMs to allow typically for concurrent certificate renewals to be triggered (thanks to autonomous LEEC agents, per-FSM connection pools, separate keys, etc.).</p>
 <p>A drawback of the aforementioned Let's Encrypt rate limits is that, while a given FSM is to remain below said thresholds, a set of parallel ones may not.</p>
 <p>Should this issue arise, an option is to use a single FSM and to trigger certificate requests in turn. Another one is to rely on a <a class="reference external" href="https://olivier-boudeville.github.io/us-common/#facilities-provided-by-this-layer">task ring</a> in order to avoid by design that such FSMs overlap.</p>
 </div>
 <div class="section" id="let-s-encrypt-accounts">
-<span id="caa"></span><h2><a class="toc-backref" href="#toc-entry-12">Let's Encrypt Accounts</a></h2>
-<p>Currently LEEC creates automatically throwaway ACME accounts, which is convenient yet may prevent the use if <a class="reference external" href="https://letsencrypt.org/docs/caa/">CAA</a> (<em>Certificate Authority Authorization</em>).</p>
+<span id="caa"></span><h2><a class="toc-backref" href="#toc-entry-17">Let's Encrypt Accounts</a></h2>
+<p>Currently LEEC creates automatically throwaway ACME accounts, which is convenient yet may prevent the use of <a class="reference external" href="https://letsencrypt.org/docs/caa/">CAA</a> (<em>Certificate Authority Authorization</em>), if wanting to specify which Certificate Authorities (CAs) are allowed to issue certificates for one's domain.</p>
 </div>
 </div>
 <div class="section" id="getting-information-about-the-generated-certificates">
-<h1><a class="toc-backref" href="#toc-entry-13">Getting Information about the Generated Certificates</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-18">Getting Information about the Generated Certificates</a></h1>
 <p>If using LEEC to generate a certificate for a <tt class="docutils literal">baz.foobar.org</tt> host, the following three files shall be obtained from the Let's Encrypt ACME server:</p>
 <ul class="simple">
 <li><tt class="docutils literal">baz.foobar.org.csr</tt>: the PEM certificate request, sent to the ACME server (~980 bytes)</li>
-<li><tt class="docutils literal">baz.foobar.org.key</tt>: the TLS private key regular file, kept on the server (~1675 bytes)</li>
-<li><tt class="docutils literal">baz.foobar.org.crt</tt>: the PEM certificate itself of interest (~3450 bytes), to be used by the webserver</li>
+<li><tt class="docutils literal">baz.foobar.org.key</tt>: the TLS private key regular file, generated on the server host, and kept there (~1675 bytes)</li>
+<li><tt class="docutils literal">baz.foobar.org.crt</tt>: the PEM certificate itself of interest (~3450 bytes), to be used by the webserver afterwards</li>
 </ul>
 <p>To get information about this certificate:</p>
 <pre class="code bash literal-block">
@@ -292,13 +558,13 @@ $<span class="w"> </span>openssl<span class="w"> </span>x509<span class="w"> </s
 </pre>
 </div>
 <div class="section" id="other-files-of-interest">
-<h1><a class="toc-backref" href="#toc-entry-14">Other Files of Interest</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-19">Other Files of Interest</a></h1>
 <p>A <tt class="docutils literal">*.key</tt> (e.g. <tt class="docutils literal"><span class="pre">my-foobar-leec-agent-private.key</span></tt>) file is a (PEM, strong enough) RSA private key generated by LEEC so that its agent can safely authenticate to the ACME servers it is interacting with.</p>
 <p><tt class="docutils literal"><span class="pre">lets-encrypt-r3-cross-signed.pem</span></tt> is the (PEM) certificate associated to the <em>Certificate Authority</em> (Let's Encrypt here). It is automatically downloaded by LEEC if not already available.</p>
-<p>The <tt class="docutils literal"><span class="pre">dh-params.pem</span></tt> file contains the parameters generated by LEEC in order to allow for safer <em>Ephemeral Diffie-Helman key exchanges</em> that is used to provide Forward Secrecy with TLS (see <a class="reference external" href="https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange">this article</a> for further information). Its generation may take quite some time.</p>
+<p>The <tt class="docutils literal"><span class="pre">dh-params.pem</span></tt> file contains the parameters generated by LEEC in order to allow for a safer <em>Ephemeral Diffie-Helman key exchange</em>, which is used to provide Forward Secrecy with TLS (see <a class="reference external" href="https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange">this article</a> for further information). Its generation may take quite some time (but is to happen once).</p>
 </div>
 <div class="section" id="troubleshooting-https-certificate-related-issues">
-<h1><a class="toc-backref" href="#toc-entry-15">Troubleshooting HTTPS Certificate-related Issues</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-20">Troubleshooting HTTPS Certificate-related Issues</a></h1>
 <p>In order to understand why a given host (typically a webserver) does not seem to handle properly certificates, one may experiment with these commands from a client computer:</p>
 <pre class="code bash literal-block">
 $<span class="w"> </span>curl<span class="w"> </span>-vvv<span class="w"> </span>-I<span class="w"> </span>https://foobar.org<span class="w">
@@ -314,32 +580,33 @@ $<span class="w"> </span>iptables<span class="w"> </span>-nL<span class="w">
 <p>Third-party solutions might also be used, like testing your server with <a class="reference external" href="https://www.ssllabs.com/ssltest/analyze.html">SSL Labs</a>; thanks to LEEC, <a class="reference external" href="https://us-web.esperide.org/#usage-recommendations">US-Web can be ranked &quot;grade A&quot;</a> there.</p>
 </div>
 <div class="section" id="licence">
-<h1><a class="toc-backref" href="#toc-entry-16">Licence</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-21">Licence</a></h1>
 <p>Ceylan-LEEC is distributed under the APACHE 2.0 licence, like the original work that it derives from.</p>
 </div>
 <div class="section" id="support">
-<h1><a class="toc-backref" href="#toc-entry-17">Support</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-22">Support</a></h1>
 <p>Bugs, questions, remarks, patches, requests for enhancements, etc. are to be sent through the <a class="reference external" href="https://github.com/Olivier-Boudeville/Ceylan-LEEC">project interface</a> (typically <a class="reference external" href="https://github.com/Olivier-Boudeville/Ceylan-LEEC/issues">issues</a>), or directly at the email address mentioned at the beginning of this document.</p>
 </div>
 <div class="section" id="possible-enhancements">
-<h1><a class="toc-backref" href="#toc-entry-18">Possible Enhancements</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-23">Possible Enhancements</a></h1>
 <ul class="simple">
 <li>re-using ACME accounts: not creating throwaway, anonymous accounts but (possibly) reusing them by registering the ACME client with its email, etc.</li>
 <li>supporting certificate revocation</li>
 <li>supporting Elliptic Curve cryptography</li>
 <li>reintroducing elements brought by the upstream project yet not updated by the current fork: unit testing, standalone testing, hex package, various escripts and yml files involved</li>
 <li>besides the slave mode (main use case of interest with LEEC), better integrating/testing the other modes (webroot and standalone)</li>
-<li>supporting extra validation challenges, besides <tt class="docutils literal"><span class="pre">http-01</span></tt>, like <tt class="docutils literal"><span class="pre">dns-01</span></tt> (necessary to <a class="reference external" href="https://letsencrypt.org/docs/faq/#does-let-s-encrypt-issue-wildcard-certificates">obtain wildcard certificates</a>, i.e. applying to all subdomains of a given domain without leaking their names through SANs) and <tt class="docutils literal"><span class="pre">proof-of-possession-01</span></tt></li>
+<li>supporting extra validation challenges, besides <tt class="docutils literal"><span class="pre">http-01</span></tt> and <tt class="docutils literal"><span class="pre">dns-01</span></tt> (necessary to <a class="reference external" href="https://letsencrypt.org/docs/faq/#does-let-s-encrypt-issue-wildcard-certificates">obtain wildcard certificates</a>, i.e. applying to all subdomains of a given domain without leaking their names through SANs), like <tt class="docutils literal"><span class="pre">proof-of-possession-01</span></tt></li>
 <li>supporting directly other ACME services besides <tt class="docutils literal">Let's Encrypt</tt> (like <tt class="docutils literal">ZeroSSL</tt>)</li>
+<li>implementing for good <tt class="docutils literal"><span class="pre">dns-01</span></tt> rather than using certbot for that</li>
 </ul>
 </div>
 <div class="section" id="please-react">
-<h1><a class="toc-backref" href="#toc-entry-19">Please React!</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-24">Please React!</a></h1>
 <p>If you have information more detailed or more recent than those presented in this document, if you noticed errors, neglects or points insufficiently discussed, drop us a line! (for that, follow the <a class="reference internal" href="#support">Support</a> guidelines).</p>
 <p>One may also be interested in <a class="reference external" href="https://howtos.esperide.org/Cybersecurity.html">our mini-HOWTO regarding cybersecurity</a>.</p>
 </div>
 <div class="section" id="ending-word">
-<h1><a class="toc-backref" href="#toc-entry-20">Ending Word</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-25">Ending Word</a></h1>
 <p>Have fun with Ceylan-LEEC!
 (not supposed to involve any memory leak)</p>
 <p><span class="raw-html"><center><img src="leec-title.png" id="responsive-image-small"></img></center></span>

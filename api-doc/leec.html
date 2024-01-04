@@ -11,20 +11,20 @@
 
 <h1>Module leec</h1>
 <ul class="index"><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul><b>Main module of LEEC</b>, the Ceylan Let's Encrypt Erlang fork; see
- <a href="http://leec.esperide.org" target="_top"><tt>http://leec.esperide.org</tt></a> for more information.
+ <a href="http://leec.esperide.org" target="_top"><code>http://leec.esperide.org</code></a> for more information.
 
-<p><b>Behaviours:</b> <a href="application.html"><tt>application</tt></a>, <a href="gen_statem.html"><tt>gen_statem</tt></a>.</p>
+<p><b>Behaviours:</b> <a href="application.html"><code>application</code></a>, <a href="gen_statem.html"><code>gen_statem</code></a>.</p>
 
 <h2><a name="description">Description</a></h2><p><b>Main module of LEEC</b>, the Ceylan Let's Encrypt Erlang fork; see
- <a href="http://leec.esperide.org" target="_top"><tt>http://leec.esperide.org</tt></a> for more information.</p>
+ <a href="http://leec.esperide.org" target="_top"><code>http://leec.esperide.org</code></a> for more information.</p>
 
  Original 'Let's Encrypt Erlang' application:
- <a href="https://github.com/gbour/letsencrypt-erlang" target="_top"><tt>https://github.com/gbour/letsencrypt-erlang</tt></a>.
+ <a href="https://github.com/gbour/letsencrypt-erlang" target="_top"><code>https://github.com/gbour/letsencrypt-erlang</code></a>.
 
 <h2><a name="types">Data Types</a></h2>
 
 <h3 class="typedecl"><a name="type-acme_operation">acme_operation()</a></h3>
-<p><tt>acme_operation() = <a href="#type-bin_string">bin_string()</a></tt></p>
+<p><code>acme_operation() = <a href="#type-bin_string">bin_string()</a></code></p>
 <p><p> ACME operations that may be triggered.</p>
 
  Known operations:
@@ -34,101 +34,141 @@
  - <code>&lt;&lt;"revokeCert"&gt;&gt;</code></p>
 
 <h3 class="typedecl"><a name="type-agent_key_file_info">agent_key_file_info()</a></h3>
-<p><tt>agent_key_file_info() = {new, <a href="#type-bin_file_path">bin_file_path()</a>} | <a href="#type-bin_file_path">bin_file_path()</a></tt></p>
+<p><code>agent_key_file_info() = {new, <a href="#type-bin_file_path">bin_file_path()</a>} | <a href="#type-bin_file_path">bin_file_path()</a></code></p>
 <p><p> Information regarding the private key of the LEEC agent.</p>
 
  (if 'new' is used, the path is supposed to be either absolute, or relative to
  the certificate directory)</p>
 
 <h3 class="typedecl"><a name="type-any_directory_path">any_directory_path()</a></h3>
-<p><tt>any_directory_path() = <a href="file_utils.html#type-any_directory_path">file_utils:any_directory_path()</a></tt></p>
+<p><code>any_directory_path() = <a href="file_utils.html#type-any_directory_path">file_utils:any_directory_path()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-any_file_path">any_file_path()</a></h3>
-<p><tt>any_file_path() = <a href="file_utils.html#type-any_file_path">file_utils:any_file_path()</a></tt></p>
+<p><code>any_file_path() = <a href="file_utils.html#type-any_file_path">file_utils:any_file_path()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-any_san">any_san()</a></h3>
-<p><tt>any_san() = <a href="#type-san">san()</a> | <a href="#type-bin_san">bin_san()</a></tt></p>
+<p><code>any_san() = <a href="#type-san">san()</a> | <a href="#type-bin_san">bin_san()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-application_name">application_name()</a></h3>
-<p><tt>application_name() = <a href="otp_utils.html#type-application_name">otp_utils:application_name()</a></tt></p>
+<p><code>application_name() = <a href="otp_utils.html#type-application_name">otp_utils:application_name()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-bin_certificate">bin_certificate()</a></h3>
-<p><tt>bin_certificate() = binary()</tt></p>
+<p><code>bin_certificate() = binary()</code></p>
 <p> A certificate, as a binary.</p>
 
 <h3 class="typedecl"><a name="type-bin_challenge_type">bin_challenge_type()</a></h3>
-<p><tt>bin_challenge_type() = <a href="#type-bin_string">bin_string()</a></tt></p>
+<p><code>bin_challenge_type() = <a href="#type-bin_string">bin_string()</a></code></p>
 <p> Challenge type, as a binary string.</p>
 
 <h3 class="typedecl"><a name="type-bin_csr_key">bin_csr_key()</a></h3>
-<p><tt>bin_csr_key() = <a href="#type-bin_key">bin_key()</a></tt></p>
+<p><code>bin_csr_key() = <a href="#type-bin_key">bin_key()</a></code></p>
 <p> A CSR key, as a binary.</p>
 
 <h3 class="typedecl"><a name="type-bin_domain">bin_domain()</a></h3>
-<p><tt>bin_domain() = <a href="net_utils.html#type-bin_fqdn">net_utils:bin_fqdn()</a></tt></p>
+<p><code>bin_domain() = <a href="net_utils.html#type-bin_fqdn">net_utils:bin_fqdn()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-bin_file_path">bin_file_path()</a></h3>
-<p><tt>bin_file_path() = <a href="file_utils.html#type-bin_file_path">file_utils:bin_file_path()</a></tt></p>
+<p><code>bin_file_path() = <a href="file_utils.html#type-bin_file_path">file_utils:bin_file_path()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-bin_key">bin_key()</a></h3>
-<p><tt>bin_key() = binary()</tt></p>
+<p><code>bin_key() = binary()</code></p>
 <p> A key, as a binary.</p>
 
 <h3 class="typedecl"><a name="type-bin_san">bin_san()</a></h3>
-<p><tt>bin_san() = <a href="#type-bin_string">bin_string()</a></tt></p>
+<p><code>bin_san() = <a href="#type-bin_string">bin_string()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-bin_string">bin_string()</a></h3>
-<p><tt>bin_string() = <a href="text_utils.html#type-bin_string">text_utils:bin_string()</a></tt></p>
+<p><code>bin_string() = <a href="text_utils.html#type-bin_string">text_utils:bin_string()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-bin_uri">bin_uri()</a></h3>
-<p><tt>bin_uri() = <a href="web_utils.html#type-bin_uri">web_utils:bin_uri()</a></tt></p>
+<p><code>bin_uri() = <a href="web_utils.html#type-bin_uri">web_utils:bin_uri()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-binary_b64">binary_b64()</a></h3>
-<p><tt>binary_b64() = binary()</tt></p>
+<p><code>binary_b64() = binary()</code></p>
 <p> A binary that is encoded in base 64.</p>
 
+<h3 class="typedecl"><a name="type-bridge_spec">bridge_spec()</a></h3>
+<p><code>bridge_spec() = <a href="trace_bridge.html#type-bridge_spec">trace_bridge:bridge_spec()</a></code></p>
+
+
+<h3 class="typedecl"><a name="type-cert_file_path">cert_file_path()</a></h3>
+<p><code>cert_file_path() = <a href="#type-pem_file_path">pem_file_path()</a></code></p>
+<p><p> A PEM-encoded file containing the actual certificate of interest.</p>
+
+ Typical names for such files may be "fullchain.pem", "cert.pem" or
+ "MYDOMAIN.crt".</p>
+
+<h3 class="typedecl"><a name="type-cert_priv_key_file_path">cert_priv_key_file_path()</a></h3>
+<p><code>cert_priv_key_file_path() = <a href="#type-pem_file_path">pem_file_path()</a></code></p>
+<p><p> A PEM-encoded file containing the private key corresponding to a certificate, 
+as securely sent back by an ACME server.</p>
+
+ <p>Such a key must be strongly secured.</p>
+
+ Typical names for such files may be "privkey.pem" or "MYDOMAIN.key".</p>
+
 <h3 class="typedecl"><a name="type-cert_req_option_id">cert_req_option_id()</a></h3>
-<p><tt>cert_req_option_id() = async | callback | netopts | challenge | sans | json</tt></p>
+<p><code>cert_req_option_id() = async | callback | netopts | challenge_type | sans | json</code></p>
 <p> Certificate request options.</p>
 
 <h3 class="typedecl"><a name="type-cert_req_option_map">cert_req_option_map()</a></h3>
-<p><tt>cert_req_option_map() = <a href="#type-table">table</a>(<a href="#type-cert_req_option_id">cert_req_option_id()</a>, term())</tt></p>
+<p><code>cert_req_option_map() = <a href="#type-table">table</a>(<a href="#type-cert_req_option_id">cert_req_option_id()</a>, term())</code></p>
 <p><p> Storing certificate request options.</p>
 
  <p>Known (atom) keys:</p>
 
-  <p>- async :: boolean() [if not defined, supposed true]</p>
+  <p>- options common for all certificate requests:</p>
 
-  <p>- callback :: fun/1</p>
+    <p>- async :: boolean():       
+- if true (the default), immediately returns, and a callback will be       
+triggered once the certificate is obtained       
+- if false, blocks until completed, and returns the path to the       
+generated certificate</p>
 
-  <p>- netopts :: map() =&gt; #{ timeout =&gt; unit_utils:milliseconds(),                           
-ssl =&gt; [ ssl:client_option() ] }</p>
+    <p>- callback :: creation_callback() -&gt; void(): the function executed when    
+Async is true, once the domain certificate has been successfully obtained</p>
 
-  <p>- challenge_type :: challenge_type(), default being 'http-01'</p>
+  <p>- options for http-01 certificate requests:    
+- netopts :: map() =&gt; #{ timeout =&gt; milliseconds(),                             
+ssl =&gt; [ssl:client_option()] }:      
+to specify an HTTP timeout or SSL client options</p>
 
-  <p>- sans :: [bin_san()]</p>
+    <p>- sans :: [any_san()]: a list of the Subject Alternative Names for that      
+certificate (if single-domain, not wildcard)</p>
 
-  - json :: boolean() (not to be set by the user)</p>
+  <p>- options for dns-01 certificate requests:</p>
 
-<h3 class="typedecl"><a name="type-certificate">certificate()</a></h3>
-<p><tt>certificate() = #certificate{cert = <a href="leec.html#type-bin_certificate">leec:bin_certificate()</a>, key = <a href="leec.html#type-bin_key">leec:bin_key()</a>}</tt></p>
+    <p>- email: email address used for registration and recovery contact    
+(otherwise specifying leec-certificates@DOMAIN)</p>
 
+  <p>- not to be set by the user:</p>
+
+    <p>- json :: boolean()</p>
+
+    - challenge_type :: challenge_type() is the type of challenge to rely on
+    when interacting with the ACME server</p>
 
 <h3 class="typedecl"><a name="type-certificate_provider">certificate_provider()</a></h3>
-<p><tt>certificate_provider() = letsencrypt</tt></p>
-<p> Other providers may be added in the future.</p>
+<p><code>certificate_provider() = letsencrypt</code></p>
+<p><p> These are CA (Certificate Authorities).</p>
+
+ Other certificate providers (e.g. ZeroSSL) may be added in the future.</p>
+
+<h3 class="typedecl"><a name="type-certificate_type">certificate_type()</a></h3>
+<p><code>certificate_type() = single_domain | wildcard_domain</code></p>
+
 
 <h3 class="typedecl"><a name="type-challenge">challenge()</a></h3>
-<p><tt>challenge() = <a href="#type-table">table</a>(<a href="#type-bin_string">bin_string()</a>, <a href="#type-bin_string">bin_string()</a>)</tt></p>
+<p><code>challenge() = <a href="#type-table">table</a>(<a href="#type-bin_string">bin_string()</a>, <a href="#type-bin_string">bin_string()</a>)</code></p>
 <p><p> All known information regarding a challenge.</p>
 
  <p>As Key =&gt; example of associated value:</p>
@@ -143,174 +183,272 @@ ssl =&gt; [ ssl:client_option() ] }</p>
      &lt;&lt;"ACME_BASE/acme/chall-v3/132509381/-Axkdw"&gt;&gt;</code></p>
 
 <h3 class="typedecl"><a name="type-challenge_type">challenge_type()</a></h3>
-<p><tt>challenge_type() = 'http-01' | 'tls-sni-01' | 'dns-01'</tt></p>
-<p> Note: only the 'http-01' challenge type is supported currently.</p>
+<p><code>challenge_type() = 'http-01' | 'dns-01' | 'tls-sni-01'</code></p>
+
+
+<h3 class="typedecl"><a name="type-creation_callback">creation_callback()</a></h3>
+<p><code>creation_callback() = fun((<a href="#type-obtain_outcome">obtain_outcome()</a>) -&gt; <a href="#type-void">void()</a>)</code></p>
+<p> A function executed when a domain certificate has been successfully obtained
+ asynchronously.</p>
+
+<h3 class="typedecl"><a name="type-creation_outcome">creation_outcome()</a></h3>
+<p><code>creation_outcome() = {certificate_ready, <a href="#type-cert_file_path">cert_file_path()</a>, <a href="#type-cert_priv_key_file_path">cert_priv_key_file_path()</a>} | <a href="#type-tagged_error">tagged_error()</a></code></p>
+<p> That is: {'error', term()}</p>
+
+<h3 class="typedecl"><a name="type-credentials_path">credentials_path()</a></h3>
+<p><code>credentials_path() = <a href="#type-any_file_path">any_file_path()</a></code></p>
+<p> A path to a file containing LEEC-related credentials.
+ See https://leec.esperide.org/#credentials-file.</p>
 
 <h3 class="typedecl"><a name="type-directory_map">directory_map()</a></h3>
-<p><tt>directory_map() = <a href="#type-table">table</a>(<a href="#type-acme_operation">acme_operation()</a>, <a href="#type-bin_uri">bin_uri()</a>)</tt></p>
+<p><code>directory_map() = <a href="#type-table">table</a>(<a href="#type-acme_operation">acme_operation()</a>, <a href="#type-bin_uri">bin_uri()</a>)</code></p>
 <p> ACME directory, converting operations to trigger into the URIs to access for
  them.</p>
 
-<h3 class="typedecl"><a name="type-domain">domain()</a></h3>
-<p><tt>domain() = <a href="net_utils.html#type-string_fqdn">net_utils:string_fqdn()</a> | <a href="#type-bin_domain">bin_domain()</a></tt></p>
+<h3 class="typedecl"><a name="type-dns_provider">dns_provider()</a></h3>
+<p><code>dns_provider() = ovh</code></p>
+<p> The known and supported DNS providers.</p>
+
+<h3 class="typedecl"><a name="type-domain_name">domain_name()</a></h3>
+<p><code>domain_name() = <a href="net_utils.html#type-string_fqdn">net_utils:string_fqdn()</a> | <a href="#type-bin_domain">bin_domain()</a></code></p>
 
 
-<h3 class="typedecl"><a name="type-error_term">error_term()</a></h3>
-<p><tt>error_term() = <a href="basic_utils.html#type-error_term">basic_utils:error_term()</a></tt></p>
+<h3 class="typedecl"><a name="type-environment">environment()</a></h3>
+<p><code>environment() = staging | production</code></p>
+<p><p> The ACME environments.</p>
+
+ Production is 'default' in ACME parlance.</p>
+
+<h3 class="typedecl"><a name="type-error_reason">error_reason()</a></h3>
+<p><code>error_reason() = <a href="basic_utils.html#type-error_reason">basic_utils:error_reason()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-event_content">event_content()</a></h3>
-<p><tt>event_content() = term()</tt></p>
+<p><code>event_content() = term()</code></p>
 
 
 <h3 class="typedecl"><a name="type-event_type">event_type()</a></h3>
-<p><tt>event_type() = <a href="http://www.erlang.org/edoc/doc/stdlib/doc/gen_statem.html#type-event_type">gen_statem:event_type()</a></tt></p>
+<p><code>event_type() = <a href="http://www.erlang.org/edoc/doc/stdlib/doc/gen_statem.html#type-event_type">gen_statem:event_type()</a></code></p>
+
+
+<h3 class="typedecl"><a name="type-file_name">file_name()</a></h3>
+<p><code>file_name() = <a href="file_utils.html#type-file_name">file_utils:file_name()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-fsm_pid">fsm_pid()</a></h3>
-<p><tt>fsm_pid() = pid()</tt></p>
+<p><code>fsm_pid() = pid()</code></p>
 <p> The PID of a LEEC FSM.</p>
 
 <h3 class="typedecl"><a name="type-json">json()</a></h3>
-<p><tt>json() = <a href="json_utils.html#type-json">json_utils:json()</a></tt></p>
+<p><code>json() = <a href="json_utils.html#type-json">json_utils:json()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-json_map_decoded">json_map_decoded()</a></h3>
-<p><tt>json_map_decoded() = map()</tt></p>
+<p><code>json_map_decoded() = map()</code></p>
 <p> JSON element decoded as a map.</p>
 
 <h3 class="typedecl"><a name="type-jws">jws()</a></h3>
-<p><tt>jws() = #jws{alg = <a href="leec.html#type-jws_algorithm">leec:jws_algorithm()</a>, url = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-bin_uri">leec:bin_uri()</a>), kid = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-bin_uri">leec:bin_uri()</a>), jwk = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-tls_public_key">leec:tls_public_key()</a>), nonce = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-nonce">leec:nonce()</a>)}</tt></p>
+<p><code>jws() = #jws{alg = <a href="leec.html#type-jws_algorithm">leec:jws_algorithm()</a>, url = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-bin_uri">leec:bin_uri()</a>), kid = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-bin_uri">leec:bin_uri()</a>), jwk = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-tls_public_key">leec:tls_public_key()</a>), nonce = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-nonce">leec:nonce()</a>)}</code></p>
 
 
 <h3 class="typedecl"><a name="type-jws_algorithm">jws_algorithm()</a></h3>
-<p><tt>jws_algorithm() = 'RS256'</tt></p>
+<p><code>jws_algorithm() = 'RS256'</code></p>
 
 
 <h3 class="typedecl"><a name="type-key_auth">key_auth()</a></h3>
-<p><tt>key_auth() = binary()</tt></p>
+<p><code>key_auth() = binary()</code></p>
 
 
 <h3 class="typedecl"><a name="type-key_integer">key_integer()</a></h3>
-<p><tt>key_integer() = integer() | binary()</tt></p>
+<p><code>key_integer() = integer() | binary()</code></p>
 <p> Element of a key.</p>
 
-<h3 class="typedecl"><a name="type-le_mode">le_mode()</a></h3>
-<p><tt>le_mode() = webroot | slave | standalone</tt></p>
-<p> Three ways of interfacing LEEC with user code.
- We mostly concentrate on the slave one.</p>
+<h3 class="typedecl"><a name="type-leec_caller_state">leec_caller_state()</a></h3>
+<p><code>leec_caller_state() = {<a href="#type-challenge_type">challenge_type()</a>, <a href="#type-fsm_pid">fsm_pid()</a>}</code></p>
+<p><p> The minimal LEEC state returned to the caller.</p>
 
-<h3 class="typedecl"><a name="type-le_state">le_state()</a></h3>
-<p><tt>le_state() = #le_state{env = staging | prod, directory_map = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-directory_map">leec:directory_map()</a>), cert_dir_path = <a href="file_utils.html#type-bin_directory_path">file_utils:bin_directory_path()</a>, cert_key_file = <a href="#type-maybe">maybe</a>(<a href="file_utils.html#type-bin_file_path">file_utils:bin_file_path()</a>), mode = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-le_mode">leec:le_mode()</a>), webroot_dir_path = <a href="#type-maybe">maybe</a>(<a href="file_utils.html#type-bin_directory_path">file_utils:bin_directory_path()</a>), port = <a href="net_utils.html#type-tcp_port">net_utils:tcp_port()</a>, nonce = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-nonce">leec:nonce()</a>), domain = <a href="#type-maybe">maybe</a>(<a href="net_utils.html#type-bin_fqdn">net_utils:bin_fqdn()</a>), sans = [<a href="leec.html#type-san">leec:san()</a>], agent_key_file_info = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-agent_key_file_info">leec:agent_key_file_info()</a>), agent_private_key = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-tls_private_key">leec:tls_private_key()</a>), jws = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-jws">leec:jws()</a>), account_key = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-tls_public_key">leec:tls_public_key()</a>), order = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-order_map">leec:order_map()</a>), challenges = <a href="leec.html#type-uri_challenge_map">leec:uri_challenge_map()</a>, cert_req_option_map = <a href="leec.html#type-cert_req_option_map">leec:cert_req_option_map()</a>, json_parser_state = <a href="json_utils.html#type-parser_state">json_utils:parser_state()</a>, tcp_connection_cache = <a href="leec.html#type-tcp_connection_cache">leec:tcp_connection_cache()</a>}</tt></p>
-<p> Needed by other LEEC modules.</p>
+ Not to be mixed up with the internal state of LEEC FSMs.</p>
+
+<h3 class="typedecl"><a name="type-leec_dns_state">leec_dns_state()</a></h3>
+<p><code>leec_dns_state() = #leec_dns_state{environment = <a href="leec.html#type-environment">leec:environment()</a>, state_dir_path = <a href="file_utils.html#type-bin_directory_path">file_utils:bin_directory_path()</a>, work_dir_path = <a href="file_utils.html#type-bin_directory_path">file_utils:bin_directory_path()</a>, certbot_path = <a href="file_utils.html#type-bin_executable_path">file_utils:bin_executable_path()</a>, credentials_dir_path = <a href="file_utils.html#type-bin_directory_path">file_utils:bin_directory_path()</a>, cert_dir_path = <a href="file_utils.html#type-bin_directory_path">file_utils:bin_directory_path()</a>, cert_key_file = <a href="#type-maybe">maybe</a>(<a href="file_utils.html#type-bin_file_path">file_utils:bin_file_path()</a>), domain = <a href="#type-maybe">maybe</a>(<a href="net_utils.html#type-bin_fqdn">net_utils:bin_fqdn()</a>)}</code></p>
+<p><p> LEEC state for the dns-01 challenge.</p>
+
+ Needed by other LEEC modules.</p>
+
+<h3 class="typedecl"><a name="type-leec_http_state">leec_http_state()</a></h3>
+<p><code>leec_http_state() = #leec_http_state{environment = <a href="leec.html#type-environment">leec:environment()</a>, directory_map = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-directory_map">leec:directory_map()</a>), cert_dir_path = <a href="file_utils.html#type-bin_directory_path">file_utils:bin_directory_path()</a>, cert_key_file = <a href="#type-maybe">maybe</a>(<a href="file_utils.html#type-bin_file_path">file_utils:bin_file_path()</a>), cert_priv_key_path = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-cert_priv_key_file_path">leec:cert_priv_key_file_path()</a>), interfacing_mode = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-web_interfacing_mode">leec:web_interfacing_mode()</a>), webroot_dir_path = <a href="#type-maybe">maybe</a>(<a href="file_utils.html#type-bin_directory_path">file_utils:bin_directory_path()</a>), port = <a href="net_utils.html#type-tcp_port">net_utils:tcp_port()</a>, nonce = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-nonce">leec:nonce()</a>), domain = <a href="#type-maybe">maybe</a>(<a href="net_utils.html#type-bin_fqdn">net_utils:bin_fqdn()</a>), sans = [<a href="leec.html#type-san">leec:san()</a>], agent_key_file_info = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-agent_key_file_info">leec:agent_key_file_info()</a>), agent_private_key = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-tls_private_key">leec:tls_private_key()</a>), jws = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-jws">leec:jws()</a>), account_key = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-tls_public_key">leec:tls_public_key()</a>), order = <a href="#type-maybe">maybe</a>(<a href="leec.html#type-order_map">leec:order_map()</a>), challenges = <a href="leec.html#type-uri_challenge_map">leec:uri_challenge_map()</a>, cert_req_option_map = <a href="leec.html#type-cert_req_option_map">leec:cert_req_option_map()</a>, json_parser_state = <a href="json_utils.html#type-parser_state">json_utils:parser_state()</a>, tcp_connection_cache = <a href="leec.html#type-tcp_connection_cache">leec:tcp_connection_cache()</a>}</code></p>
+<p><p> LEEC state for the http-01 challenge.</p>
+
+ Needed by other LEEC modules.</p>
+
+<h3 class="typedecl"><a name="type-leec_state">leec_state()</a></h3>
+<p><code>leec_state() = <a href="#type-leec_http_state">leec_http_state()</a> | <a href="#type-leec_dns_state">leec_dns_state()</a></code></p>
+<p> Any type of LEEC state.</p>
 
 <h3 class="typedecl"><a name="type-maybe">maybe()</a></h3>
-<p><tt>maybe(T) = <a href="basic_utils.html#type-maybe">basic_utils:maybe</a>(T)</tt></p>
+<p><code>maybe(T) = <a href="basic_utils.html#type-maybe">basic_utils:maybe</a>(T)</code></p>
+
+
+<h3 class="typedecl"><a name="type-milliseconds">milliseconds()</a></h3>
+<p><code>milliseconds() = <a href="unit_utils.html#type-milliseconds">unit_utils:milliseconds()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-nonce">nonce()</a></h3>
-<p><tt>nonce() = binary()</tt></p>
+<p><code>nonce() = binary()</code></p>
 <p> An arbitrary binary that can be used just once in a cryptographic
  communication.</p>
 
-<h3 class="typedecl"><a name="type-order_map">order_map()</a></h3>
-<p><tt>order_map() = <a href="#type-table">table</a>(<a href="#type-bin_string">bin_string()</a>, <a href="#type-bin_uri">bin_uri()</a>)</tt></p>
+<h3 class="typedecl"><a name="type-obtain_outcome">obtain_outcome()</a></h3>
+<p><code>obtain_outcome() = async | <a href="#type-obtained_outcome">obtained_outcome()</a></code></p>
+<p> Returned value once requesting a certificate.</p>
 
+<h3 class="typedecl"><a name="type-obtained_outcome">obtained_outcome()</a></h3>
+<p><code>obtained_outcome() = {certificate_generation_success, <a href="#type-cert_file_path">cert_file_path()</a>, <a href="#type-cert_priv_key_file_path">cert_priv_key_file_path()</a>} | {certificate_generation_failure, <a href="#type-error_reason">error_reason()</a>}</code></p>
+<p><p> Returned user-targeted value (either as a message or as the argument of a 
+callback) after having sent a request to obtain a certificate.</p>
+
+ Defined to differentiate from creation_outcome() and gather all possible error
+ terms.</p>
+
+<h3 class="typedecl"><a name="type-order_map">order_map()</a></h3>
+<p><code>order_map() = <a href="#type-table">table</a>(<a href="#type-bin_string">bin_string()</a>, <a href="#type-bin_uri">bin_uri()</a>)</code></p>
+
+
+<h3 class="typedecl"><a name="type-pem_file_path">pem_file_path()</a></h3>
+<p><code>pem_file_path() = <a href="#type-bin_file_path">bin_file_path()</a></code></p>
+<p><p> A path to a PEM-encoded ("Privacy Enhanced Mail", a rather misleading naming) 
+file may contain just a public certificate, or an entire certificate chain 
+including the public key, private key, and root certificates (which is 
+preferrable), or even just a certificate request.</p>
+
+ <p>This is a text file containing sections like "-----BEGIN CERTIFICATE-----", 
+"-----BEGIN PRIVATE KEY-----", etc.</p>
+
+ Its extension may be ".pem".</p>
 
 <h3 class="typedecl"><a name="type-request">request()</a></h3>
-<p><tt>request() = atom()</tt></p>
+<p><code>request() = atom()</code></p>
 
 
 <h3 class="typedecl"><a name="type-rsa_private_key">rsa_private_key()</a></h3>
-<p><tt>rsa_private_key() = [<a href="#type-key_integer">key_integer()</a>]</tt></p>
+<p><code>rsa_private_key() = [<a href="#type-key_integer">key_integer()</a>]</code></p>
 <p><p> Description of a RSA private key.</p>
 
  (as crypto:rsa_private() is not exported)</p>
 
 <h3 class="typedecl"><a name="type-san">san()</a></h3>
-<p><tt>san() = <a href="#type-ustring">ustring()</a></tt></p>
+<p><code>san() = <a href="#type-ustring">ustring()</a></code></p>
 <p><p> Subject Alternative Name, i.e. values to be associated with a security 
 certificate using a subjectAltName field.</p>
 
- See <a href="https://en.wikipedia.org/wiki/Subject_Alternative_Name" target="_top"><tt>https://en.wikipedia.org/wiki/Subject_Alternative_Name</tt></a>.</p>
+ See <a href="https://en.wikipedia.org/wiki/Subject_Alternative_Name" target="_top"><code>https://en.wikipedia.org/wiki/Subject_Alternative_Name</code></a>.</p>
+
+<h3 class="typedecl"><a name="type-start_common_option">start_common_option()</a></h3>
+<p><code>start_common_option() = {environment, <a href="#type-environment">environment()</a>} | {work_dir_path, <a href="#type-any_directory_path">any_directory_path()</a>} | {agent_key_file_path, <a href="#type-any_file_path">any_file_path()</a>} | {cert_dir_path, <a href="#type-any_directory_path">any_directory_path()</a>} | {http_timeout, <a href="#type-milliseconds">milliseconds()</a>}</code></p>
+
+
+<h3 class="typedecl"><a name="type-start_dns_01_option">start_dns_01_option()</a></h3>
+<p><code>start_dns_01_option() = {dns_provider, <a href="#type-dns_provider">dns_provider()</a>} | {cred_dir_path, <a href="#type-any_directory_path">any_directory_path()</a>}</code></p>
+
+
+<h3 class="typedecl"><a name="type-start_http_01_option">start_http_01_option()</a></h3>
+<p><code>start_http_01_option() = {interfacing_mode, <a href="#type-web_interfacing_mode">web_interfacing_mode()</a>} | {webroot_dir_path, <a href="#type-any_directory_path">any_directory_path()</a>} | {port, <a href="#type-tcp_port">tcp_port()</a>}</code></p>
+<p> Options associated to the http-01 challenge, for single-domain certificates.</p>
 
 <h3 class="typedecl"><a name="type-start_option">start_option()</a></h3>
-<p><tt>start_option() = staging | {mode, <a href="#type-le_mode">le_mode()</a>} | {key_file_path, <a href="#type-any_file_path">any_file_path()</a>} | {cert_dir_path, <a href="#type-any_directory_path">any_directory_path()</a>} | {webroot_dir_path, <a href="#type-any_directory_path">any_directory_path()</a>} | {port, <a href="#type-tcp_port">tcp_port()</a>} | {http_timeout, <a href="unit_utils.html#type-milliseconds">unit_utils:milliseconds()</a>}</tt></p>
-<p> A user-specified LEEC start option.</p>
+<p><code>start_option() = <a href="#type-start_common_option">start_common_option()</a> | <a href="#type-start_http_01_option">start_http_01_option()</a> | <a href="#type-start_dns_01_option">start_dns_01_option()</a></code></p>
 
-<h3 class="typedecl"><a name="type-start_ret">start_ret()</a></h3>
-<p><tt>start_ret() = <a href="http://www.erlang.org/edoc/doc/stdlib/doc/gen_statem.html#type-start_ret">gen_statem:start_ret()</a></tt></p>
 
+<h3 class="typedecl"><a name="type-start_outcome">start_outcome()</a></h3>
+<p><code>start_outcome() = {ok, <a href="#type-leec_caller_state">leec_caller_state()</a>} | <a href="basic_utils.html#type-tagged_error">basic_utils:tagged_error()</a></code></p>
+<p>'ok' | gen_statem:start_ret().</p>
 
 <h3 class="typedecl"><a name="type-state_callback_result">state_callback_result()</a></h3>
-<p><tt>state_callback_result() = <a href="fsm_utils.html#type-state_callback_result">fsm_utils:state_callback_result</a>(<a href="http://www.erlang.org/edoc/doc/stdlib/doc/gen_statem.html#type-action">gen_statem:action()</a>)</tt></p>
+<p><code>state_callback_result() = <a href="fsm_utils.html#type-state_callback_result">fsm_utils:state_callback_result</a>(<a href="http://www.erlang.org/edoc/doc/stdlib/doc/gen_statem.html#type-action">gen_statem:action()</a>)</code></p>
 
 
 <h3 class="typedecl"><a name="type-status">status()</a></h3>
-<p><tt>status() = pending | processing | valid | invalid | revoked</tt></p>
-<p> FSM status (corresponding to state names).</p>
+<p><code>status() = pending | processing | valid | invalid | revoked</code></p>
+<p> LEEC FSM status (corresponding to state names).</p>
 
 <h3 class="typedecl"><a name="type-table">table()</a></h3>
-<p><tt>table(K, V) = <a href="map_hashtable.html#type-map_hashtable">map_hashtable:map_hashtable</a>(K, V)</tt></p>
+<p><code>table(K, V) = <a href="map_hashtable.html#type-map_hashtable">map_hashtable:map_hashtable</a>(K, V)</code></p>
+
+
+<h3 class="typedecl"><a name="type-tagged_error">tagged_error()</a></h3>
+<p><code>tagged_error() = <a href="basic_utils.html#type-tagged_error">basic_utils:tagged_error()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-tcp_connection_cache">tcp_connection_cache()</a></h3>
-<p><tt>tcp_connection_cache() = <a href="#type-table">table</a>({<a href="web_utils.html#type-protocol_type">web_utils:protocol_type()</a>, <a href="net_utils.html#type-string_host_name">net_utils:string_host_name()</a>, <a href="#type-tcp_port">tcp_port()</a>}, <a href="shotgun.html#type-connection">shotgun:connection()</a>)</tt></p>
+<p><code>tcp_connection_cache() = <a href="#type-table">table</a>({<a href="web_utils.html#type-protocol_type">web_utils:protocol_type()</a>, <a href="net_utils.html#type-string_host_name">net_utils:string_host_name()</a>, <a href="#type-tcp_port">tcp_port()</a>}, <a href="shotgun.html#type-connection">shotgun:connection()</a>)</code></p>
 <p> For the reuse of TCP connections to the ACME server.</p>
 
 <h3 class="typedecl"><a name="type-tcp_port">tcp_port()</a></h3>
-<p><tt>tcp_port() = <a href="net_utils.html#type-tcp_port">net_utils:tcp_port()</a></tt></p>
+<p><code>tcp_port() = <a href="net_utils.html#type-tcp_port">net_utils:tcp_port()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-thumbprint">thumbprint()</a></h3>
-<p><tt>thumbprint() = <a href="#type-json">json()</a></tt></p>
+<p><code>thumbprint() = <a href="#type-json">json()</a></code></p>
 <p> A JSON-encoded key.</p>
 
 <h3 class="typedecl"><a name="type-thumbprint_map">thumbprint_map()</a></h3>
-<p><tt>thumbprint_map() = <a href="#type-table">table</a>(<a href="#type-token">token()</a>, <a href="#type-thumbprint">thumbprint()</a>)</tt></p>
+<p><code>thumbprint_map() = <a href="#type-table">table</a>(<a href="#type-token">token()</a>, <a href="#type-thumbprint">thumbprint()</a>)</code></p>
 <p> Associating tokens with keys.</p>
 
 <h3 class="typedecl"><a name="type-tls_csr">tls_csr()</a></h3>
-<p><tt>tls_csr() = <a href="#type-binary_b64">binary_b64()</a></tt></p>
+<p><code>tls_csr() = <a href="#type-binary_b64">binary_b64()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-tls_private_key">tls_private_key()</a></h3>
-<p><tt>tls_private_key() = #tls_private_key{raw = <a href="leec.html#type-rsa_private_key">leec:rsa_private_key()</a>, b64_pair = {<a href="leec.html#type-binary_b64">leec:binary_b64()</a>, <a href="leec.html#type-binary_b64">leec:binary_b64()</a>}, file_path = <a href="file_utils.html#type-bin_file_path">file_utils:bin_file_path()</a>}</tt></p>
-
+<p><code>tls_private_key() = #tls_private_key{raw = <a href="leec.html#type-rsa_private_key">leec:rsa_private_key()</a>, b64_pair = {<a href="leec.html#type-binary_b64">leec:binary_b64()</a>, <a href="leec.html#type-binary_b64">leec:binary_b64()</a>}, file_path = <a href="file_utils.html#type-bin_file_path">file_utils:bin_file_path()</a>}</code></p>
+<p> The TLS private key (locally generated and never sent) of the target
+ certificate.</p>
 
 <h3 class="typedecl"><a name="type-tls_public_key">tls_public_key()</a></h3>
-<p><tt>tls_public_key() = #tls_public_key{kty = 'RSA', n = <a href="text_utils.html#type-bin_string">text_utils:bin_string()</a>, e = <a href="text_utils.html#type-bin_string">text_utils:bin_string()</a>}</tt></p>
-
+<p><code>tls_public_key() = #tls_public_key{kty = 'RSA', n = <a href="text_utils.html#type-bin_string">text_utils:bin_string()</a>, e = <a href="text_utils.html#type-bin_string">text_utils:bin_string()</a>}</code></p>
+<p> The TLS public key (locally generated) of the target certificate.</p>
 
 <h3 class="typedecl"><a name="type-token">token()</a></h3>
-<p><tt>token() = <a href="#type-ustring">ustring()</a></tt></p>
+<p><code>token() = <a href="#type-ustring">ustring()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-type_challenge_map">type_challenge_map()</a></h3>
-<p><tt>type_challenge_map() = <a href="#type-table">table</a>(<a href="#type-challenge_type">challenge_type()</a>, <a href="#type-challenge">challenge()</a>)</tt></p>
+<p><code>type_challenge_map() = <a href="#type-table">table</a>(<a href="#type-challenge_type">challenge_type()</a>, <a href="#type-challenge">challenge()</a>)</code></p>
 
 
 <h3 class="typedecl"><a name="type-uri_challenge_map">uri_challenge_map()</a></h3>
-<p><tt>uri_challenge_map() = <a href="#type-table">table</a>(<a href="#type-bin_uri">bin_uri()</a>, <a href="#type-challenge">challenge()</a>)</tt></p>
+<p><code>uri_challenge_map() = <a href="#type-table">table</a>(<a href="#type-bin_uri">bin_uri()</a>, <a href="#type-challenge">challenge()</a>)</code></p>
 
 
 <h3 class="typedecl"><a name="type-ustring">ustring()</a></h3>
-<p><tt>ustring() = <a href="text_utils.html#type-ustring">text_utils:ustring()</a></tt></p>
+<p><code>ustring() = <a href="text_utils.html#type-ustring">text_utils:ustring()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-void">void()</a></h3>
-<p><tt>void() = <a href="basic_utils.html#type-void">basic_utils:void()</a></tt></p>
+<p><code>void() = <a href="basic_utils.html#type-void">basic_utils:void()</a></code></p>
+
+
+<h3 class="typedecl"><a name="type-web_interfacing_mode">web_interfacing_mode()</a></h3>
+<p><code>web_interfacing_mode() = webroot | slave | standalone</code></p>
 
 
 <h2><a name="index">Function Index</a></h2>
 <table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#callback_mode-0">callback_mode/0</a></td><td>Tells about the retained mode regarding callback.</td></tr>
+<tr><td valign="top"><a href="#caller_state_to_string-1">caller_state_to_string/1</a></td><td>Returns a textual description of the specified LEEC caller state.</td></tr>
+<tr><td valign="top"><a href="#can_perform_dns_challenges-0">can_perform_dns_challenges/0</a></td><td>Tells whether LEEC has a chance to run successfully a dns-01 challenge.</td></tr>
 <tr><td valign="top"><a href="#code_change-4">code_change/4</a></td><td>Standard "code change" callback.</td></tr>
+<tr><td valign="top"><a href="#dns_provider_to_string-1">dns_provider_to_string/1</a></td><td>Returns a textual representation of the specified DNS provider.</td></tr>
 <tr><td valign="top"><a href="#finalize-3">finalize/3</a></td><td>Manages the 'finalize' state.</td></tr>
 <tr><td valign="top"><a href="#get_agent_key_path-1">get_agent_key_path/1</a></td><td>Returns the (absolute, binary) path of the current private key of the 
 LEEC agent.</td></tr>
-<tr><td valign="top"><a href="#get_default_cert_request_options-0">get_default_cert_request_options/0</a></td><td>Returns the default options for certificate requests, here enabling the
- async (non-blocking) mode.</td></tr>
-<tr><td valign="top"><a href="#get_default_cert_request_options-1">get_default_cert_request_options/1</a></td><td>Returns the default optionsfor certificate requests, with specified async
+<tr><td valign="top"><a href="#get_certificate_priv_key_filename-1">get_certificate_priv_key_filename/1</a></td><td>Returns the filename of the private key of the certificate for the
+ specified domain.</td></tr>
+<tr><td valign="top"><a href="#get_credentials_path_for-3">get_credentials_path_for/3</a></td><td>Returns a file path corresponding to the specified domain name managed by
+ the specified DNS provider, in the specified credentials directory, made based
+ on the proposed LEEC conventions.</td></tr>
+<tr><td valign="top"><a href="#get_default_cert_request_options-1">get_default_cert_request_options/1</a></td><td>Returns the default options for certificate requests for the specified
+ challenge type, here enabling the async (non-blocking) mode.</td></tr>
+<tr><td valign="top"><a href="#get_default_cert_request_options-2">get_default_cert_request_options/2</a></td><td>Returns the default optionsfor certificate requests, with specified async
  mode.</td></tr>
 <tr><td valign="top"><a href="#get_ongoing_challenges-1">get_ongoing_challenges/1</a></td><td>Returns the ongoing challenges with pre-computed thumbprints.</td></tr>
 <tr><td valign="top"><a href="#get_ordered_prerequisites-0">get_ordered_prerequisites/0</a></td><td>Returns an (ordered) list of the LEEC prerequisite OTP applications, to 
@@ -319,15 +457,23 @@ be started in that order.</td></tr>
 for certificate requests to be triggered.</td></tr>
 <tr><td valign="top"><a href="#init-1">init/1</a></td><td>Initializes the LEEC state machine.</td></tr>
 <tr><td valign="top"><a href="#invalid-3">invalid/3</a></td><td>Manages the 'invalid' state.</td></tr>
+<tr><td valign="top"><a href="#is_known_challenge_type-1">is_known_challenge_type/1</a></td><td>Tells whether the specified atom is a known challenge type.</td></tr>
+<tr><td valign="top"><a href="#is_supported_dns_provider-1">is_supported_dns_provider/1</a></td><td>Tells whether LEEC supports the specified DNS provider.</td></tr>
+<tr><td valign="top"><a href="#maybe_caller_state_to_string-1">maybe_caller_state_to_string/1</a></td><td>Returns a textual description of the specified maybe-LEEC caller state.</td></tr>
 <tr><td valign="top"><a href="#obtain_certificate_for-2">obtain_certificate_for/2</a></td><td>Generates, once started, asynchronously (in a non-blocking manner), a new 
 certificate for the specified domain (FQDN).</td></tr>
 <tr><td valign="top"><a href="#obtain_certificate_for-3">obtain_certificate_for/3</a></td><td>Generates, once started, synchronously (in a blocking manner) or not, a 
 new certificate for the specified domain (FQDN).</td></tr>
 <tr><td valign="top"><a href="#pending-3">pending/3</a></td><td>Manages the 'pending' state, when challenges are on-the-go, that is being
  processed with the ACME server.</td></tr>
+<tr><td valign="top"><a href="#reset_state-2">reset_state/2</a></td><td>Resets the LEEC state, typically prior to starting any (first) LEEC 
+instance.</td></tr>
 <tr><td valign="top"><a href="#send_ongoing_challenges-2">send_ongoing_challenges/2</a></td><td>Sends the ongoing challenges to the specified process.</td></tr>
-<tr><td valign="top"><a href="#start-1">start/1</a></td><td>Starts a (non-bridged) instance of the LEEC service FSM.</td></tr>
-<tr><td valign="top"><a href="#start-2">start/2</a></td><td>Starts an instance of the LEEC service FSM, possibly with a trace bridge.</td></tr>
+<tr><td valign="top"><a href="#start-2">start/2</a></td><td>Starts a (non-bridged) instance of the LEEC service FSM, meant to rely on 
+the specified type of challenge.</td></tr>
+<tr><td valign="top"><a href="#start-3">start/3</a></td><td>Starts an instance of the LEEC service FSM, possibly with a trace bridge, 
+meant to rely on the specified type of challenge.</td></tr>
+<tr><td valign="top"><a href="#state_to_string-1">state_to_string/1</a></td><td>Returns a textual description of the specified LEEC (internal) state.</td></tr>
 <tr><td valign="top"><a href="#stop-1">stop/1</a></td><td>Stops the specified instance of LEEC service; switches it to idle (does
  not terminate it for good).</td></tr>
 <tr><td valign="top"><a href="#terminate-1">terminate/1</a></td><td>Terminates the specified instance of LEEC service: stops it properly, and 
@@ -340,21 +486,39 @@ terminates the corresponding FSM process.</td></tr>
 
 <h3 class="function"><a name="callback_mode-0">callback_mode/0</a></h3>
 <div class="spec">
-<p><tt>callback_mode() -&gt; <a href="fsm_utils.html#type-callback_mode_ret">fsm_utils:callback_mode_ret()</a></tt><br></p>
+<p><code>callback_mode() -&gt; <a href="fsm_utils.html#type-callback_mode_ret">fsm_utils:callback_mode_ret()</a></code><br></p>
 <p> </p>
 </div><p>Tells about the retained mode regarding callback. Here, one callback
  function per state, akin to gen_fsm.
 </p>
 
+<h3 class="function"><a name="caller_state_to_string-1">caller_state_to_string/1</a></h3>
+<div class="spec">
+<p><code>caller_state_to_string(LEECCallerState::<a href="#type-leec_caller_state">leec_caller_state()</a>) -&gt; <a href="#type-ustring">ustring()</a></code><br></p>
+<p> </p>
+</div><p>Returns a textual description of the specified LEEC caller state.</p>
+
+<h3 class="function"><a name="can_perform_dns_challenges-0">can_perform_dns_challenges/0</a></h3>
+<div class="spec">
+<p><code>can_perform_dns_challenges() -&gt; boolean()</code><br></p>
+<p> </p>
+</div><p>Tells whether LEEC has a chance to run successfully a dns-01 challenge.</p>
+
 <h3 class="function"><a name="code_change-4">code_change/4</a></h3>
 <div class="spec">
-<p><tt>code_change(X1, StateName, LEState, X4) -&gt; any()</tt></p>
+<p><code>code_change(X1, StateName, LHState, X4) -&gt; any()</code></p>
 <p> </p>
 </div><p>Standard "code change" callback.</p>
 
+<h3 class="function"><a name="dns_provider_to_string-1">dns_provider_to_string/1</a></h3>
+<div class="spec">
+<p><code>dns_provider_to_string(DNSProvider::<a href="#type-dns_provider">dns_provider()</a>) -&gt; <a href="#type-ustring">ustring()</a></code><br></p>
+<p> </p>
+</div><p>Returns a textual representation of the specified DNS provider.</p>
+
 <h3 class="function"><a name="finalize-3">finalize/3</a></h3>
 <div class="spec">
-<p><tt>finalize(EventType, PreviousState, Data) -&gt; any()</tt></p>
+<p><code>finalize(EventType, PreviousState, Data) -&gt; any()</code></p>
 <p> </p>
 </div><p><p>Manages the 'finalize' state.</p>
 
@@ -372,7 +536,7 @@ terminates the corresponding FSM process.</td></tr>
 
 <h3 class="function"><a name="get_agent_key_path-1">get_agent_key_path/1</a></h3>
 <div class="spec">
-<p><tt>get_agent_key_path(FsmPid::<a href="#type-fsm_pid">fsm_pid()</a>) -&gt; error | <a href="#type-maybe">maybe</a>(<a href="#type-bin_file_path">bin_file_path()</a>)</tt><br></p>
+<p><code>get_agent_key_path(CallerState::<a href="#type-leec_caller_state">leec_caller_state()</a>) -&gt; error | <a href="#type-maybe">maybe</a>(<a href="#type-bin_file_path">bin_file_path()</a>)</code><br></p>
 <p> </p>
 </div><p><p>Returns the (absolute, binary) path of the current private key of the 
 LEEC agent.</p>
@@ -383,17 +547,34 @@ parallel) rather than multiplying the keys.</p>
  (exported API helper)
 </p>
 
-<h3 class="function"><a name="get_default_cert_request_options-0">get_default_cert_request_options/0</a></h3>
+<h3 class="function"><a name="get_certificate_priv_key_filename-1">get_certificate_priv_key_filename/1</a></h3>
 <div class="spec">
-<p><tt>get_default_cert_request_options() -&gt; <a href="#type-cert_req_option_map">cert_req_option_map()</a></tt><br></p>
+<p><code>get_certificate_priv_key_filename(DomainName::<a href="#type-domain_name">domain_name()</a>) -&gt; <a href="#type-file_name">file_name()</a></code><br></p>
 <p> </p>
-</div><p>Returns the default options for certificate requests, here enabling the
- async (non-blocking) mode.
+</div><p>Returns the filename of the private key of the certificate for the
+ specified domain.
+</p>
+
+<h3 class="function"><a name="get_credentials_path_for-3">get_credentials_path_for/3</a></h3>
+<div class="spec">
+<p><code>get_credentials_path_for(DNSProvider::<a href="#type-dns_provider">dns_provider()</a>, DomainName::<a href="#type-domain_name">domain_name()</a>, AnyCredBasePath::<a href="#type-any_directory_path">any_directory_path()</a>) -&gt; <a href="#type-credentials_path">credentials_path()</a></code><br></p>
+<p> </p>
+</div><p>Returns a file path corresponding to the specified domain name managed by
+ the specified DNS provider, in the specified credentials directory, made based
+ on the proposed LEEC conventions.
 </p>
 
 <h3 class="function"><a name="get_default_cert_request_options-1">get_default_cert_request_options/1</a></h3>
 <div class="spec">
-<p><tt>get_default_cert_request_options(Async::boolean()) -&gt; <a href="#type-cert_req_option_map">cert_req_option_map()</a></tt><br></p>
+<p><code>get_default_cert_request_options(ChallengeType::<a href="#type-challenge_type">challenge_type()</a>) -&gt; <a href="#type-cert_req_option_map">cert_req_option_map()</a></code><br></p>
+<p> </p>
+</div><p>Returns the default options for certificate requests for the specified
+ challenge type, here enabling the async (non-blocking) mode.
+</p>
+
+<h3 class="function"><a name="get_default_cert_request_options-2">get_default_cert_request_options/2</a></h3>
+<div class="spec">
+<p><code>get_default_cert_request_options(ChallengeType::<a href="#type-challenge_type">challenge_type()</a>, Async::boolean()) -&gt; <a href="#type-cert_req_option_map">cert_req_option_map()</a></code><br></p>
 <p> </p>
 </div><p>Returns the default optionsfor certificate requests, with specified async
  mode.
@@ -401,7 +582,7 @@ parallel) rather than multiplying the keys.</p>
 
 <h3 class="function"><a name="get_ongoing_challenges-1">get_ongoing_challenges/1</a></h3>
 <div class="spec">
-<p><tt>get_ongoing_challenges(FsmPid::<a href="#type-fsm_pid">fsm_pid()</a>) -&gt; error | no_challenge | <a href="#type-thumbprint_map">thumbprint_map()</a></tt><br></p>
+<p><code>get_ongoing_challenges(FsmPid::<a href="#type-fsm_pid">fsm_pid()</a>) -&gt; error | no_challenge | <a href="#type-thumbprint_map">thumbprint_map()</a></code><br></p>
 <p> </p>
 </div><p><p>Returns the ongoing challenges with pre-computed thumbprints.</p>
 
@@ -412,7 +593,7 @@ parallel) rather than multiplying the keys.</p>
 
 <h3 class="function"><a name="get_ordered_prerequisites-0">get_ordered_prerequisites/0</a></h3>
 <div class="spec">
-<p><tt>get_ordered_prerequisites() -&gt; [<a href="#type-application_name">application_name()</a>]</tt><br></p>
+<p><code>get_ordered_prerequisites() -&gt; [<a href="#type-application_name">application_name()</a>]</code><br></p>
 <p> </p>
 </div><p><p>Returns an (ordered) list of the LEEC prerequisite OTP applications, to 
 be started in that order.</p>
@@ -425,12 +606,12 @@ erlang_color</p>
  <p>- jsx preferred over jiffy; yet neither needs to be initialised as an 
 application</p>
 
- - no need to start Myriad either
+ - no need to start Myriad either (library application)
 </p>
 
 <h3 class="function"><a name="idle-3">idle/3</a></h3>
 <div class="spec">
-<p><tt>idle(EventType::<a href="#type-event_type">event_type()</a>, PreviousState::<a href="#type-event_content">event_content()</a>, Data::<a href="#type-le_state">le_state()</a>) -&gt; <a href="#type-state_callback_result">state_callback_result()</a></tt><br></p>
+<p><code>idle(EventType::<a href="#type-event_type">event_type()</a>, PreviousState::<a href="#type-event_content">event_content()</a>, Data::<a href="#type-leec_http_state">leec_http_state()</a>) -&gt; <a href="#type-state_callback_result">state_callback_result()</a></code><br></p>
 <p> </p>
 </div><p><p>Manages the 'idle' state, the initial state, typically used when awaiting 
 for certificate requests to be triggered.</p>
@@ -440,7 +621,7 @@ for certificate requests to be triggered.</p>
 
 <h3 class="function"><a name="init-1">init/1</a></h3>
 <div class="spec">
-<p><tt>init(X1::{[<a href="#type-start_option">start_option()</a>], <a href="json_utils.html#type-parser_state">json_utils:parser_state()</a>, <a href="#type-maybe">maybe</a>(<a href="trace_bridge.html#type-bridge_spec">trace_bridge:bridge_spec()</a>)}) -&gt; {ok, InitialStateName::idle, InitialData::<a href="#type-le_state">le_state()</a>}</tt><br></p>
+<p><code>init(X1::{<a href="#type-challenge_type">challenge_type()</a>, [<a href="#type-start_option">start_option()</a>], <a href="json_utils.html#type-parser_state">json_utils:parser_state()</a>, <a href="#type-maybe">maybe</a>(<a href="#type-bridge_spec">bridge_spec()</a>)}) -&gt; {ok, InitialStateName::idle, InitialData::<a href="#type-leec_http_state">leec_http_state()</a>}</code><br></p>
 <p> </p>
 </div><p><p>Initializes the LEEC state machine.</p>
 
@@ -459,7 +640,7 @@ for certificate requests to be triggered.</p>
 
 <h3 class="function"><a name="invalid-3">invalid/3</a></h3>
 <div class="spec">
-<p><tt>invalid(EventType, PreviousState, Data) -&gt; any()</tt></p>
+<p><code>invalid(EventType, PreviousState, Data) -&gt; any()</code></p>
 <p> </p>
 </div><p><p>Manages the 'invalid' state.</p>
 
@@ -474,24 +655,43 @@ for certificate requests to be triggered.</p>
    state 'valid'     : certificate is ready
 </p>
 
+<h3 class="function"><a name="is_known_challenge_type-1">is_known_challenge_type/1</a></h3>
+<div class="spec">
+<p><code>is_known_challenge_type(ChalType::atom()) -&gt; boolean()</code><br></p>
+<p> </p>
+</div><p><p>Tells whether the specified atom is a known challenge type.</p>
+
+ Does not guarantee that this LEEC instance is able to handle it.
+</p>
+
+<h3 class="function"><a name="is_supported_dns_provider-1">is_supported_dns_provider/1</a></h3>
+<div class="spec">
+<p><code>is_supported_dns_provider(DNSProvider::atom()) -&gt; boolean()</code><br></p>
+<p> </p>
+</div><p><p>Tells whether LEEC supports the specified DNS provider.</p>
+
+ It is a necessary yet not sufficient condition (e.g. proper provider-specific
+ credentials will be needed as well).
+</p>
+
+<h3 class="function"><a name="maybe_caller_state_to_string-1">maybe_caller_state_to_string/1</a></h3>
+<div class="spec">
+<p><code>maybe_caller_state_to_string(MaybeLEECCallerState::<a href="#type-maybe">maybe</a>(<a href="#type-leec_caller_state">leec_caller_state()</a>)) -&gt; <a href="#type-ustring">ustring()</a></code><br></p>
+<p> </p>
+</div><p>Returns a textual description of the specified maybe-LEEC caller state.</p>
+
 <h3 class="function"><a name="obtain_certificate_for-2">obtain_certificate_for/2</a></h3>
 <div class="spec">
-<p><tt>obtain_certificate_for(Domain::<a href="#type-domain">domain()</a>, FsmPid::<a href="#type-fsm_pid">fsm_pid()</a>) -&gt; async | <a href="#type-error_term">error_term()</a></tt><br></p>
+<p><code>obtain_certificate_for(Domain::<a href="#type-domain_name">domain_name()</a>, LeecCallerState::<a href="#type-leec_caller_state">leec_caller_state()</a>) -&gt; <a href="#type-obtain_outcome">obtain_outcome()</a></code><br></p>
 <p> </p>
 </div><p><p>Generates, once started, asynchronously (in a non-blocking manner), a new 
 certificate for the specified domain (FQDN).</p>
 
- <p>Parameters:</p>
+ <p>Parameters: 
+- Domain is the domain name to generate an ACME certificate for 
+- LeecCallerState is the caller state obtained when starting LEEC</p>
 
- <p>- Domain is the domain name to generate an ACME certificate for</p>
-
- <p>- FsmPid is the PID of the FSM to rely on</p>
-
- <p>Returns:</p>
-
- <p>- 'async' if async is set (the default being sync)</p>
-
- <p>- {error, Err} if a failure happens</p>
+ <p>See obtain_certificate_for/3 for the return type.</p>
 
  Belongs to the user-facing API; requires the LEEC service to be already
  started.
@@ -499,42 +699,16 @@ certificate for the specified domain (FQDN).</p>
 
 <h3 class="function"><a name="obtain_certificate_for-3">obtain_certificate_for/3</a></h3>
 <div class="spec">
-<p><tt>obtain_certificate_for(Domain::<a href="#type-domain">domain()</a>, FsmPid::<a href="#type-fsm_pid">fsm_pid()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>) -&gt; async | {certificate_ready, <a href="#type-bin_file_path">bin_file_path()</a>} | <a href="#type-error_term">error_term()</a></tt><br></p>
+<p><code>obtain_certificate_for(Domain::<a href="#type-domain_name">domain_name()</a>, LeecCallerState::<a href="#type-leec_caller_state">leec_caller_state()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>) -&gt; <a href="#type-obtain_outcome">obtain_outcome()</a></code><br></p>
 <p> </p>
 </div><p><p>Generates, once started, synchronously (in a blocking manner) or not, a 
 new certificate for the specified domain (FQDN).</p>
 
- <p>Parameters:</p>
-
- <p>- Domain is the domain name to generate an ACME certificate for</p>
-
- <p>- FsmPid is the PID of the FSM to rely on</p>
-
- <p>- CertReqOptionMap is a map listing the options applying to this certificate 
-request, whose key (as atom)/value pairs (all optional except 'async' and 
-'netopts') are:</p>
-
-    <p>- 'async' / boolean(): if true, blocks until complete and returns generated    
-certificate filename if false, immediately returns</p>
-
-    <p>- 'callback' / fun/1: function executed when Async is true, once domain    
-certificate has been successfully generated</p>
-
-    <p>- 'netopts' / map(): mostly to specify an HTTP timeout or SSL client    
-options</p>
-
-    <p>- 'challenge_type' / challenge_type() is the type of challenge to rely on    
-when interacting with the ACME server</p>
-
-    <p>- 'sans' / [ any_san() ]: a list of the Subject Alternative Names for that    
-certificate</p>
-
- <p>Returns:</p>
-
- <p>- if synchronous (the default): either {certificate_ready, BinFilePath} if 
-successful, otherwise {error, Err}</p>
-
- <p>- otherwise (asynchronous), 'async'</p>
+ <p>Parameters: 
+- Domain is the domain name to generate an ACME certificate for 
+- LeecCallerState is the caller state obtained when starting LEEC 
+- CertReqOptionMap is a map listing the options applying to this certificate 
+request, whose key (as atom) / value pairs may depend on the challenge type</p>
 
  Belongs to the user-facing API; requires the LEEC service to be already
  started.
@@ -542,48 +716,87 @@ successful, otherwise {error, Err}</p>
 
 <h3 class="function"><a name="pending-3">pending/3</a></h3>
 <div class="spec">
-<p><tt>pending(EventType, PreviousState, Data) -&gt; any()</tt></p>
+<p><code>pending(EventType, PreviousState, Data) -&gt; any()</code></p>
 <p> </p>
 </div><p>Manages the 'pending' state, when challenges are on-the-go, that is being
  processed with the ACME server.
 </p>
 
+<h3 class="function"><a name="reset_state-2">reset_state/2</a></h3>
+<div class="spec">
+<p><code>reset_state(ChallengeType::<a href="#type-challenge_type">challenge_type()</a>, AnyCertDir::<a href="#type-any_directory_path">any_directory_path()</a>) -&gt; boolean()</code><br></p>
+<p> </p>
+</div><p><p>Resets the LEEC state, typically prior to starting any (first) LEEC 
+instance.</p>
+
+ <p>This may be useful for example with a certbot-based dns-01 challenge, in order 
+to wipe out the state of certbot to ensure that new certificates are obtained 
+(as opposed to former ones being reused, whereas their expiration timestamp 
+will not be specifically read).</p>
+
+ <p>Otherwise tries to preserve state (e.g. any former certificate obtained 
+through http-01), as during the (potentially lengthy) renewal process, no 
+functional certificate (hence HTTPS access) would exist.</p>
+
+ <p>Returns whether a state deletion was done.</p>
+
+ Not integrated to start/{2,3} as multiple LEEC instances can be used, and one
+ should not interfere with the others, through their common state
+ (e.g. regarding the one of certbot). Also, this may be useful only at the
+ first LEEC initialisation, not for the next automatic renewals.
+</p>
+
 <h3 class="function"><a name="send_ongoing_challenges-2">send_ongoing_challenges/2</a></h3>
 <div class="spec">
-<p><tt>send_ongoing_challenges(FsmPid::<a href="#type-fsm_pid">fsm_pid()</a>, TargetPid::pid()) -&gt; <a href="#type-void">void()</a></tt><br></p>
+<p><code>send_ongoing_challenges(LCS::<a href="#type-leec_caller_state">leec_caller_state()</a>, TargetPid::pid()) -&gt; <a href="#type-void">void()</a></code><br></p>
 <p> </p>
 </div><p><p>Sends the ongoing challenges to the specified process.</p>
 
- <p>Typically useful in a slave operation mode, when the web handler cannot access 
-directly the PID of the LEEC FSM: this code is then called by a third-party 
-process (e.g. a certificate manager one, statically known of the web handler, 
-and triggered by it), and returns the requested challenged to the specified 
-target PID (most probably the one of the web handler itself).</p>
+ <p>Typically useful in a slave interfacing mode, when the web handler cannot 
+access directly the PID of the LEEC FSM: this code is then called by a 
+third-party process (e.g. a certificate manager one, statically known of the 
+web handler, and triggered by it), and returns the requested challenged to the 
+specified target PID (most probably the one of the web handler itself).</p>
 
  (exported API helper)
 </p>
 
-<h3 class="function"><a name="start-1">start/1</a></h3>
-<div class="spec">
-<p><tt>start(StartOptions::[<a href="#type-start_option">start_option()</a>]) -&gt; <a href="#type-start_ret">start_ret()</a></tt><br></p>
-<p> </p>
-</div><p><p>Starts a (non-bridged) instance of the LEEC service FSM.</p>
-
- Apparently the 'application' behaviour would expect as argument:
- 'normal' | {'failover', atom()} | {'takeover', atom()}
- and, as return type:
- {'error', _} | {'ok', pid()} | {'ok', pid(), _} instead.
-</p>
-
 <h3 class="function"><a name="start-2">start/2</a></h3>
 <div class="spec">
-<p><tt>start(StartOptions::[<a href="#type-start_option">start_option()</a>], MaybeBridgeSpec::<a href="#type-maybe">maybe</a>(<a href="trace_bridge.html#type-bridge_spec">trace_bridge:bridge_spec()</a>)) -&gt; <a href="#type-start_ret">start_ret()</a></tt><br></p>
+<p><code>start(ChallengeType::<a href="#type-challenge_type">challenge_type()</a>, StartOptions::[<a href="#type-start_option">start_option()</a>]) -&gt; <a href="#type-start_outcome">start_outcome()</a></code><br></p>
 <p> </p>
-</div><p>Starts an instance of the LEEC service FSM, possibly with a trace bridge.</p>
+</div><p><p>Starts a (non-bridged) instance of the LEEC service FSM, meant to rely on 
+the specified type of challenge.</p>
+
+ See start/3 for more details.
+</p>
+
+<h3 class="function"><a name="start-3">start/3</a></h3>
+<div class="spec">
+<p><code>start(ChallengeType::<a href="#type-challenge_type">challenge_type()</a>, StartOptions::[<a href="#type-start_option">start_option()</a>], MaybeBridgeSpec::<a href="#type-maybe">maybe</a>(<a href="#type-bridge_spec">bridge_spec()</a>)) -&gt; <a href="#type-start_outcome">start_outcome()</a></code><br></p>
+<p> </p>
+</div><p><p>Starts an instance of the LEEC service FSM, possibly with a trace bridge, 
+meant to rely on the specified type of challenge.</p>
+
+ <p>Note that for most challenges to succeed, LEEC must be started from the domain 
+of interest, as a webserver there must be controlled (for the http-01 
+challenge) or its DNS zone must be updated, generally from one of the 
+authorised IP addresses (for the dns-01 challenge).</p>
+
+ Note also that some challenges (especially the dns-01 one) will take
+ significant time to succeed (typically as a few minutes will have to be waited
+ for DNS changes to propagate).
+</p>
+
+<h3 class="function"><a name="state_to_string-1">state_to_string/1</a></h3>
+<div class="spec">
+<p><code>state_to_string(LHS::<a href="#type-leec_state">leec_state()</a>) -&gt; <a href="#type-ustring">ustring()</a></code><br></p>
+<p> </p>
+</div><p>Returns a textual description of the specified LEEC (internal) state.</p>
 
 <h3 class="function"><a name="stop-1">stop/1</a></h3>
 <div class="spec">
-<p><tt>stop(FsmPid::<a href="#type-fsm_pid">fsm_pid()</a>) -&gt; <a href="#type-void">void()</a></tt><br></p>
+<p><code>stop(LCS::<a href="#type-leec_caller_state">leec_caller_state()</a>) -&gt; <a href="#type-void">void()</a></code><br></p>
 <p> </p>
 </div><p>Stops the specified instance of LEEC service; switches it to idle (does
  not terminate it for good).
@@ -591,7 +804,7 @@ target PID (most probably the one of the web handler itself).</p>
 
 <h3 class="function"><a name="terminate-1">terminate/1</a></h3>
 <div class="spec">
-<p><tt>terminate(FsmPid::<a href="#type-fsm_pid">fsm_pid()</a>) -&gt; <a href="#type-void">void()</a></tt><br></p>
+<p><code>terminate(LEECCallerState::<a href="#type-leec_caller_state">leec_caller_state()</a>) -&gt; <a href="#type-void">void()</a></code><br></p>
 <p> </p>
 </div><p><p>Terminates the specified instance of LEEC service: stops it properly, and 
 terminates the corresponding FSM process.</p>
@@ -602,18 +815,18 @@ terminates the corresponding FSM process.</p>
 
 <h3 class="function"><a name="terminate-3">terminate/3</a></h3>
 <div class="spec">
-<p><tt>terminate(Reason, State, Data) -&gt; any()</tt></p>
+<p><code>terminate(Reason, State, Data) -&gt; any()</code></p>
 <p> </p>
 </div><p>Standard termination callback.</p>
 
 <h3 class="function"><a name="valid-3">valid/3</a></h3>
 <div class="spec">
-<p><tt>valid(EventType, PreviousState, Data) -&gt; any()</tt></p>
+<p><code>valid(EventType, PreviousState, Data) -&gt; any()</code></p>
 <p> </p>
 </div><p><p>Manages the 'valid' state.</p>
 
  <p>When challenges have been successfully completed, finalizes the ACME order and 
-generates TLS certificate.</p>
+generates the TLS certificate.</p>
 
  <p>Returns Status, the order status.</p>
 

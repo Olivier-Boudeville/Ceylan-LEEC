@@ -126,7 +126,7 @@ h3 {
 
 
 h4 {
-	color: #ff6811;
+	color: #aa4444;
 	font-size: 20px;
 	margin-left: 10%;
 	margin-right: 7%;
@@ -137,7 +137,7 @@ h4 {
 
 
 h5 {
-	color: #ff7e39;
+	color: #aa1811;
 	font-size: 16px;
 	margin-left: 15%;
 	margin-right: 15%;
@@ -550,7 +550,7 @@ div.banner {
 
 div.banner p {
 	/*color: #00FF00;*/
-	background: #aa332b;
+	background: #88332b;
 	margin-left: 0em;
 	padding: 0em;
 	font-family: Arial, sans-serif;

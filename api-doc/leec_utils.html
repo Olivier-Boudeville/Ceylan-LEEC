@@ -17,15 +17,15 @@
 <h2><a name="types">Data Types</a></h2>
 
 <h3 class="typedecl"><a name="type-any_string">any_string()</a></h3>
-<p><tt>any_string() = <a href="text_utils.html#type-any_string">text_utils:any_string()</a></tt></p>
+<p><code>any_string() = <a href="text_utils.html#type-any_string">text_utils:any_string()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-binary_b64">binary_b64()</a></h3>
-<p><tt>binary_b64() = <a href="leec.html#type-binary_b64">leec:binary_b64()</a></tt></p>
+<p><code>binary_b64() = <a href="leec.html#type-binary_b64">leec:binary_b64()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-parser_state">parser_state()</a></h3>
-<p><tt>parser_state() = <a href="json_utils.html#type-parser_state">json_utils:parser_state()</a></tt></p>
+<p><code>parser_state() = <a href="json_utils.html#type-parser_state">json_utils:parser_state()</a></code></p>
 
 
 <h2><a name="index">Function Index</a></h2>
@@ -39,25 +39,25 @@
 
 <h3 class="function"><a name="b64encode-1">b64encode/1</a></h3>
 <div class="spec">
-<p><tt>b64encode(X::<a href="#type-any_string">any_string()</a>) -&gt; <a href="#type-binary_b64">binary_b64()</a></tt><br></p>
+<p><code>b64encode(X::<a href="#type-any_string">any_string()</a>) -&gt; <a href="#type-binary_b64">binary_b64()</a></code><br></p>
 <p> </p>
 </div><p>Encodes the specified content in b64.</p>
 
 <h3 class="function"><a name="hashdigest-2">hashdigest/2</a></h3>
 <div class="spec">
-<p><tt>hashdigest(X1::sha256, Content::binary()) -&gt; binary()</tt><br></p>
+<p><code>hashdigest(X1::sha256, Content::binary()) -&gt; binary()</code><br></p>
 <p> </p>
 </div><p>Returns the SHA256 hexadecimal digest of the specified content.</p>
 
 <h3 class="function"><a name="hexdigest-1">hexdigest/1</a></h3>
 <div class="spec">
-<p><tt>hexdigest(X::<a href="#type-any_string">any_string()</a>) -&gt; binary()</tt><br></p>
+<p><code>hexdigest(X::<a href="#type-any_string">any_string()</a>) -&gt; binary()</code><br></p>
 <p> </p>
 </div><p>Returns the hex digest of the specified string argument.</p>
 
 <h3 class="function"><a name="jsonb64encode-2">jsonb64encode/2</a></h3>
 <div class="spec">
-<p><tt>jsonb64encode(X::map(), ParserState::<a href="#type-parser_state">parser_state()</a>) -&gt; <a href="#type-binary_b64">binary_b64()</a></tt><br></p>
+<p><code>jsonb64encode(X::map(), ParserState::<a href="#type-parser_state">parser_state()</a>) -&gt; <a href="#type-binary_b64">binary_b64()</a></code><br></p>
 <p> </p>
 </div><p>Encodes the specified content first in JSON, then in b64.</p>
 <hr>
