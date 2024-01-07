@@ -114,15 +114,15 @@ endif
 
 
 # REBAR3_PROJECT_NAME should be defined on a per-project basis.
-ifndef PROJECT_NAME_FOR_REBAR
-	PROJECT_NAME_FOR_REBAR := $(PROJECT_SHORT_NAME)
+ifndef PROJECT_NAME_FOR_OTP
+	PROJECT_NAME_FOR_OTP := $(PROJECT_SHORT_NAME)
 endif
 
 
 # The uniquely-defined version of this layer, for all uses (including rebar and
 # hex):
 #
-LEEC_VERSION := 1.2.2
+LEEC_VERSION := 1.2.3
 
 
 # PROJECT_VERSION should be defined on a per-project basis.
