@@ -22,7 +22,7 @@
 
 % Depends on the Ceylan-Myriad OTP library application (Erlang implied):
 
-% As a GIT-based dependency:
+% As a Git-based dependency:
 {deps, [ {myriad, {git, "https://github.com/Olivier-Boudeville/Ceylan-Myriad.git",
 					{branch, "master"}}},
 
@@ -50,7 +50,7 @@
 % hex-compile-hook-script.sh, to compensate for the GNUmake* root files that the
 % package archive will not include at their location)
 %
-%{deps, [ {myriad, "MYRIAD_VERSION_FOR_REBAR"} ] }.
+%{deps, [ {myriad, "MYRIAD_VERSION_FOR_OTP"} ] }.
 
 
 % Include directories found in INC:
@@ -98,7 +98,7 @@
 %
 {relx, [
 
-  {release, {leec_release, "VERSION_FOR_REBAR"},
+  {release, {leec_release, "VERSION_FOR_OTP"},
 			% myriad thus implied:
 			[sasl, leec]},
 

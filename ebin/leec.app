@@ -13,7 +13,7 @@
 % ./ebin/leec.app
 % ./src/leec.app.src -> ../ebin/leec.app
 %
-% For more information see the Ceylan-Myriad 'rebar3-create-app-file' make
+% For more information see the Ceylan-Myriad 'create-app-file' make
 % target and its associated comments.
 
 
@@ -26,7 +26,7 @@
 
   {description, "Ceylan-LEEC, a letsencrypt.org client library for Erlang, the Ceylan fork of letsencrypt-erlang, as an OTP library application here (see http://leec.esperide.org)"},
 
-  {vsn, "1.2.2"},
+  {vsn, "1.2.3"},
 
   {registered, []},
 
