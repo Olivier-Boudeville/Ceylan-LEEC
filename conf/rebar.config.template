@@ -60,6 +60,8 @@
 %
 {erl_opts, [ {leec_version,"VERSION_FOR_OTP"}, {d,myriad_debug_mode}, {d,leec_debug_mode}, debug_info, {debug_info_key,"DEBUG_KEY_FOR_REBAR"}, report_warnings, warn_export_all, warn_export_vars, warn_shadow_vars, warn_obsolete_guards, warn_unused_import, warnings_as_errors, INCS_FOR_REBAR, {d,myriad_httpc_backend,native_httpc} ]}.
 
+% Attempt to unblock the rebar build of US-Web because of LEEC:
+{erlc_compiler, [{recursive,false}]}.
 
 % (hooks needed, for example to create the include symlinks and for the build
 % itself)
