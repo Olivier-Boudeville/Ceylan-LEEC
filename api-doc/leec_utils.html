@@ -28,8 +28,18 @@
 <p><code>parser_state() = <a href="json_utils.html#type-parser_state">json_utils:parser_state()</a></code></p>
 
 
+<h3 class="typedecl"><a name="type-three_digit_version">three_digit_version()</a></h3>
+<p><code>three_digit_version() = <a href="basic_utils.html#type-three_digit_version">basic_utils:three_digit_version()</a></code></p>
+
+
+<h3 class="typedecl"><a name="type-ustring">ustring()</a></h3>
+<p><code>ustring() = <a href="text_utils.html#type-ustring">text_utils:ustring()</a></code></p>
+
+
 <h2><a name="index">Function Index</a></h2>
 <table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#b64encode-1">b64encode/1</a></td><td>Encodes the specified content in b64.</td></tr>
+<tr><td valign="top"><a href="#get_leec_version-0">get_leec_version/0</a></td><td>Returns the version of the LEEC library being used.</td></tr>
+<tr><td valign="top"><a href="#get_leec_version_string-0">get_leec_version_string/0</a></td><td>Returns the version of the LEEC library being used, as a string.</td></tr>
 <tr><td valign="top"><a href="#hashdigest-2">hashdigest/2</a></td><td>Returns the SHA256 hexadecimal digest of the specified content.</td></tr>
 <tr><td valign="top"><a href="#hexdigest-1">hexdigest/1</a></td><td>Returns the hex digest of the specified string argument.</td></tr>
 <tr><td valign="top"><a href="#jsonb64encode-2">jsonb64encode/2</a></td><td>Encodes the specified content first in JSON, then in b64.</td></tr>
@@ -42,6 +52,18 @@
 <p><code>b64encode(X::<a href="#type-any_string">any_string()</a>) -&gt; <a href="#type-binary_b64">binary_b64()</a></code><br></p>
 <p> </p>
 </div><p>Encodes the specified content in b64.</p>
+
+<h3 class="function"><a name="get_leec_version-0">get_leec_version/0</a></h3>
+<div class="spec">
+<p><code>get_leec_version() -&gt; <a href="#type-three_digit_version">three_digit_version()</a></code><br></p>
+<p> </p>
+</div><p>Returns the version of the LEEC library being used.</p>
+
+<h3 class="function"><a name="get_leec_version_string-0">get_leec_version_string/0</a></h3>
+<div class="spec">
+<p><code>get_leec_version_string() -&gt; <a href="#type-ustring">ustring()</a></code><br></p>
+<p> </p>
+</div><p>Returns the version of the LEEC library being used, as a string.</p>
 
 <h3 class="function"><a name="hashdigest-2">hashdigest/2</a></h3>
 <div class="spec">
