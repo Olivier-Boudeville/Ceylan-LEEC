@@ -37,6 +37,10 @@ run() ->
 
 	test_facilities:display( "Testing LEEC." ),
 
+	test_facilities:display( "The version of this currently tested LEEC "
+		"library is ~ts (i.e. ~w).", [ leec_utils:get_leec_version_string(),
+									   leec_utils:get_leec_version() ] ),
+
 	% Not in an OTP context here, yet we need OTP applications such as LEEC to
 	% work (e.g. w.r.t. their .app being found, etc.):
 

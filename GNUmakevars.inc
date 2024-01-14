@@ -85,7 +85,8 @@ ifeq ($(EXECUTION_TARGET),development)
 endif
 
 
-ERLANG_COMPILER_OPT_BASE += $(LEEC_DEBUG_FLAGS) \
+ERLANG_COMPILER_OPT_BASE += -Dleec_version=\"$(LEEC_VERSION)\" \
+							$(LEEC_DEBUG_FLAGS)                \
 							$(LEEC_CHECK_FLAGS)
 
 
@@ -119,10 +120,10 @@ ifndef PROJECT_NAME_FOR_OTP
 endif
 
 
-# The uniquely-defined version of this layer, for all uses (including rebar and
-# hex):
+# The uniquely-defined version of this layer, for all uses (including rebar, hex
+# and the code itself, see leec_utils:get_leec_version{_string,}/0):
 #
-LEEC_VERSION := 1.2.3
+LEEC_VERSION := 1.2.4
 
 
 # PROJECT_VERSION should be defined on a per-project basis.

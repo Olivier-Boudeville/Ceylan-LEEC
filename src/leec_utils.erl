@@ -28,17 +28,39 @@
 -author("Olivier Boudeville (olivier dot boudeville at esperide dot com").
 
 
+% Version-related functions.
+-export([ get_leec_version/0, get_leec_version_string/0 ]).
+
+
 -export([ b64encode/1, jsonb64encode/2, hexdigest/1, hashdigest/2 ]).
 
 
 % Shorthands:
 
+-type three_digit_version() :: basic_utils:three_digit_version().
+
+-type ustring() :: text_utils:ustring().
 -type any_string() :: text_utils:any_string().
 
 -type parser_state() :: json_utils:parser_state().
 
 -type binary_b64() :: leec:binary_b64().
 
+
+
+% Version-related functions.
+
+% @doc Returns the version of the LEEC library being used.
+-spec get_leec_version() -> three_digit_version().
+get_leec_version() ->
+	basic_utils:parse_version( get_leec_version_string() ).
+
+
+% @doc Returns the version of the LEEC library being used, as a string.
+-spec get_leec_version_string() -> ustring().
+get_leec_version_string() ->
+	% As defined (uniquely) in GNUmakevars.inc:
+	?leec_version.
 
 
 
