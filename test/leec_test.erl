@@ -17,13 +17,14 @@
 % Author: Olivier Boudeville [olivier (dot) boudeville (at) esperide (dot) com]
 % Creation date: Wednesday, October 28, 2020.
 
-
-% @doc Very <b>basic usage example for Ceylan-LEEC</b>, mainly for the http-01
-% challenge, based on mostly irrelevant settings.
-%
-% Allows to check that LEEC can be used directly, out of a rebar3 context.
-%
 -module(leec_test).
+
+-moduledoc """
+Very **basic usage example for Ceylan-LEEC**, mainly for the http-01 challenge,
+based on mostly irrelevant settings.
+
+Allows to check that LEEC can be used directly, out of a rebar3 context.
+""".
 
 
 % For run/0 export and al:

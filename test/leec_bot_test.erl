@@ -17,14 +17,15 @@
 % Author: Olivier Boudeville [olivier (dot) boudeville (at) esperide (dot) com]
 % Creation date: Friday, May 5, 2023.
 
-
-% @doc Basic usage example of the <b>Ceylan-LEEC certbot support</b>, based on
-% irrelevant settings.
-%
-% Allows to check that the LEEC certbot support can be used directly, out of a
-% rebar3 context.
-%
 -module(leec_bot_test).
+
+-moduledoc """
+Basic usage example of the **Ceylan-LEEC certbot support**, based on irrelevant
+settings.
+
+Allows to check that the LEEC certbot support can be used directly, out of a
+rebar3 context.
+""".
 
 
 % For run/0 export and al:
@@ -32,7 +33,7 @@
 
 
 
-% @doc Performs the actual dns-01 challenge test.
+-doc "Performs the actual dns-01 challenge test.".
 -spec run_actual_test() -> void().
 run_actual_test() ->
 

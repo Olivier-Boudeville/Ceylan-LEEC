@@ -16,10 +16,15 @@
 %
 % This file is part of the Ceylan-LEEC library, a fork of the Guillaume Bour's
 % letsencrypt-erlang library, released under the same licence.
+%
+% Creation date: 2020.
 
-
-% @doc Module in charge of managing <b>TLS-related operations</b>.
 -module(leec_tls).
+
+-moduledoc """
+Module in charge of managing **TLS-related operations**.
+""".
+
 
 % Original work:
 -author("Guillaume Bour (guillaume at bour dot cc)").
@@ -37,11 +42,12 @@
 
 -include_lib("public_key/include/public_key.hrl").
 
+
 % For the records introduced:
 -include_lib("leec.hrl").
 
 
-% Shorthands:
+% Type shorthands:
 
 -type file_path() :: file_utils:file_path().
 -type bin_file_path() :: file_utils:bin_file_path().
@@ -65,15 +71,15 @@
 
 
 
+-doc """
+Obtains a private key for the current LEEC agent, either by creating it (in a
+specified filename or in a generated one) or by reading a pre-existing one from
+file.
 
-% @doc Obtains a private key for the current LEEC agent, either by creating it
-% (in a specified filename or in a generated one) or by reading a pre-existing
-% one from file.
-%
-% Does not involve any network access.
-%
+Does not involve any network access.
+""".
 -spec obtain_private_key(
-		maybe( { 'new', any_file_name() } | any_file_path() ),
+		option( { 'new', any_file_name() } | any_file_path() ),
 		bin_directory_path() ) -> tls_private_key().
 obtain_private_key( _KeyFileInfo=undefined, BinCertDirPath ) ->
 
@@ -197,14 +203,15 @@ obtain_private_key( _KeyFileInfo=KeyFilePath, BinCertDirPath ) ->
 
 
 
-% @doc Secures a proper DH file for safer key exchange, creates it only if
-% necessary, returns its path.
-%
-% The Ephemeral Diffie-Helman key exchange is a very effective way of ensuring
-% Forward Secrecy by exchanging a set of keys that never hit the wire.
-%
-% Does not involve any network access.
-%
+-doc """
+Secures a proper DH file for safer key exchange, creates it only if necessary,
+returns its path.
+
+The Ephemeral Diffie-Helman key exchange is a very effective way of ensuring
+Forward Secrecy by exchanging a set of keys that never hit the wire.
+
+Does not involve any network access.
+""".
 -spec obtain_dh_key( directory_path() ) -> bin_file_path().
 obtain_dh_key( CertDir ) ->
 
@@ -268,9 +275,10 @@ obtain_dh_key( CertDir ) ->
 
 
 
-% @doc Obtains the intermediate certificate of the default authority, using
-% default HTTP options.
-%
+-doc """
+Obtains the intermediate certificate of the default authority, using default
+HTTP options.
+""".
 -spec obtain_ca_cert_file( any_directory_path() ) -> bin_file_path().
 obtain_ca_cert_file( TargetDir ) ->
 
@@ -279,7 +287,8 @@ obtain_ca_cert_file( TargetDir ) ->
 	obtain_ca_cert_file( TargetDir, HttpOptions ).
 
 
-% @doc Obtains the intermediate certificate of the default authority.
+
+-doc "Obtains the intermediate certificate of the default authority.".
 -spec obtain_ca_cert_file( any_directory_path(), http_options() ) ->
 									bin_file_path().
 obtain_ca_cert_file( TargetDir, HttpOptions ) ->
@@ -287,7 +296,8 @@ obtain_ca_cert_file( TargetDir, HttpOptions ) ->
 						 HttpOptions ).
 
 
-% @doc Obtains the intermediate certificate of the specified authority.
+
+-doc "Obtains the intermediate certificate of the specified authority.".
 -spec obtain_ca_cert_file( any_directory_path(), certificate_provider(),
 						   http_options() ) -> file_path().
 obtain_ca_cert_file( TargetDir, _CertProvider=letsencrypt, HttpOptions ) ->
@@ -301,7 +311,6 @@ obtain_ca_cert_file( TargetDir, _CertProvider=letsencrypt, HttpOptions ) ->
 	case file_utils:is_existing_file_or_link( FilePath ) of
 
 		true ->
-
 			trace_bridge:info_fmt(
 				"Certificate authority certificate file was found already "
 				"existing (as '~ts'), not downloading it.", [ FilePath ] ),
@@ -309,14 +318,13 @@ obtain_ca_cert_file( TargetDir, _CertProvider=letsencrypt, HttpOptions ) ->
 			text_utils:string_to_binary( FilePath );
 
 		false ->
-
 			trace_bridge:info_fmt( "No certificate authority certificate "
 				"file found (no '~ts'), downloading it from ~ts, "
 				"with following HTTP options:~n  ~p",
 				[ FilePath, CAUrl, HttpOptions ] ),
 
 			% Expected to be equal to FilePath:
-			ResFilePath = web_utils:download_file( CAUrl, TargetDir,
+			ResFilePath = web_utils:download_file( CAUrl, TargetDir, 
 												   HttpOptions ),
 
 			text_utils:string_to_binary( ResFilePath )
@@ -325,10 +333,11 @@ obtain_ca_cert_file( TargetDir, _CertProvider=letsencrypt, HttpOptions ) ->
 
 
 
-% @doc Returns a CSR certificate request.
-%
-% For that, generates also the whole base certificante and its private key.
-%
+-doc """
+Returns a CSR certificate request.
+
+For that, generates also the whole base certificante and its private key.
+""".
 -spec get_cert_request( bin_fqdn(), bin_directory_path(), [ san() ] ) ->
 								leec:tls_csr().
 get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
@@ -367,9 +376,10 @@ get_cert_request( BinDomain, BinCertDirPath, SANs ) ->
 
 
 
-% @doc Generates the specified certificate with subjectAlternativeName, either
-% an actual one, or a temporary (1 day), autosigned one.
-%
+-doc """
+Generates the specified certificate with subjectAlternativeName, either an
+actual one, or a temporary (1 day), autosigned one.
+""".
 -spec generate_certificate( 'request' | 'autosigned', bin_fqdn(),
 	cert_file_path(), cert_priv_key_file_path(), [ san() ] ) -> void().
 generate_certificate( CertType, BinDomain, OutCertPath, PrivKeyFilePath,
@@ -451,10 +461,11 @@ generate_certificate( CertType, BinDomain, OutCertPath, PrivKeyFilePath,
 
 
 
-% @doc Writes the specified certificate, overwriting any prior one.
-%
-% Domain certificate only.
-%
+-doc """
+Writes the specified certificate, overwriting any prior one.
+
+Domain certificate only.
+""".
 -spec write_certificate( net_utils:string_fqdn(), bin_certificate(),
 						 bin_directory_path() ) -> file_path().
 write_certificate( Domain, BinDomainCert, BinCertDirPath ) ->
@@ -474,17 +485,20 @@ write_certificate( Domain, BinDomainCert, BinCertDirPath ) ->
 
 
 
-% @doc Returns a map-based version of the specified public key record, typically
-% for encoding.
-%
+-doc """
+Returns a map-based version of the specified public key record, typically for
+encoding.
+""".
 -spec key_to_map( tls_public_key() ) -> map().
 key_to_map( #tls_public_key{ kty=Kty, n=N, e=E } ) ->
 	#{ <<"kty">> => Kty, <<"n">> => N, <<"e">> => E }.
 
 
-% @doc Returns the key record corresponding to the specified map, typically
-% obtained from a remote server.
-%
+
+-doc """
+Returns the key record corresponding to the specified map, typically obtained
+from a remote server.
+""".
 -spec map_to_key( map() ) -> tls_public_key().
 map_to_key( Map ) ->
 

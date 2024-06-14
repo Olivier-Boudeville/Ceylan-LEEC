@@ -16,10 +16,15 @@
 %
 % This file is part of the Ceylan-LEEC library, a fork of the Guillaume Bour's
 % letsencrypt-erlang library, released under the same licence.
+%
+% This file was forked on 2020.
 
-
-% @doc This module concentrates <b>utilities transverse to LEEC</b>.
 -module(leec_utils).
+
+-moduledoc """
+This module concentrates **>utilities transverse to LEEC**.
+""".
+
 
 % Original work:
 -author("Guillaume Bour (guillaume at bour dot cc)").
@@ -35,7 +40,8 @@
 -export([ b64encode/1, jsonb64encode/2, hexdigest/1, hashdigest/2 ]).
 
 
-% Shorthands:
+
+% Type shorthands:
 
 -type three_digit_version() :: basic_utils:three_digit_version().
 
@@ -50,13 +56,15 @@
 
 % Version-related functions.
 
-% @doc Returns the version of the LEEC library being used.
+
+-doc "Returns the version of the LEEC library being used.".
 -spec get_leec_version() -> three_digit_version().
 get_leec_version() ->
 	basic_utils:parse_version( get_leec_version_string() ).
 
 
-% @doc Returns the version of the LEEC library being used, as a string.
+
+-doc "Returns the version of the LEEC library being used, as a string.".
 -spec get_leec_version_string() -> ustring().
 get_leec_version_string() ->
 	% As defined (uniquely) in GNUmakevars.inc:
@@ -64,7 +72,7 @@ get_leec_version_string() ->
 
 
 
-% @doc Encodes the specified content in b64.
+-doc "Encodes the specified content in b64.".
 -spec b64encode( any_string() ) -> binary_b64().
 b64encode( X ) ->
 	Base64 = base64:encode( X ),
@@ -72,7 +80,7 @@ b64encode( X ) ->
 
 
 
-% @doc Encodes the specified content first in JSON, then in b64.
+-doc "Encodes the specified content first in JSON, then in b64.".
 -spec jsonb64encode( map(), parser_state() ) -> binary_b64().
 jsonb64encode( X, ParserState ) when is_map( X ) ->
 
@@ -100,7 +108,7 @@ encode_byte( B ) ->
 
 
 
-% @doc Returns the hex digest of the specified string argument.
+-doc "Returns the hex digest of the specified string argument.".
 -spec hexdigest( any_string() ) -> binary().
 hexdigest( X ) ->
 	<< <<( hex( H ) ),( hex(L) )>> || <<H:4,L:4>> <= X >>.
@@ -115,7 +123,7 @@ hex( C ) ->
 
 
 
-% @doc Returns the SHA256 hexadecimal digest of the specified content.
+-doc "Returns the SHA256 hexadecimal digest of the specified content.".
 -spec hashdigest( sha256, binary() ) -> binary().
 hashdigest( sha256, Content ) ->
 	hexdigest( crypto:hash( sha256, Content ) ).

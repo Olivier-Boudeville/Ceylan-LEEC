@@ -16,18 +16,19 @@
 %
 % This file is part of the Ceylan-LEEC library, a fork of the Guillaume Bour's
 % letsencrypt-erlang library, released under the same licence.
+% Creation date: 2020.
 
 
 % To be able to be built also through rebar3, not only by Myriad's native build
 % system:
 
 -type void() :: basic_utils:void().
--type maybe( T ) :: basic_utils:maybe( T ).
+-type option( T ) :: basic_utils:option( T ).
 
 -type table( K, V ) :: map_hashtable:map_hashtable( K, V ).
 
 % Unused silencing:
--export_type([ void/0, maybe/1, table/2 ]).
+-export_type([ void/0, option/1, table/2 ]).
 
 
 % As records are so much clearer and relevant than maps in this context:
@@ -70,20 +71,20 @@
 	alg = 'RS256' :: leec:jws_algorithm(),
 
 	% For example "https://acme-staging-v02.api.letsencrypt.org/acme/new-order"
-	url :: maybe( leec:bin_uri() ),
+	url :: option( leec:bin_uri() ),
 
 	% Key identifier; e.g.
 	% "https://acme-staging-v02.api.letsencrypt.org/acme/acct/16082748"
 	%
-	kid :: maybe( leec:bin_uri() ),
+	kid :: option( leec:bin_uri() ),
 
 	% The public key used to verify the JWS, in order to authenticate future
 	% requests from the account to the ACME server:
 	%
-	jwk :: maybe( leec:tls_public_key() ),
+	jwk :: option( leec:tls_public_key() ),
 
 	% The nonce that shall be used for next sending:
-	nonce = undefined :: maybe( leec:nonce() ) } ).
+	nonce = undefined :: option( leec:nonce() ) } ).
 
 
 
@@ -100,7 +101,7 @@
 	% URIs to be called depending on operations being needed regarding
 	% certificates):
 	%
-	directory_map = undefined :: maybe( leec:directory_map() ),
+	directory_map = undefined :: option( leec:directory_map() ),
 
 	% Directory where certificates are to be stored:
 	cert_dir_path :: file_utils:bin_directory_path(),
@@ -108,18 +109,18 @@
 	% The filename (relative to cert_dir_path) of the target certificate (CSR)
 	% private key file (if any) for the domain(s) of interest.
 	%
-	cert_key_file = undefined :: maybe( file_utils:bin_file_path() ),
+	cert_key_file = undefined :: option( file_utils:bin_file_path() ),
 
 	% The absolute path to the file containing the private key of the target
 	% certificate:
 	%
-	cert_priv_key_path = undefined :: maybe( leec:cert_priv_key_file_path() ),
+	cert_priv_key_path = undefined :: option( leec:cert_priv_key_file_path() ),
 
 	% Interfacing mode; for example webroot.
-	interfacing_mode = undefined :: maybe( leec:web_interfacing_mode() ),
+	interfacing_mode = undefined :: option( leec:web_interfacing_mode() ),
 
 	% If mode is 'webroot':
-	webroot_dir_path = undefined :: maybe( file_utils:bin_directory_path() ),
+	webroot_dir_path = undefined :: option( file_utils:bin_directory_path() ),
 
 	% If mode is 'standalone':
 	port = 80 :: net_utils:tcp_port(),
@@ -131,14 +132,14 @@
 	%
 	% (might be added in the future)
 	%
-	%user_id :: maybe( term() ),
+	%user_id :: option( term() ),
 
 	% State-related data:
 
 	% Current nonce to be specified, in order to avoid any replay attack:
-	nonce = undefined :: maybe( leec:nonce() ),
+	nonce = undefined :: option( leec:nonce() ),
 
-	domain = undefined :: maybe( net_utils:bin_fqdn() ),
+	domain = undefined :: option( net_utils:bin_fqdn() ),
 
 	% The Subject Alternative Names of interest:
 	sans = [] :: [ leec:san() ],
@@ -146,25 +147,25 @@
 	% Information regarding the key of the LEEC agent; it is either created or
 	% read from any user-specified file:
 	%
-	agent_key_file_info = undefined :: maybe( leec:agent_key_file_info() ),
+	agent_key_file_info = undefined :: option( leec:agent_key_file_info() ),
 
 	% The TLS private key the LEEC agent is relying on:
-	agent_private_key = undefined :: maybe( leec:tls_private_key() ),
+	agent_private_key = undefined :: option( leec:tls_private_key() ),
 
 	% No need to record the path to the private key file of the LEEC agent, as
 	% it is a field of the previous attribute:
 	%
-	%agent_key_file_path = undefined :: maybe( file_utils:file_path() ),
+	%agent_key_file_path = undefined :: option( file_utils:file_path() ),
 
 	% JSON Web Signature of the private key of the LEEC agent:
-	jws = undefined :: maybe( leec:jws() ),
+	jws = undefined :: option( leec:jws() ),
 
 	% The public key returned by the ACME server when an account is obtained
 	% (its private key remains on the ACME server):
 	%
-	account_key :: maybe( leec:tls_public_key() ),
+	account_key :: option( leec:tls_public_key() ),
 
-	order = undefined :: maybe( leec:order_map() ),
+	order = undefined :: option( leec:order_map() ),
 
 	% Known challenges, per URI:
 	challenges = #{} :: leec:uri_challenge_map(),
@@ -207,11 +208,11 @@
 	% The filename (relative to cert_dir_path) of the target certificate (CSR)
 	% private key file (if any) for the domain(s) of interest.
 	%
-	cert_key_file = undefined :: maybe( file_utils:bin_file_path() ),
+	cert_key_file = undefined :: option( file_utils:bin_file_path() ),
 
-	domain = undefined :: maybe( net_utils:bin_fqdn() )
+	domain = undefined :: option( net_utils:bin_fqdn() )
 
 	% Email address used for registration and recovery contact:
-	% Not relevant here: email :: maybe( email_utils:bin_email_address() )
+	% Not relevant here: email :: option( email_utils:bin_email_address() )
 
  } ).

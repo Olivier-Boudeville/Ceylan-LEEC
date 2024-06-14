@@ -19,12 +19,14 @@
 %
 % This file was forked on 2020.
 
-
-% @doc This module manages <b>JSON Web Signatures</b> (JWS).
-%
-% See [https://en.wikipedia.org/wiki/JSON_Web_Signature].
-%
 -module(leec_jws).
+
+-moduledoc """
+This module manages **JSON Web Signatures** (JWS).
+
+See <https://en.wikipedia.org/wiki/JSON_Web_Signature>.
+""".
+
 
 % Original work:
 -author("Guillaume Bour (guillaume at bour dot cc)").
@@ -40,16 +42,19 @@
 -include("leec.hrl").
 
 
+
+-doc """
+Known keys:
+  - termsOfServiceAgreed :: boolean()
+  - contact :: ustring()
+""".
 -type payload() :: table( atom(), term() ).
-% Known keys:
-%  - termsOfServiceAgreed :: boolean()
-%  - contact :: ustring()
 
 
--type content() :: maybe( payload() ).
+-type content() :: option( payload() ).
 
 
-% Shorthands:
+% Type shorthands:
 
 -type jws() :: leec:jws().
 -type leec_http_state() :: leec:leec_http_state().
@@ -59,7 +64,7 @@
 
 
 
-% @doc Initializes a RSA JWS with specified TLS private key.
+-doc "Initializes a RSA JWS with specified TLS private key.".
 -spec init( tls_private_key() ) -> jws().
 init( #tls_private_key{ b64_pair={ N, E } } ) ->
 	#jws{ alg='RS256',
@@ -68,12 +73,13 @@ init( #tls_private_key{ b64_pair={ N, E } } ) ->
 
 
 
-% @doc Builds and returns the JWS body.
-%
-% See [https://www.rfc-editor.org/rfc/rfc8555.html#section-6.2].
-%
-% Content is the payload (if any).
-%
+-doc """
+Builds and returns the JWS body.
+
+See <https://www.rfc-editor.org/rfc/rfc8555.html#section-6.2>.
+
+Content is the payload (if any).
+""".
 -spec encode( tls_private_key(), jws(), content(), leec_http_state() ) ->
 					leec:binary_b64().
 encode( PrivateKey, Jws, Content,
@@ -107,10 +113,11 @@ encode( PrivateKey, Jws, Content,
 
 
 
-% @doc Builds and returns the ACME key authorization.
-%
-% See [https://www.rfc-editor.org/rfc/rfc8555.html#section-8.1].
-%
+-doc """
+Builds and returns the ACME key authorization.
+
+See <https://www.rfc-editor.org/rfc/rfc8555.html#section-8.1>.
+""".
 -spec get_key_authorization( tls_public_key(), leec:token(),
 							 leec_http_state() ) -> leec:key_auth().
 get_key_authorization( #tls_public_key{ kty=Kty, n=N, e=E }, Token,
@@ -127,9 +134,10 @@ get_key_authorization( #tls_public_key{ kty=Kty, n=N, e=E }, Token,
 
 
 
-% @doc Returns a map-based version of the specified JSON Web Signature record,
-% typically for encoding.
-%
+-doc """
+Returns a map-based version of the specified JSON Web Signature record,
+typically for encoding.
+""".
 -spec jws_to_map( jws() ) -> map().
 jws_to_map( #jws{ alg=Alg, url=MaybeUrl, kid=MaybeKid, jwk=MaybeJwk,
 				  nonce=MaybeNonce } ) ->

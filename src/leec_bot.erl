@@ -5,27 +5,31 @@
 %
 % This file was created on Monday, May 1, 2023.
 
-
-% @doc This module helps the <b>usage of certification bots</b>, in pratice
-% cerbot (see https://certbot.eff.org/pages/about).
-%
-% The prerequistes and conventions described in
-% https://leec.esperide.org/#wildcard-domain-certificates-with-the-dns-01-challenge
-% are expected to have been respected here.
-%
 -module(leec_bot).
+
+-moduledoc """
+This module helps the **usage of certification bots**, in practice cerbot (see
+<https://certbot.eff.org/pages/about>).
+
+The prerequistes and conventions described in
+<https://leec.esperide.org/#wildcard-domain-certificates-with-the-dns-01-challenge>
+are expected to have been respected here.
+""".
 
 
 % This fork:
 -author("Olivier Boudeville (olivier dot boudeville at esperide dot com)").
 
 
+-doc """
+For example a path like
+"/etc/xdg/universal-server/leec-ovh-credentials-for-foobar.org.txt".
+""".
 -type certbot_credentials_file_path() :: file_path().
-% For example a path like
-% "/etc/xdg/universal-server/leec-ovh-credentials-for-foobar.org.txt".
 
+
+-doc "A currently supported DNS provider.".
 -type dns_provider() :: leec:dns_provider().
-% A currently supported DNS provider.
 
 
 -export_type([ certbot_credentials_file_path/0, dns_provider/0 ]).
@@ -51,7 +55,7 @@
 
 
 
-% Shorthands:
+% Type shorthands:
 
 -type file_path() :: file_utils:file_path().
 -type bin_directory_path() :: file_utils:bin_directory_path().
@@ -69,12 +73,13 @@
 
 
 
-% @doc Initialises the LEEC bot for the dns-01 challenge.
-%
-% Returns the PID of (currently) a pseudo-FSM process (can be seen as a
-% single-state FSM).
-%
--spec init_bot( leec_dns_state(), maybe( bridge_spec() ) ) -> no_return().
+-doc """
+Initialises the LEEC bot for the dns-01 challenge.
+
+Returns the PID of (currently) a pseudo-FSM process (can be seen as a
+single-state FSM).
+""".
+-spec init_bot( leec_dns_state(), option( bridge_spec() ) ) -> no_return().
 init_bot( LDState, MaybeBridgeSpec ) ->
 
 	trace_bridge:register_if_not_already( MaybeBridgeSpec ),
@@ -86,7 +91,7 @@ init_bot( LDState, MaybeBridgeSpec ) ->
 
 
 
-% @doc Main loop of the LEEC bot.
+-doc "Main loop of the LEEC bot.".
 -spec bot_main_loop( leec_dns_state() ) -> no_return().
 bot_main_loop( LDState ) ->
 
@@ -145,12 +150,13 @@ bot_main_loop( LDState ) ->
 
 
 
-% @doc Actual creation of the wildcard certificate.
-%
-% A certificate for "MYDOMAIN" will be written under the directory specified in
-% the 'cert_dir_path' key, as live/MYDOMAIN/fullchain.pem. Its associated
-% private key will be stored in live/MYDOMAIN/privkey.pem.
-%
+-doc """
+Actual creation of the wildcard certificate.
+
+A certificate for "MYDOMAIN" will be written under the directory specified in
+the 'cert_dir_path' key, as live/MYDOMAIN/fullchain.pem. Its associated private
+key will be stored in live/MYDOMAIN/privkey.pem.
+""".
 -spec create_certificate( bin_domain(), dns_provider(), bin_email_address(),
 						  leec_dns_state() ) -> creation_outcome().
 create_certificate( BinDomainName, DNSProvider, BinEmailAddress,
@@ -279,18 +285,21 @@ create_certificate( BinDomainName, DNSProvider, BinEmailAddress,
 
 
 
+
 % "Static" section.
 
 
-% @doc Returns a path to the certbot executable.
-%
-% Note that any plugin for a DNS provider of choice shall have been installed.
-%
-% For example, on Arch Linux with the OVH DNS provider: `pacman -Sy certbot
-% certbot-dns-ovh'.
-%
-% Throws an exception if the executable is not found.
-%
+-doc """
+Returns a path to the certbot executable.
+
+Note that any plugin for a DNS provider of choice shall have been installed.
+
+For example, on Arch Linux with the OVH DNS provider: `pacman -Sy certbot
+certbot-dns-ovh`.
+
+Throws an exception if the executable is not found.
+
+""".
 -spec get_certbot_executable_path() -> executable_path().
 get_certbot_executable_path() ->
 	% Typically "/usr/bin/certbot":
@@ -306,9 +315,10 @@ get_certbot_executable_path() ->
 
 
 
-% @doc Returns suitable certbot options related to the DNS provider, for the
-% specified settings.
-%
+-doc """
+Returns suitable certbot options related to the DNS provider, for the specified
+settings.
+""".
 -spec get_dns_provider_options( dns_provider(), bin_domain(),
 				bin_directory_path() ) -> [ command_line_element() ].
 get_dns_provider_options( DNSProvider, BinDomainName, BinCredDir ) ->
