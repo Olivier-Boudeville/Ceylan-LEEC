@@ -60,7 +60,7 @@ For example a path like
 -type file_path() :: file_utils:file_path().
 -type bin_directory_path() :: file_utils:bin_directory_path().
 
--type command_line_element() :: shell_utils:command_line_element().
+-type command_line_element() :: cmd_line_utils:command_line_element().
 
 -type executable_path() :: executable_utils:executable_path().
 -type bin_email_address() :: email_utils:bin_email_address().
