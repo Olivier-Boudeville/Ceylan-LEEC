@@ -26,7 +26,7 @@
 
   {description, "Ceylan-LEEC, a letsencrypt.org client library for Erlang, the Ceylan fork of letsencrypt-erlang, as an OTP library application here (see http://leec.esperide.org)"},
 
-  {vsn, "1.2.4"},
+  {vsn, "1.2.5"},
 
   {registered, []},
 
