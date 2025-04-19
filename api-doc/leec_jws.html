@@ -10,86 +10,72 @@
 <hr>
 
 <h1>Module leec_jws</h1>
-<ul class="index"><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>This module manages <b>JSON Web Signatures</b> (JWS).
+<ul class="index"><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>
 
-
-<h2><a name="description">Description</a></h2><p>This module manages <b>JSON Web Signatures</b> (JWS).</p>
-
- See <a href="https://en.wikipedia.org/wiki/JSON_Web_Signature" target="_top"><code>https://en.wikipedia.org/wiki/JSON_Web_Signature</code></a>.
 
 <h2><a name="types">Data Types</a></h2>
 
 <h3 class="typedecl"><a name="type-content">content()</a></h3>
-<p><code>content() = <a href="#type-maybe">maybe</a>(<a href="#type-payload">payload()</a>)</code></p>
+<p><code>content() = <a href="#type-option" docgen-rel="seetype" docgen-href="#option/0">option</a>(<a href="#type-payload" docgen-rel="seetype" docgen-href="#payload/0">payload()</a>)</code></p>
 
 
 <h3 class="typedecl"><a name="type-jws">jws()</a></h3>
-<p><code>jws() = <a href="leec.html#type-jws">leec:jws()</a></code></p>
+<p><code>jws() = <a href="leec.html#type-jws" docgen-rel="seetype" docgen-href="leec#jws/0">leec:jws()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-leec_http_state">leec_http_state()</a></h3>
-<p><code>leec_http_state() = <a href="leec.html#type-leec_http_state">leec:leec_http_state()</a></code></p>
+<p><code>leec_http_state() = <a href="leec.html#type-leec_http_state" docgen-rel="seetype" docgen-href="leec#leec_http_state/0">leec:leec_http_state()</a></code></p>
 
 
-<h3 class="typedecl"><a name="type-maybe">maybe()</a></h3>
-<p><code>maybe(T) = <a href="basic_utils.html#type-maybe">basic_utils:maybe</a>(T)</code></p>
+<h3 class="typedecl"><a name="type-option">option()</a></h3>
+<p><code>option(T) = <a href="basic_utils.html#type-option" docgen-rel="seetype" docgen-href="basic_utils#option/0">basic_utils:option</a>(T)</code></p>
 
 
 <h3 class="typedecl"><a name="type-payload">payload()</a></h3>
-<p><code>payload() = <a href="#type-table">table</a>(atom(), term())</code></p>
-<p> Known keys:
-  - termsOfServiceAgreed :: boolean()
-  - contact :: ustring()</p>
+<p><code>payload() = <a href="#type-table" docgen-rel="seetype" docgen-href="#table/0">table</a>(atom(), term())</code></p>
+
 
 <h3 class="typedecl"><a name="type-table">table()</a></h3>
-<p><code>table(K, V) = <a href="map_hashtable.html#type-map_hashtable">map_hashtable:map_hashtable</a>(K, V)</code></p>
+<p><code>table(K, V) = <a href="map_hashtable.html#type-map_hashtable" docgen-rel="seetype" docgen-href="map_hashtable#map_hashtable/0">map_hashtable:map_hashtable</a>(K, V)</code></p>
 
 
 <h3 class="typedecl"><a name="type-tls_private_key">tls_private_key()</a></h3>
-<p><code>tls_private_key() = <a href="leec.html#type-tls_private_key">leec:tls_private_key()</a></code></p>
+<p><code>tls_private_key() = <a href="leec.html#type-tls_private_key" docgen-rel="seetype" docgen-href="leec#tls_private_key/0">leec:tls_private_key()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-tls_public_key">tls_public_key()</a></h3>
-<p><code>tls_public_key() = <a href="leec.html#type-tls_public_key">leec:tls_public_key()</a></code></p>
+<p><code>tls_public_key() = <a href="leec.html#type-tls_public_key" docgen-rel="seetype" docgen-href="leec#tls_public_key/0">leec:tls_public_key()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-void">void()</a></h3>
-<p><code>void() = <a href="basic_utils.html#type-void">basic_utils:void()</a></code></p>
+<p><code>void() = <a href="basic_utils.html#type-void" docgen-rel="seetype" docgen-href="basic_utils#void/0">basic_utils:void()</a></code></p>
 
 
 <h2><a name="index">Function Index</a></h2>
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#encode-4">encode/4</a></td><td>Builds and returns the JWS body.</td></tr>
-<tr><td valign="top"><a href="#get_key_authorization-3">get_key_authorization/3</a></td><td>Builds and returns the ACME key authorization.</td></tr>
-<tr><td valign="top"><a href="#init-1">init/1</a></td><td>Initializes a RSA JWS with specified TLS private key.</td></tr>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#encode-4">encode/4</a></td><td></td></tr>
+<tr><td valign="top"><a href="#get_key_authorization-3">get_key_authorization/3</a></td><td></td></tr>
+<tr><td valign="top"><a href="#init-1">init/1</a></td><td></td></tr>
 </table>
 
 <h2><a name="functions">Function Details</a></h2>
 
 <h3 class="function"><a name="encode-4">encode/4</a></h3>
 <div class="spec">
-<p><code>encode(PrivateKey::<a href="#type-tls_private_key">tls_private_key()</a>, Jws::<a href="#type-jws">jws()</a>, Content::<a href="#type-content">content()</a>, Leec_http_state::<a href="#type-leec_http_state">leec_http_state()</a>) -&gt; <a href="leec.html#type-binary_b64">leec:binary_b64()</a></code><br></p>
+<p><code>encode(PrivateKey::<a href="#type-tls_private_key" docgen-rel="seetype" docgen-href="#tls_private_key/0">tls_private_key()</a>, Jws::<a href="#type-jws" docgen-rel="seetype" docgen-href="#jws/0">jws()</a>, Content::<a href="#type-content" docgen-rel="seetype" docgen-href="#content/0">content()</a>, Leec_http_state::<a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>) -&gt; <a href="leec.html#type-binary_b64" docgen-rel="seetype" docgen-href="leec#binary_b64/0">leec:binary_b64()</a></code><br></p>
 <p> </p>
-</div><p><p>Builds and returns the JWS body.</p>
-
- <p>See <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-6.2" target="_top"><code>https://www.rfc-editor.org/rfc/rfc8555.html#section-6.2</code></a>.</p>
-
- Content is the payload (if any).
-</p>
+</div>
 
 <h3 class="function"><a name="get_key_authorization-3">get_key_authorization/3</a></h3>
 <div class="spec">
-<p><code>get_key_authorization(Tls_public_key::<a href="#type-tls_public_key">tls_public_key()</a>, Token::<a href="leec.html#type-token">leec:token()</a>, Leec_http_state::<a href="#type-leec_http_state">leec_http_state()</a>) -&gt; <a href="leec.html#type-key_auth">leec:key_auth()</a></code><br></p>
+<p><code>get_key_authorization(Tls_public_key::<a href="#type-tls_public_key" docgen-rel="seetype" docgen-href="#tls_public_key/0">tls_public_key()</a>, Token::<a href="leec.html#type-token" docgen-rel="seetype" docgen-href="leec#token/0">leec:token()</a>, Leec_http_state::<a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>) -&gt; <a href="leec.html#type-key_auth" docgen-rel="seetype" docgen-href="leec#key_auth/0">leec:key_auth()</a></code><br></p>
 <p> </p>
-</div><p><p>Builds and returns the ACME key authorization.</p>
-
- See <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-8.1" target="_top"><code>https://www.rfc-editor.org/rfc/rfc8555.html#section-8.1</code></a>.
-</p>
+</div>
 
 <h3 class="function"><a name="init-1">init/1</a></h3>
 <div class="spec">
-<p><code>init(Tls_private_key::<a href="#type-tls_private_key">tls_private_key()</a>) -&gt; <a href="#type-jws">jws()</a></code><br></p>
+<p><code>init(Tls_private_key::<a href="#type-tls_private_key" docgen-rel="seetype" docgen-href="#tls_private_key/0">tls_private_key()</a>) -&gt; <a href="#type-jws" docgen-rel="seetype" docgen-href="#jws/0">jws()</a></code><br></p>
 <p> </p>
-</div><p>Initializes a RSA JWS with specified TLS private key.</p>
+</div>
 <hr>
 
 <div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>

@@ -10,86 +10,65 @@
 <hr>
 
 <h1>Module leec_bot</h1>
-<ul class="index"><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>This module helps the <b>usage of certification bots</b>, in pratice 
-cerbot (see https://certbot.eff.org/pages/about).
+<ul class="index"><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>
 
-
-<h2><a name="description">Description</a></h2><p>This module helps the <b>usage of certification bots</b>, in pratice 
-cerbot (see https://certbot.eff.org/pages/about).</p>
-
- The prerequistes and conventions described in
- https://leec.esperide.org/#wildcard-domain-certificates-with-the-dns-01-challenge
- are expected to have been respected here.
 
 <h2><a name="types">Data Types</a></h2>
 
 <h3 class="typedecl"><a name="type-bridge_spec">bridge_spec()</a></h3>
-<p><code>bridge_spec() = <a href="trace_bridge.html#type-bridge_spec">trace_bridge:bridge_spec()</a></code></p>
+<p><code>bridge_spec() = <a href="trace_bridge.html#type-bridge_spec" docgen-rel="seetype" docgen-href="trace_bridge#bridge_spec/0">trace_bridge:bridge_spec()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-certbot_credentials_file_path">certbot_credentials_file_path()</a></h3>
-<p><code>certbot_credentials_file_path() = <a href="#type-file_path">file_path()</a></code></p>
-<p> For example a path like
- "/etc/xdg/universal-server/leec-ovh-credentials-for-foobar.org.txt".</p>
+<p><code>certbot_credentials_file_path() = <a href="#type-file_path" docgen-rel="seetype" docgen-href="#file_path/0">file_path()</a></code></p>
+
 
 <h3 class="typedecl"><a name="type-dns_provider">dns_provider()</a></h3>
-<p><code>dns_provider() = <a href="leec.html#type-dns_provider">leec:dns_provider()</a></code></p>
-<p> A currently supported DNS provider.</p>
+<p><code>dns_provider() = <a href="leec.html#type-dns_provider" docgen-rel="seetype" docgen-href="leec#dns_provider/0">leec:dns_provider()</a></code></p>
+
 
 <h3 class="typedecl"><a name="type-executable_path">executable_path()</a></h3>
-<p><code>executable_path() = <a href="executable_utils.html#type-executable_path">executable_utils:executable_path()</a></code></p>
+<p><code>executable_path() = <a href="executable_utils.html#type-executable_path" docgen-rel="seetype" docgen-href="executable_utils#executable_path/0">executable_utils:executable_path()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-file_path">file_path()</a></h3>
-<p><code>file_path() = <a href="file_utils.html#type-file_path">file_utils:file_path()</a></code></p>
+<p><code>file_path() = <a href="file_utils.html#type-file_path" docgen-rel="seetype" docgen-href="file_utils#file_path/0">file_utils:file_path()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-leec_dns_state">leec_dns_state()</a></h3>
-<p><code>leec_dns_state() = <a href="leec.html#type-leec_dns_state">leec:leec_dns_state()</a></code></p>
+<p><code>leec_dns_state() = <a href="leec.html#type-leec_dns_state" docgen-rel="seetype" docgen-href="leec#leec_dns_state/0">leec:leec_dns_state()</a></code></p>
 
 
-<h3 class="typedecl"><a name="type-maybe">maybe()</a></h3>
-<p><code>maybe(T) = <a href="basic_utils.html#type-maybe">basic_utils:maybe</a>(T)</code></p>
+<h3 class="typedecl"><a name="type-option">option()</a></h3>
+<p><code>option(T) = <a href="basic_utils.html#type-option" docgen-rel="seetype" docgen-href="basic_utils#option/0">basic_utils:option</a>(T)</code></p>
 
 
 <h3 class="typedecl"><a name="type-table">table()</a></h3>
-<p><code>table(K, V) = <a href="map_hashtable.html#type-map_hashtable">map_hashtable:map_hashtable</a>(K, V)</code></p>
+<p><code>table(K, V) = <a href="map_hashtable.html#type-map_hashtable" docgen-rel="seetype" docgen-href="map_hashtable#map_hashtable/0">map_hashtable:map_hashtable</a>(K, V)</code></p>
 
 
 <h3 class="typedecl"><a name="type-void">void()</a></h3>
-<p><code>void() = <a href="basic_utils.html#type-void">basic_utils:void()</a></code></p>
+<p><code>void() = <a href="basic_utils.html#type-void" docgen-rel="seetype" docgen-href="basic_utils#void/0">basic_utils:void()</a></code></p>
 
 
 <h2><a name="index">Function Index</a></h2>
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#get_certbot_executable_path-0">get_certbot_executable_path/0</a></td><td>Returns a path to the certbot executable.</td></tr>
-<tr><td valign="top"><a href="#init_bot-2">init_bot/2</a></td><td>Initialises the LEEC bot for the dns-01 challenge.</td></tr>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#get_certbot_executable_path-0">get_certbot_executable_path/0</a></td><td></td></tr>
+<tr><td valign="top"><a href="#init_bot-2">init_bot/2</a></td><td></td></tr>
 </table>
 
 <h2><a name="functions">Function Details</a></h2>
 
 <h3 class="function"><a name="get_certbot_executable_path-0">get_certbot_executable_path/0</a></h3>
 <div class="spec">
-<p><code>get_certbot_executable_path() -&gt; <a href="#type-executable_path">executable_path()</a></code><br></p>
+<p><code>get_certbot_executable_path() -&gt; <a href="#type-executable_path" docgen-rel="seetype" docgen-href="#executable_path/0">executable_path()</a></code><br></p>
 <p> </p>
-</div><p><p>Returns a path to the certbot executable.</p>
-
- <p>Note that any plugin for a DNS provider of choice shall have been installed.</p>
-
- <p>For example, on Arch Linux with the OVH DNS provider: <code>pacman -Sy certbot
- certbot-dns-ovh</code>.</p>
-
- Throws an exception if the executable is not found.
-</p>
+</div>
 
 <h3 class="function"><a name="init_bot-2">init_bot/2</a></h3>
 <div class="spec">
-<p><code>init_bot(LDState::<a href="#type-leec_dns_state">leec_dns_state()</a>, MaybeBridgeSpec::<a href="#type-maybe">maybe</a>(<a href="#type-bridge_spec">bridge_spec()</a>)) -&gt; no_return()</code><br></p>
+<p><code>init_bot(LDState::<a href="#type-leec_dns_state" docgen-rel="seetype" docgen-href="#leec_dns_state/0">leec_dns_state()</a>, MaybeBridgeSpec::<a href="#type-option" docgen-rel="seetype" docgen-href="#option/0">option</a>(<a href="#type-bridge_spec" docgen-rel="seetype" docgen-href="#bridge_spec/0">bridge_spec()</a>)) -&gt; no_return()</code><br></p>
 <p> </p>
-</div><p><p>Initialises the LEEC bot for the dns-01 challenge.</p>
-
- Returns the PID of (currently) a pseudo-FSM process (can be seen as a
- single-state FSM).
-</p>
+</div>
 <hr>
 
 <div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>

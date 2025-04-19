@@ -10,238 +10,175 @@
 <hr>
 
 <h1>Module leec_api</h1>
-<ul class="index"><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>This module centralises the main functions regarding the <b>API used to
- interact with ACME servers</b>.
+<ul class="index"><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>
 
-
-<h2><a name="description">Description</a></h2>This module centralises the main functions regarding the <b>API used to
- interact with ACME servers</b>.
 
 <h2><a name="types">Data Types</a></h2>
 
 <h3 class="typedecl"><a name="type-bin_certificate">bin_certificate()</a></h3>
-<p><code>bin_certificate() = <a href="leec.html#type-bin_certificate">leec:bin_certificate()</a></code></p>
+<p><code>bin_certificate() = <a href="leec.html#type-bin_certificate" docgen-rel="seetype" docgen-href="leec#bin_certificate/0">leec:bin_certificate()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-bin_csr_key">bin_csr_key()</a></h3>
-<p><code>bin_csr_key() = <a href="leec.html#type-bin_csr_key">leec:bin_csr_key()</a></code></p>
+<p><code>bin_csr_key() = <a href="leec.html#type-bin_csr_key" docgen-rel="seetype" docgen-href="leec#bin_csr_key/0">leec:bin_csr_key()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-bin_domain">bin_domain()</a></h3>
-<p><code>bin_domain() = <a href="leec.html#type-bin_domain">leec:bin_domain()</a></code></p>
+<p><code>bin_domain() = <a href="leec.html#type-bin_domain" docgen-rel="seetype" docgen-href="leec#bin_domain/0">leec:bin_domain()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-bin_string">bin_string()</a></h3>
-<p><code>bin_string() = <a href="text_utils.html#type-bin_string">text_utils:bin_string()</a></code></p>
+<p><code>bin_string() = <a href="text_utils.html#type-bin_string" docgen-rel="seetype" docgen-href="text_utils#bin_string/0">text_utils:bin_string()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-bin_uri">bin_uri()</a></h3>
-<p><code>bin_uri() = <a href="web_utils.html#type-bin_uri">web_utils:bin_uri()</a></code></p>
+<p><code>bin_uri() = <a href="web_utils.html#type-bin_uri" docgen-rel="seetype" docgen-href="web_utils#bin_uri/0">web_utils:bin_uri()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-cert_req_option_map">cert_req_option_map()</a></h3>
-<p><code>cert_req_option_map() = <a href="leec.html#type-cert_req_option_map">leec:cert_req_option_map()</a></code></p>
+<p><code>cert_req_option_map() = <a href="leec.html#type-cert_req_option_map" docgen-rel="seetype" docgen-href="leec#cert_req_option_map/0">leec:cert_req_option_map()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-challenge">challenge()</a></h3>
-<p><code>challenge() = <a href="leec.html#type-challenge">leec:challenge()</a></code></p>
+<p><code>challenge() = <a href="leec.html#type-challenge" docgen-rel="seetype" docgen-href="leec#challenge/0">leec:challenge()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-directory_map">directory_map()</a></h3>
-<p><code>directory_map() = <a href="leec.html#type-directory_map">leec:directory_map()</a></code></p>
+<p><code>directory_map() = <a href="leec.html#type-directory_map" docgen-rel="seetype" docgen-href="leec#directory_map/0">leec:directory_map()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-environment">environment()</a></h3>
-<p><code>environment() = <a href="leec.html#type-environment">leec:environment()</a></code></p>
+<p><code>environment() = <a href="leec.html#type-environment" docgen-rel="seetype" docgen-href="leec#environment/0">leec:environment()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-json_map_decoded">json_map_decoded()</a></h3>
-<p><code>json_map_decoded() = <a href="leec.html#type-json_map_decoded">leec:json_map_decoded()</a></code></p>
+<p><code>json_map_decoded() = <a href="leec.html#type-json_map_decoded" docgen-rel="seetype" docgen-href="leec#json_map_decoded/0">leec:json_map_decoded()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-jws">jws()</a></h3>
-<p><code>jws() = <a href="leec.html#type-jws">leec:jws()</a></code></p>
+<p><code>jws() = <a href="leec.html#type-jws" docgen-rel="seetype" docgen-href="leec#jws/0">leec:jws()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-leec_http_state">leec_http_state()</a></h3>
-<p><code>leec_http_state() = <a href="leec.html#type-leec_http_state">leec:leec_http_state()</a></code></p>
-
-
-<h3 class="typedecl"><a name="type-maybe">maybe()</a></h3>
-<p><code>maybe(T) = <a href="basic_utils.html#type-maybe">basic_utils:maybe</a>(T)</code></p>
+<p><code>leec_http_state() = <a href="leec.html#type-leec_http_state" docgen-rel="seetype" docgen-href="leec#leec_http_state/0">leec:leec_http_state()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-nonce">nonce()</a></h3>
-<p><code>nonce() = <a href="web_utils.html#type-nonce">web_utils:nonce()</a></code></p>
+<p><code>nonce() = <a href="web_utils.html#type-nonce" docgen-rel="seetype" docgen-href="web_utils#nonce/0">web_utils:nonce()</a></code></p>
+
+
+<h3 class="typedecl"><a name="type-option">option()</a></h3>
+<p><code>option(T) = <a href="basic_utils.html#type-option" docgen-rel="seetype" docgen-href="basic_utils#option/0">basic_utils:option</a>(T)</code></p>
 
 
 <h3 class="typedecl"><a name="type-order_map">order_map()</a></h3>
-<p><code>order_map() = <a href="leec.html#type-order_map">leec:order_map()</a></code></p>
+<p><code>order_map() = <a href="leec.html#type-order_map" docgen-rel="seetype" docgen-href="leec#order_map/0">leec:order_map()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-table">table()</a></h3>
-<p><code>table(K, V) = <a href="map_hashtable.html#type-map_hashtable">map_hashtable:map_hashtable</a>(K, V)</code></p>
+<p><code>table(K, V) = <a href="map_hashtable.html#type-map_hashtable" docgen-rel="seetype" docgen-href="map_hashtable#map_hashtable/0">map_hashtable:map_hashtable</a>(K, V)</code></p>
 
 
 <h3 class="typedecl"><a name="type-tcp_connection_cache">tcp_connection_cache()</a></h3>
-<p><code>tcp_connection_cache() = <a href="leec.html#type-tcp_connection_cache">leec:tcp_connection_cache()</a></code></p>
+<p><code>tcp_connection_cache() = <a href="leec.html#type-tcp_connection_cache" docgen-rel="seetype" docgen-href="leec#tcp_connection_cache/0">leec:tcp_connection_cache()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-tls_private_key">tls_private_key()</a></h3>
-<p><code>tls_private_key() = <a href="leec.html#type-tls_private_key">leec:tls_private_key()</a></code></p>
+<p><code>tls_private_key() = <a href="leec.html#type-tls_private_key" docgen-rel="seetype" docgen-href="leec#tls_private_key/0">leec:tls_private_key()</a></code></p>
 
 
 <h3 class="typedecl"><a name="type-void">void()</a></h3>
-<p><code>void() = <a href="basic_utils.html#type-void">basic_utils:void()</a></code></p>
+<p><code>void() = <a href="basic_utils.html#type-void" docgen-rel="seetype" docgen-href="basic_utils#void/0">basic_utils:void()</a></code></p>
 
 
 <h2><a name="index">Function Index</a></h2>
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#binary_to_status-1">binary_to_status/1</a></td><td>Returns the status corresponding to specified binary string.</td></tr>
-<tr><td valign="top"><a href="#close_tcp_connections-1">close_tcp_connections/1</a></td><td>Closes all pending (cached) TCP connections.</td></tr>
-<tr><td valign="top"><a href="#finalize_order-6">finalize_order/6</a></td><td>Finalizes the order once a challenge has been validated.</td></tr>
-<tr><td valign="top"><a href="#get_acme_account-5">get_acme_account/5</a></td><td>Requests an account obtained (indirectly) for specified private key.</td></tr>
-<tr><td valign="top"><a href="#get_certificate-5">get_certificate/5</a></td><td>Downloads certificate for finalized order and returns itself.</td></tr>
-<tr><td valign="top"><a href="#get_directory_map-3">get_directory_map/3</a></td><td>Returns a directory map listing all ACME protocol URLs.</td></tr>
-<tr><td valign="top"><a href="#get_nonce-3">get_nonce/3</a></td><td>Gets and returns a fresh nonce by using the corresponding URI.</td></tr>
-<tr><td valign="top"><a href="#get_order-5">get_order/5</a></td><td>Orders a new certificate from the ACME server.</td></tr>
-<tr><td valign="top"><a href="#get_tcp_connection-4">get_tcp_connection/4</a></td><td>Returns a suitable TCP connection.</td></tr>
-<tr><td valign="top"><a href="#notify_ready_for_challenge-5">notify_ready_for_challenge/5</a></td><td>Notifies the ACME server that we are ready for challenge validation.</td></tr>
-<tr><td valign="top"><a href="#request_authorization-5">request_authorization/5</a></td><td>Requests authorization for given identifier.</td></tr>
-<tr><td valign="top"><a href="#request_new_certificate-6">request_new_certificate/6</a></td><td>Requests (orders from ACME) a new certificate (of DNS type).</td></tr>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#binary_to_status-1">binary_to_status/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#close_tcp_connections-1">close_tcp_connections/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#finalize_order-6">finalize_order/6</a></td><td></td></tr>
+<tr><td valign="top"><a href="#get_acme_account-5">get_acme_account/5</a></td><td></td></tr>
+<tr><td valign="top"><a href="#get_certificate-5">get_certificate/5</a></td><td></td></tr>
+<tr><td valign="top"><a href="#get_directory_map-3">get_directory_map/3</a></td><td></td></tr>
+<tr><td valign="top"><a href="#get_nonce-3">get_nonce/3</a></td><td></td></tr>
+<tr><td valign="top"><a href="#get_order-5">get_order/5</a></td><td></td></tr>
+<tr><td valign="top"><a href="#get_tcp_connection-4">get_tcp_connection/4</a></td><td></td></tr>
+<tr><td valign="top"><a href="#notify_ready_for_challenge-5">notify_ready_for_challenge/5</a></td><td></td></tr>
+<tr><td valign="top"><a href="#request_authorization-5">request_authorization/5</a></td><td></td></tr>
+<tr><td valign="top"><a href="#request_new_certificate-6">request_new_certificate/6</a></td><td></td></tr>
 </table>
 
 <h2><a name="functions">Function Details</a></h2>
 
 <h3 class="function"><a name="binary_to_status-1">binary_to_status/1</a></h3>
 <div class="spec">
-<p><code>binary_to_status(InvalidBinStatus::<a href="#type-bin_string">bin_string()</a>) -&gt; <a href="leec.html#type-status">leec:status()</a></code><br></p>
+<p><code>binary_to_status(InvalidBinStatus::<a href="#type-bin_string" docgen-rel="seetype" docgen-href="#bin_string/0">bin_string()</a>) -&gt; <a href="leec.html#type-status" docgen-rel="seetype" docgen-href="leec#status/0">leec:status()</a></code><br></p>
 <p> </p>
-</div><p>Returns the status corresponding to specified binary string.</p>
+</div>
 
 <h3 class="function"><a name="close_tcp_connections-1">close_tcp_connections/1</a></h3>
 <div class="spec">
-<p><code>close_tcp_connections(TCPCache::<a href="#type-tcp_connection_cache">tcp_connection_cache()</a>) -&gt; <a href="#type-void">void()</a></code><br></p>
+<p><code>close_tcp_connections(TCPCache::<a href="#type-tcp_connection_cache" docgen-rel="seetype" docgen-href="#tcp_connection_cache/0">tcp_connection_cache()</a>) -&gt; <a href="#type-void" docgen-rel="seetype" docgen-href="#void/0">void()</a></code><br></p>
 <p> </p>
-</div><p>Closes all pending (cached) TCP connections.</p>
+</div>
 
 <h3 class="function"><a name="finalize_order-6">finalize_order/6</a></h3>
 <div class="spec">
-<p><code>finalize_order(OrderDirMap::<a href="#type-order_map">order_map()</a>, Csr::<a href="#type-bin_csr_key">bin_csr_key()</a>, PrivKey::<a href="#type-tls_private_key">tls_private_key()</a>, Jws::<a href="#type-jws">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state">leec_http_state()</a>) -&gt; {{<a href="#type-json_map_decoded">json_map_decoded()</a>, <a href="#type-bin_uri">bin_uri()</a>, <a href="#type-nonce">nonce()</a>}, <a href="#type-leec_http_state">leec_http_state()</a>}</code><br></p>
+<p><code>finalize_order(OrderDirMap::<a href="#type-order_map" docgen-rel="seetype" docgen-href="#order_map/0">order_map()</a>, Csr::<a href="#type-bin_csr_key" docgen-rel="seetype" docgen-href="#bin_csr_key/0">bin_csr_key()</a>, PrivKey::<a href="#type-tls_private_key" docgen-rel="seetype" docgen-href="#tls_private_key/0">tls_private_key()</a>, Jws::<a href="#type-jws" docgen-rel="seetype" docgen-href="#jws/0">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map" docgen-rel="seetype" docgen-href="#cert_req_option_map/0">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>) -&gt; {{<a href="#type-json_map_decoded" docgen-rel="seetype" docgen-href="#json_map_decoded/0">json_map_decoded()</a>, <a href="#type-bin_uri" docgen-rel="seetype" docgen-href="#bin_uri/0">bin_uri()</a>, <a href="#type-nonce" docgen-rel="seetype" docgen-href="#nonce/0">nonce()</a>}, <a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>}</code><br></p>
 <p> </p>
-</div><p><p>Finalizes the order once a challenge has been validated.</p>
-
- Refer to <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4" target="_top"><code>https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4</code></a>.
-</p>
+</div>
 
 <h3 class="function"><a name="get_acme_account-5">get_acme_account/5</a></h3>
 <div class="spec">
-<p><code>get_acme_account(DirMap::<a href="#type-directory_map">directory_map()</a>, PrivKey::<a href="#type-tls_private_key">tls_private_key()</a>, Jws::<a href="#type-jws">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state">leec_http_state()</a>) -&gt; {{<a href="#type-json_map_decoded">json_map_decoded()</a>, <a href="#type-bin_uri">bin_uri()</a>, <a href="#type-nonce">nonce()</a>}, <a href="#type-leec_http_state">leec_http_state()</a>}</code><br></p>
+<p><code>get_acme_account(DirMap::<a href="#type-directory_map" docgen-rel="seetype" docgen-href="#directory_map/0">directory_map()</a>, PrivKey::<a href="#type-tls_private_key" docgen-rel="seetype" docgen-href="#tls_private_key/0">tls_private_key()</a>, Jws::<a href="#type-jws" docgen-rel="seetype" docgen-href="#jws/0">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map" docgen-rel="seetype" docgen-href="#cert_req_option_map/0">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>) -&gt; {{<a href="#type-json_map_decoded" docgen-rel="seetype" docgen-href="#json_map_decoded/0">json_map_decoded()</a>, <a href="#type-bin_uri" docgen-rel="seetype" docgen-href="#bin_uri/0">bin_uri()</a>, <a href="#type-nonce" docgen-rel="seetype" docgen-href="#nonce/0">nonce()</a>}, <a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>}</code><br></p>
 <p> </p>
-</div><p><p>Requests an account obtained (indirectly) for specified private key.</p>
-
- <p>Refer to <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-7.3.1" target="_top"><code>https://www.rfc-editor.org/rfc/rfc8555.html#section-7.3.1</code></a>.</p>
-
- <p>This is either a new account or one that was already created by this FSM.</p>
-
- <p>Returns {Response, Location, Nonce}, where:</p>
-
- <p>- Response is json (decoded as map)</p>
-
- <p>- Location is the URL corresponding to the created ACME account</p>
-
- - Nonce is a new valid replay-nonce
-</p>
+</div>
 
 <h3 class="function"><a name="get_certificate-5">get_certificate/5</a></h3>
 <div class="spec">
-<p><code>get_certificate(X1::<a href="#type-order_map">order_map()</a>, Key::<a href="#type-tls_private_key">tls_private_key()</a>, Jws::<a href="#type-jws">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state">leec_http_state()</a>) -&gt; {{<a href="#type-bin_certificate">bin_certificate()</a>, <a href="#type-nonce">nonce()</a>}, <a href="#type-leec_http_state">leec_http_state()</a>}</code><br></p>
+<p><code>get_certificate(X1::<a href="#type-order_map" docgen-rel="seetype" docgen-href="#order_map/0">order_map()</a>, Key::<a href="#type-tls_private_key" docgen-rel="seetype" docgen-href="#tls_private_key/0">tls_private_key()</a>, Jws::<a href="#type-jws" docgen-rel="seetype" docgen-href="#jws/0">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map" docgen-rel="seetype" docgen-href="#cert_req_option_map/0">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>) -&gt; {{<a href="#type-bin_certificate" docgen-rel="seetype" docgen-href="#bin_certificate/0">bin_certificate()</a>, <a href="#type-nonce" docgen-rel="seetype" docgen-href="#nonce/0">nonce()</a>}, <a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>}</code><br></p>
 <p> </p>
-</div><p><p>Downloads certificate for finalized order and returns itself.</p>
-
- Refer to <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.2" target="_top"><code>https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.2</code></a>.
-</p>
+</div>
 
 <h3 class="function"><a name="get_directory_map-3">get_directory_map/3</a></h3>
 <div class="spec">
-<p><code>get_directory_map(Env::<a href="#type-environment">environment()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state">leec_http_state()</a>) -&gt; {<a href="leec.html#type-directory_map">leec:directory_map()</a>, <a href="#type-leec_http_state">leec_http_state()</a>}</code><br></p>
+<p><code>get_directory_map(Env::<a href="#type-environment" docgen-rel="seetype" docgen-href="#environment/0">environment()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map" docgen-rel="seetype" docgen-href="#cert_req_option_map/0">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>) -&gt; {<a href="leec.html#type-directory_map" docgen-rel="seetype" docgen-href="leec#directory_map/0">leec:directory_map()</a>, <a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>}</code><br></p>
 <p> </p>
-</div><p><p>Returns a directory map listing all ACME protocol URLs.</p>
-
- Refer to <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-7.1.1" target="_top"><code>https://www.rfc-editor.org/rfc/rfc8555.html#section-7.1.1</code></a>.
-</p>
+</div>
 
 <h3 class="function"><a name="get_nonce-3">get_nonce/3</a></h3>
 <div class="spec">
-<p><code>get_nonce(DirMap::<a href="#type-directory_map">directory_map()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state">leec_http_state()</a>) -&gt; {<a href="#type-nonce">nonce()</a>, <a href="#type-leec_http_state">leec_http_state()</a>}</code><br></p>
+<p><code>get_nonce(DirMap::<a href="#type-directory_map" docgen-rel="seetype" docgen-href="#directory_map/0">directory_map()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map" docgen-rel="seetype" docgen-href="#cert_req_option_map/0">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>) -&gt; {<a href="#type-nonce" docgen-rel="seetype" docgen-href="#nonce/0">nonce()</a>, <a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>}</code><br></p>
 <p> </p>
-</div><p><p>Gets and returns a fresh nonce by using the corresponding URI.</p>
-
- Refer to <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-7.2" target="_top"><code>https://www.rfc-editor.org/rfc/rfc8555.html#section-7.2</code></a>.
-</p>
+</div>
 
 <h3 class="function"><a name="get_order-5">get_order/5</a></h3>
 <div class="spec">
-<p><code>get_order(BinUri::<a href="#type-bin_uri">bin_uri()</a>, PrivKey::<a href="#type-tls_private_key">tls_private_key()</a>, Jws::<a href="#type-jws">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state">leec_http_state()</a>) -&gt; {{<a href="#type-json_map_decoded">json_map_decoded()</a>, <a href="#type-bin_uri">bin_uri()</a>, <a href="#type-nonce">nonce()</a>}, <a href="#type-leec_http_state">leec_http_state()</a>}</code><br></p>
+<p><code>get_order(BinUri::<a href="#type-bin_uri" docgen-rel="seetype" docgen-href="#bin_uri/0">bin_uri()</a>, PrivKey::<a href="#type-tls_private_key" docgen-rel="seetype" docgen-href="#tls_private_key/0">tls_private_key()</a>, Jws::<a href="#type-jws" docgen-rel="seetype" docgen-href="#jws/0">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map" docgen-rel="seetype" docgen-href="#cert_req_option_map/0">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>) -&gt; {{<a href="#type-json_map_decoded" docgen-rel="seetype" docgen-href="#json_map_decoded/0">json_map_decoded()</a>, <a href="#type-bin_uri" docgen-rel="seetype" docgen-href="#bin_uri/0">bin_uri()</a>, <a href="#type-nonce" docgen-rel="seetype" docgen-href="#nonce/0">nonce()</a>}, <a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>}</code><br></p>
 <p> </p>
-</div><p>Orders a new certificate from the ACME server.</p>
+</div>
 
 <h3 class="function"><a name="get_tcp_connection-4">get_tcp_connection/4</a></h3>
 <div class="spec">
-<p><code>get_tcp_connection(Proto::<a href="web_utils.html#type-protocol_type">web_utils:protocol_type()</a>, Host::<a href="net_utils.html#type-string_host_name">net_utils:string_host_name()</a>, Port::<a href="net_utils.html#type-tcp_port">net_utils:tcp_port()</a>, TCPCache::<a href="#type-tcp_connection_cache">tcp_connection_cache()</a>) -&gt; {<a href="shotgun.html#type-connection">shotgun:connection()</a>, <a href="#type-tcp_connection_cache">tcp_connection_cache()</a>}</code><br></p>
+<p><code>get_tcp_connection(Proto::<a href="web_utils.html#type-protocol_type" docgen-rel="seetype" docgen-href="web_utils#protocol_type/0">web_utils:protocol_type()</a>, Host::<a href="net_utils.html#type-string_host_name" docgen-rel="seetype" docgen-href="net_utils#string_host_name/0">net_utils:string_host_name()</a>, Port::<a href="net_utils.html#type-tcp_port" docgen-rel="seetype" docgen-href="net_utils#tcp_port/0">net_utils:tcp_port()</a>, TCPCache::<a href="#type-tcp_connection_cache" docgen-rel="seetype" docgen-href="#tcp_connection_cache/0">tcp_connection_cache()</a>) -&gt; {<a href="shotgun.html#type-connection" docgen-rel="seetype" docgen-href="shotgun#connection/0">shotgun:connection()</a>, <a href="#type-tcp_connection_cache" docgen-rel="seetype" docgen-href="#tcp_connection_cache/0">tcp_connection_cache()</a>}</code><br></p>
 <p> </p>
-</div><p><p>Returns a suitable TCP connection.</p>
-
- If a connection to the given Proto://Host:Port is already opened, returns it,
- otherwise returns a newly opened connection.
-</p>
+</div>
 
 <h3 class="function"><a name="notify_ready_for_challenge-5">notify_ready_for_challenge/5</a></h3>
 <div class="spec">
-<p><code>notify_ready_for_challenge(Challenge::<a href="#type-challenge">challenge()</a>, PrivKey::<a href="#type-tls_private_key">tls_private_key()</a>, Jws::<a href="#type-jws">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state">leec_http_state()</a>) -&gt; {{<a href="#type-json_map_decoded">json_map_decoded()</a>, <a href="#type-bin_uri">bin_uri()</a>, <a href="#type-nonce">nonce()</a>}, <a href="#type-leec_http_state">leec_http_state()</a>}</code><br></p>
+<p><code>notify_ready_for_challenge(Challenge::<a href="#type-challenge" docgen-rel="seetype" docgen-href="#challenge/0">challenge()</a>, PrivKey::<a href="#type-tls_private_key" docgen-rel="seetype" docgen-href="#tls_private_key/0">tls_private_key()</a>, Jws::<a href="#type-jws" docgen-rel="seetype" docgen-href="#jws/0">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map" docgen-rel="seetype" docgen-href="#cert_req_option_map/0">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>) -&gt; {{<a href="#type-json_map_decoded" docgen-rel="seetype" docgen-href="#json_map_decoded/0">json_map_decoded()</a>, <a href="#type-bin_uri" docgen-rel="seetype" docgen-href="#bin_uri/0">bin_uri()</a>, <a href="#type-nonce" docgen-rel="seetype" docgen-href="#nonce/0">nonce()</a>}, <a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>}</code><br></p>
 <p> </p>
-</div><p><p>Notifies the ACME server that we are ready for challenge validation.</p>
-
- <p>Refer to <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-7.5.1" target="_top"><code>https://www.rfc-editor.org/rfc/rfc8555.html#section-7.5.1</code></a>.</p>
-
- <p>Returns {Response, Location, Nonce}, where:</p>
-
-  <p>- Response is json (decoded as map)</p>
-
-  <p>- Location is create account url</p>
-
-  - Nonce is a new valid replay-nonce
-</p>
+</div>
 
 <h3 class="function"><a name="request_authorization-5">request_authorization/5</a></h3>
 <div class="spec">
-<p><code>request_authorization(AuthUri::<a href="#type-bin_uri">bin_uri()</a>, PrivKey::<a href="#type-tls_private_key">tls_private_key()</a>, Jws::<a href="#type-jws">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state">leec_http_state()</a>) -&gt; {{<a href="#type-json_map_decoded">json_map_decoded()</a>, <a href="#type-bin_uri">bin_uri()</a>, <a href="#type-nonce">nonce()</a>}, <a href="#type-leec_http_state">leec_http_state()</a>}</code><br></p>
+<p><code>request_authorization(AuthUri::<a href="#type-bin_uri" docgen-rel="seetype" docgen-href="#bin_uri/0">bin_uri()</a>, PrivKey::<a href="#type-tls_private_key" docgen-rel="seetype" docgen-href="#tls_private_key/0">tls_private_key()</a>, Jws::<a href="#type-jws" docgen-rel="seetype" docgen-href="#jws/0">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map" docgen-rel="seetype" docgen-href="#cert_req_option_map/0">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>) -&gt; {{<a href="#type-json_map_decoded" docgen-rel="seetype" docgen-href="#json_map_decoded/0">json_map_decoded()</a>, <a href="#type-bin_uri" docgen-rel="seetype" docgen-href="#bin_uri/0">bin_uri()</a>, <a href="#type-nonce" docgen-rel="seetype" docgen-href="#nonce/0">nonce()</a>}, <a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>}</code><br></p>
 <p> </p>
-</div><p><p>Requests authorization for given identifier.</p>
-
- <p>Refer to <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.1" target="_top"><code>https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4.1</code></a>.</p>
-
- Returns {Response, Location, Nonce}, where:
-  - Response is json (decoded as map)
-  - Location is create account url
-  - Nonce is a new valid replay-nonce
-</p>
+</div>
 
 <h3 class="function"><a name="request_new_certificate-6">request_new_certificate/6</a></h3>
 <div class="spec">
-<p><code>request_new_certificate(DirMap::<a href="#type-directory_map">directory_map()</a>, BinDomains::[<a href="#type-bin_domain">bin_domain()</a>], PrivKey::<a href="#type-tls_private_key">tls_private_key()</a>, AccountJws::<a href="#type-jws">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state">leec_http_state()</a>) -&gt; {{<a href="#type-json_map_decoded">json_map_decoded()</a>, <a href="#type-bin_uri">bin_uri()</a>, <a href="#type-nonce">nonce()</a>}, <a href="#type-leec_http_state">leec_http_state()</a>}</code><br></p>
+<p><code>request_new_certificate(DirMap::<a href="#type-directory_map" docgen-rel="seetype" docgen-href="#directory_map/0">directory_map()</a>, BinDomains::[<a href="#type-bin_domain" docgen-rel="seetype" docgen-href="#bin_domain/0">bin_domain()</a>], PrivKey::<a href="#type-tls_private_key" docgen-rel="seetype" docgen-href="#tls_private_key/0">tls_private_key()</a>, AccountJws::<a href="#type-jws" docgen-rel="seetype" docgen-href="#jws/0">jws()</a>, CertReqOptionMap::<a href="#type-cert_req_option_map" docgen-rel="seetype" docgen-href="#cert_req_option_map/0">cert_req_option_map()</a>, LHState::<a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>) -&gt; {{<a href="#type-json_map_decoded" docgen-rel="seetype" docgen-href="#json_map_decoded/0">json_map_decoded()</a>, <a href="#type-bin_uri" docgen-rel="seetype" docgen-href="#bin_uri/0">bin_uri()</a>, <a href="#type-nonce" docgen-rel="seetype" docgen-href="#nonce/0">nonce()</a>}, <a href="#type-leec_http_state" docgen-rel="seetype" docgen-href="#leec_http_state/0">leec_http_state()</a>}</code><br></p>
 <p> </p>
-</div><p><p>Requests (orders from ACME) a new certificate (of DNS type).</p>
-
- <p>Refer to <a href="https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4" target="_top"><code>https://www.rfc-editor.org/rfc/rfc8555.html#section-7.4</code></a>.</p>
-
- <p>Returns {Response, Location, Nonce}, where:</p>
-
- <p>- Response is json (decoded as map)</p>
-
- <p>- Location is the URL corresponding to the created ACME account</p>
-
- - Nonce is a new valid replay-nonce
-</p>
+</div>
 <hr>
 
 <div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
