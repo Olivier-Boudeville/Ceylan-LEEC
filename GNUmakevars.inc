@@ -123,7 +123,7 @@ endif
 # The uniquely-defined version of this layer, for all uses (including rebar, hex
 # and the code itself, see leec_utils:get_leec_version{_string,}/0):
 #
-LEEC_VERSION := 1.2.5
+LEEC_VERSION := 1.2.6
 
 
 # PROJECT_VERSION should be defined on a per-project basis.
@@ -266,7 +266,7 @@ endif
 # Documentation section.
 
 ifndef EDOC_OPTS
-	EDOC_OPTS = '[{dir,"$(API_DOC_ROOT)"}, {def,{vsn,"$(PROJECT_VERSION)"}}, {preprocess,true}, {macros,[{$(PROJECT_EDOC_VERSION_KEY),"$(PROJECT_VERSION)"}]}, {includes,["$(LAYER_TOP)/include", "$(MYRIAD_TOP)/.."]}, {overview, "$(LAYER_TOP)/overview.edoc"}]'
+	EDOC_OPTS = '[{dir,"$(API_DOC_ROOT)"}, {def,{vsn,"$(PROJECT_VERSION)"}}, {preprocess,true}, {macros,[{$(PROJECT_EDOC_VERSION_KEY),"$(PROJECT_VERSION)"}]}, {includes,["..", "$(MYRIAD_TOP)/.."]}, {overview, "$(LAYER_TOP)/overview.edoc"}]'
 endif
 
 
