@@ -39,8 +39,8 @@
   % Elli is useful iff in standalone mode (i.e. if needing to run our own
   % webserver); LEEC currently does not use it.
   %
-  % Note that, to select the JSON parser to use, 'jsx' might be replaced by
-  % 'jiffy' below.
+  % Note that no JSON parser is to be selected, as the Erlang-builtin 'json' one
+  % will be relied upon (previous, 'jsx' could be replaced by 'jiffy' below).
   %
   % Finally, this 'applications' entry must be consistent with
   % conf/rebar.config.template (source of the actual rebar.config) and with the
@@ -52,10 +52,10 @@
   % Complete with elli, if preferring jiffy:
   %{applications, [kernel, stdlib, shotgun, jiffy, myriad]},
 
-  % jsx, no elli nor shotgun is our current default:
-  {applications, [kernel, stdlib, jsx, myriad]},
+  % Our current default: no jsx, elli or shotgun.
+  {applications, [kernel, stdlib, myriad]},
 
-  {env,[]},
+  {env, []},
 
   % Flat hierarchy in ebin here:
   {modules, [MODULES_FOR_OTP]},
