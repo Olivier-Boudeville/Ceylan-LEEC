@@ -435,21 +435,23 @@ endif
 #	endif
 #endif
 
-ifndef JIFFY_TOP
-	ifneq ($(wildcard $(LEEC_TOP)/_checkouts/jiffy/.),)
-		JIFFY_TOP = $(LEEC_TOP)/_checkouts/jiffy
-	else
-		ifneq ($(wildcard $(SIBLING_ROOT)/jiffy/.),)
-			JIFFY_TOP = $(SIBLING_ROOT)/jiffy
-		else
-			JIFFY_TOP = $(PREREQ_ROOT)/jiffy
-		endif
-	endif
-endif
+# ifndef JIFFY_TOP
+#	ifneq ($(wildcard $(LEEC_TOP)/_checkouts/jiffy/.),)
+#		JIFFY_TOP = $(LEEC_TOP)/_checkouts/jiffy
+#	else
+#		ifneq ($(wildcard $(SIBLING_ROOT)/jiffy/.),)
+#			JIFFY_TOP = $(SIBLING_ROOT)/jiffy
+#		else
+#			JIFFY_TOP = $(PREREQ_ROOT)/jiffy
+#		endif
+#	endif
+# endif
 
-LEEC_EXTRA_DEPS = $(COWLIB_TOP) $(GUN_TOP) $(SHOTGUN_TOP)       \
-				  $(ELLI_TOP) $(ERLANG_COLOR_TOP) $(YAMERL_TOP) \
-				  $(GETOPT_TOP) $(JSX_TOP) $(JIFFY_TOP)
+# Removed: $(ELLI_TOP) $(ERLANG_COLOR_TOP) $(YAMERL_TOP) $(GETOPT_TOP)
+# $(JSX_TOP) $(JIFFY_TOP)
+#
+LEEC_EXTRA_DEPS = $(COWLIB_TOP) $(GUN_TOP) $(SHOTGUN_TOP)
+
 
 # $(SIBLING_ROOT) and $(PREREQ_ROOT) are added, as most includes are expected to
 # be done with include_lib, hence as, for example, "elli/include/elli.hrl":
