@@ -1615,7 +1615,7 @@ Sends the ongoing challenges to the specified process.
 Typically useful in a slave interfacing mode, when the web handler cannot access
 directly the PID of the LEEC FSM: this code is then called by a third-party
 process (e.g. a certificate manager one, statically known of the web handler,
-and triggered by it), and returns the requested challenged to the specified
+and triggered by it), and returns the requested challenges to the specified
 target PID (most probably the one of the web handler itself).
 
 (exported API helper)
@@ -1626,8 +1626,8 @@ send_ongoing_challenges( _LCS={ _ChalType, FsmPid }, TargetPid ) ->
 	gen_statem:cast( _ServerRef=FsmPid,
 					 _Msg={ send_ongoing_challenges, TargetPid } );
 
-send_ongoing_challenges( InvalidLCS, _TargetPid ) ->
-	throw( { invalid_leec_caller_state, InvalidLCS } ).
+send_ongoing_challenges( InvalidLCS, TargetPid ) ->
+	throw( { invalid_leec_caller_state, InvalidLCS, TargetPid } ).
 
 
 
