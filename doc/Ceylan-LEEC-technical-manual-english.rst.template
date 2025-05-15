@@ -311,12 +311,12 @@ So, for the time being, LEEC merely integrates the well-known procedures describ
 Additionally to the intrinsic advantages of wildcard certificates, with this approach we moved:
 
 - (probably) from a leaf certificate to a more flexible full-chain one
-- from a 4096-bit RSA algorithm to a more recent, supposedly stronger, smaller 256-bit id-ecPublicKey (ASN1 OID: prime256v1 / NIST CURVE: P-256) one
+- from a 4096-bit RSA algorithm to a more recent, supposedly stronger, smaller 256-bit id-ecPublicKey (*ASN1 OID: prime256v1 / NIST CURVE: P-256*) one
 
 One should nevertheless note that:
 
-- rate limits still apply, and moreover certbot instances are not able to run concurrently (reporting "*Another instance of Certbot is already running*"), most probably because they cannot edit collaboratively the certbot state on the filesystem; as a consequence, we use our task ring to avoid any overlapping, but then, on startup, the duration before all domains are ready may become large (as dns-01 challenges are long to resolve because of DNS propagation)
-- certbot manages by itself the certificates that it produces, reading their expiration date to decide at each launch whether they shall be then updated; as a result, when a LEEC-using program (like US-Web) starts, should it do not check their remaining lifespan, it shall better wipe out its local certbot persistent state (see ``leec:reset_state/2``), so that it gets fresh certificates (otherwise such programs may plan a renewal too late for any "already used" certificate)
+- rate limits still apply, and moreover certbot instances are not able to run concurrently (reporting "*Another instance of Certbot is already running*"), most probably because they are not able to edit collaboratively the certbot state on the filesystem; as a consequence, we use our task ring to avoid any overlapping, but then, on startup, the duration before all domains are ready may become large (as dns-01 challenges are long to resolve, because of DNS propagation; roughly 2 minutes and 15 seconds per domain, according to our tests)
+- certbot manages by itself the certificates that it produces, reading their expiration date to decide at each launch whether they shall be then updated; as a result, when a LEEC-using program (like US-Web) starts, should it not check their remaining lifespan (which is currently not done), it shall better wipe out its local certbot persistent state (see ``leec:reset_state/2``), so that it gets fresh certificates (otherwise these programs may plan a renewal too late for any certificate that was already generated)
 
 
 Software Installation
@@ -324,7 +324,7 @@ Software Installation
 
 The certbot mechanism will have to use the API that is specific to one's DNS provider, in our case it will be `certbot-dns-ovh <https://certbot-dns-ovh.readthedocs.io/en/stable/>`_.
 
-Installation can be done with ``pacman -Sy certbot certbot-dns-ovh``.
+Installation can be done with ``pacman -S certbot certbot-dns-ovh``.
 
 
 
@@ -458,7 +458,7 @@ We do not want this third-party code to run as root, we prefer running it as a L
 
 .. _`credentials file`:
 
-We therefore create in a directory of choice (for example ``/etc/xdg/universal-server/``) a ``leec-ovh-credentials-for-foobar.org.txt`` file whose content is:
+We therefore create in a directory of choice (for example ``/etc/xdg/universal-server/``) a ``leec-ovh-credentials-for-foobar.org.txt`` file whose content (of course still based on bogus values) is:
 
 .. code:: bash
 
@@ -522,7 +522,7 @@ Design Notes
 Multiple Domains Having Each Multiple Hostnames
 ===============================================
 
-At least the ACME servers from Let's Encrypt enforce various rate limits (both in `production environment <https://letsencrypt.org/docs/rate-limits/>`_ and in `staging <https://letsencrypt.org/docs/staging-environment/>`_ one) that are fairly low, which leads to preferring requesting certificates only on a per-domain basis (e.g. globally for ``foobar.org``) rather than on a per-hostname host basis (e.g. one for ``baz.foobar.org``, another one for ``hurrican.foobar.org``, etc., these hosts being virtual ones or not), as such requests would quickly become too numerous to respect these rate thresholds.
+At least the ACME servers from Let's Encrypt enforce various rate limits (both in `production environment <https://letsencrypt.org/docs/rate-limits/>`_ and in `staging <https://letsencrypt.org/docs/staging-environment/>`_ one) that are fairly low, which leads to preferring requesting certificates only on a per-domain basis (e.g. globally for ``foobar.org``) rather than on a per-hostname host basis (e.g. one for ``baz.foobar.org``, another one for ``hurricane.foobar.org``, etc., these hosts being virtual ones or not), as such requests would quickly become too numerous to respect these rate thresholds.
 
 A per-domain certificate should then include directly its various hostnames as *Subject Alternative Names* (SAN entries).
 
@@ -530,7 +530,7 @@ With the ``http-01`` challenge type, no wildcard for such SAN hosts (e.g. ``*.fo
 
 .. [#] As a result, the certificate may disclose virtual hosts that would be otherwise invisible from the Internet (as not even declared in the DNS entries for that domain that would act as wildcard name resolvers).
 
-So for example, with LEEC, the certificate for ``foobar.org`` (that would be managed by a dedicated LEEC agent) should list following SAN entries: ``baz.foobar.org``, ``hurrican.foobar.org``, etc.
+So for example, with LEEC, the certificate for ``foobar.org`` (that would be managed by a dedicated LEEC agent) should list following SAN entries: ``baz.foobar.org``, ``hurricane.foobar.org``, etc.
 
 For more flexibility a `wildcard certificate`_ may be preferred.
 
