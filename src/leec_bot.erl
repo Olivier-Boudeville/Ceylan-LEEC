@@ -211,8 +211,9 @@ create_certificate( BinDomainName, DNSProvider, BinEmailAddress,
 
 	% --quiet implies --non-interactive:
 	ActualArgs = [ "certonly" | EnvOpts ]
-		++ [ "--non-interactive", "--agree-tos", "--config-dir", BinStateDir,
-			 "--work-dir", BinWorkDir, "--logs-dir", BinWorkDir  ]
+		++ [ "--non-interactive", "--agree-tos", "--force-renewal",
+             "--config-dir", BinStateDir, "--work-dir", BinWorkDir,
+             "--logs-dir", BinWorkDir  ]
 		++ DNSProviderOpts
 		++ [ "--email", BinEmailAddress, DirectDomainOpt, WildcardDomainOpt ],
 
@@ -276,6 +277,9 @@ create_certificate( BinDomainName, DNSProvider, BinEmailAddress,
 			end;
 
 		ErrorP={ RetCode, CmdOutput } ->
+            % A cause of error could be dead *.crt (or maybe *.key) certificate
+            % symlinks, or even non-existing files.
+            %
 			trace_bridge:error_fmt( "Actual run for '~ts' failed: "
 				"error code #~B, output: '~ts'.",
 				[ BinCertbotExecPath, RetCode, CmdOutput ] ),
