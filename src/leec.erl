@@ -515,7 +515,7 @@ the certificate directory)
 -doc """
 Description of a RSA private key.
 
-(as crypto:rsa_private() is not exported)
+(as `crypto:rsa_private()` is not exported)
 """.
 -type rsa_private_key() :: [ key_integer() ].
 
@@ -861,10 +861,10 @@ reset_state( _ChallengeType, _AnyCertDir ) ->
 
 
 -doc """
-Starts a (non-bridged) instance of the LEEC service FSM, meant to rely on the
-specified type of challenge.
+Starts a linked, non-bridged instance of the LEEC service FSM, meant to rely on
+the specified type of challenge.
 
-See start/3 for more details.
+See `start/3` for more details.
 """.
 -spec start( challenge_type(), [ start_option() ] ) -> start_outcome().
 start( ChallengeType, StartOptions ) ->
@@ -873,8 +873,8 @@ start( ChallengeType, StartOptions ) ->
 
 
 -doc """
-Starts an instance of the LEEC service FSM, possibly with a trace bridge, meant
-to rely on the specified type of challenge.
+Starts a linked instance of the LEEC service FSM, possibly with a trace bridge,
+meant to rely on the specified type of challenge.
 
 Note that for most challenges to succeed, LEEC must be started from the domain
 of interest, as a webserver there must be controlled (for the http-01 challenge)
@@ -1075,7 +1075,7 @@ Parameters:
 - Domain is the domain name to generate an ACME certificate for
 - LeecCallerState is the caller state obtained when starting LEEC
 
-See obtain_certificate_for/3 for the return type.
+See `obtain_certificate_for/3` for the return type.
 
 Belongs to the user-facing API; requires the LEEC service to be already started.
 """.

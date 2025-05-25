@@ -172,7 +172,10 @@ create_certificate( BinDomainName, DNSProvider, BinEmailAddress,
 
 	DryRunArgs = [ "--version" ],
 
-	% No need for specific working directory, environment or port option:
+	% No need for specific working directory, environment or port option; not
+	% expected to check at this level that it is the sole certbot instance
+	% running, thus not expected to fail:
+    %
 	case system_utils:run_executable( BinCertbotExecPath, DryRunArgs ) of
 
 		{ _DryRetCode=0, DryCmdOutput } ->
@@ -221,6 +224,13 @@ create_certificate( BinDomainName, DNSProvider, BinEmailAddress,
 		"Arguments used for the actual certificate creation:~n  ~p",
 		[ ActualArgs ] ) ),
 
+    % Processes (or possibly any certbot lock file) could be checked to avoid
+    % "Another instance of Certbot is already running", at least thanks to a
+    % (limited) waiting.
+
+    % May fail for various reasons, like "Error adding TXT record:
+    % HTTPSConnectionPool" / "SSL: UNEXPECTED_EOF_WHILE_READING":
+    %
 	case system_utils:run_executable( BinCertbotExecPath, ActualArgs ) of
 	% For mock-up calls:
 	%case { 0, "Testing!" } of
