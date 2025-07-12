@@ -23,12 +23,11 @@
 
 -moduledoc """
 **Main module of LEEC**, the Ceylan Let's Encrypt Erlang fork; see
-<http://leec.esperide.org> for more information.
+[http://leec.esperide.org] for more information.
 
 Original 'Let's Encrypt Erlang' application:
-<https://github.com/gbour/letsencrypt-erlang>.
+[https://github.com/gbour/letsencrypt-erlang].
 """.
-
 
 
 % Original work:
@@ -182,7 +181,7 @@ The types of certificates that can requested from a certificate authority.
 Depending on the target certificate type, different challenges will be used.
 
 DNS names in certificates may only have a single wildcard character, and it must
-be the entire leftmost DNS label, for instance "*.foobar.org".
+be the entire leftmost DNS label, for instance `"*.foobar.org"`.
 """.
 -type certificate_type() ::
 
@@ -211,7 +210,7 @@ be the entire leftmost DNS label, for instance "*.foobar.org".
 -doc """
 The ACME environments.
 
-Production is 'default' in ACME parlance.
+Production is `default` in ACME parlance.
 """.
 -type environment() :: 'staging' | 'production'.
 
@@ -223,10 +222,10 @@ file may contain just a public certificate, or an entire certificate chain
 including the public key, private key, and root certificates (which is
 preferrable), or even just a certificate request.
 
-This is a text file containing sections like "-----BEGIN CERTIFICATE-----",
-"-----BEGIN PRIVATE KEY-----", etc.
+This is a text file containing sections like `"-----BEGIN CERTIFICATE-----"`,
+`"-----BEGIN PRIVATE KEY-----"`, etc.
 
-Its extension may be ".pem".
+Its extension may be `".pem"`.
 """.
 -type pem_file_path() :: bin_file_path().
 
@@ -235,8 +234,8 @@ Its extension may be ".pem".
 -doc """
 A PEM-encoded file containing the actual certificate of interest.
 
-Typical names for such files may be "fullchain.pem", "cert.pem" or
-"MYDOMAIN.crt".
+Typical names for such files may be `"fullchain.pem"`, `"cert.pem"` or
+`"MYDOMAIN.crt"`.
 """.
 -type cert_file_path() :: pem_file_path().
 
@@ -248,7 +247,7 @@ as securely sent back by an ACME server.
 
 Such a key must be strongly secured.
 
-Typical names for such files may be "privkey.pem" or "MYDOMAIN.key".
+Typical names for such files may be `"privkey.pem"` or `"MYDOMAIN.key"`.
 """.
 -type cert_priv_key_file_path() :: pem_file_path().
 
@@ -297,7 +296,7 @@ As Key => example of associated value:
 - `<<"type">> => <<"http-01">>`
 
 - `<<"url">> =>
-	 <<"ACME_BASE/acme/chall-v3/132509381/-Axkdw">>`
+	<<"ACME_BASE/acme/chall-v3/132509381/-Axkdw">>`
 """.
 -type challenge() :: table( bin_string(), bin_string() ).
 
@@ -347,7 +346,7 @@ As Key => example of associated value:
 
 
 -doc """
-Options associated to the http-01 challenge, for single-domain certificates.
+Options associated to the `http-01` challenge, for single-domain certificates.
 """.
 -type start_http_01_option() ::
 	{ 'interfacing_mode', web_interfacing_mode() }
@@ -356,7 +355,7 @@ Options associated to the http-01 challenge, for single-domain certificates.
 
 
 
--doc "Options associated to the dns-01 challenge, for wildcard certificates.".
+-doc "Options associated to the `dns-01` challenge, for wildcard certificates.".
 -type start_dns_01_option() ::
 
 	% The DNS provider where an entry will have to be updated for the challenge:
@@ -375,7 +374,7 @@ Options associated to the http-01 challenge, for single-domain certificates.
 -doc """
 A path to a file containing LEEC-related credentials.
 
-See <https://leec.esperide.org/#credentials-file>.
+See [https://leec.esperide.org/#credentials-file].
 """.
 -type credentials_path() :: any_file_path().
 
@@ -467,7 +466,7 @@ An arbitrary binary that can be used just once in a cryptographic communication.
 Subject Alternative Name, i.e. values to be associated with a security
 certificate using a subjectAltName field.
 
-See <https://en.wikipedia.org/wiki/Subject_Alternative_Name>.
+See [https://en.wikipedia.org/wiki/Subject_Alternative_Name].
 """.
 -type san() :: ustring().
 
@@ -485,7 +484,7 @@ See <https://en.wikipedia.org/wiki/Subject_Alternative_Name>.
 -doc """
 Information regarding the private key of the LEEC agent.
 
-(if 'new' is used, the path is supposed to be either absolute, or relative to
+(if `new` is used, the path is supposed to be either absolute, or relative to
 the certificate directory)
 """.
 -type agent_key_file_info() :: { 'new', bin_file_path() } | bin_file_path().
@@ -567,7 +566,7 @@ certificate.
 
 
 -doc """
-LEEC state for the http-01 challenge.
+LEEC state for the `http-01` challenge.
 
 Needed by other LEEC modules.
 """.
@@ -576,7 +575,7 @@ Needed by other LEEC modules.
 
 
 -doc """
-LEEC state for the dns-01 challenge.
+LEEC state for the `dns-01` challenge.
 
 Needed by other LEEC modules.
 """.
@@ -669,7 +668,7 @@ Not to be mixed up with the internal state of LEEC FSMs.
 -doc """
 Returned value after starting LEEC.
 
-In practice, for all challenges: either an error or {ok, LeecCallerState}.
+In practice, for all challenges: either an error or `{ok, LeecCallerState}`.
 """.
 -type start_outcome() :: { 'ok', leec_caller_state() }
 					   | basic_utils:tagged_error().
@@ -691,7 +690,7 @@ creation.
 Returned user-targeted value (either as a message or as the argument of a
 callback) after having sent a request to obtain a certificate.
 
-Defined to differentiate from creation_outcome() and gather all possible error
+Defined to differentiate from `creation_outcome()` and gather all possible error
 terms.
 """.
 -type obtained_outcome() ::
@@ -780,7 +779,9 @@ is_known_challenge_type( _ChalType ) ->
 
 
 
--doc "Tells whether LEEC has a chance to run successfully a dns-01 challenge.".
+-doc """
+Tells whether LEEC has a chance to run successfully a `dns-01` challenge.
+""".
 -spec can_perform_dns_challenges() -> boolean().
 can_perform_dns_challenges() ->
 	% Not a sufficient guarantee (and 'true' not returned):
@@ -806,7 +807,7 @@ is_supported_dns_provider( _DNSProvider ) ->
 -doc """
 Resets the LEEC state, typically prior to starting any (first) LEEC instance.
 
-This may be useful for example with a certbot-based dns-01 challenge, in order
+This may be useful for example with a certbot-based `dns-01` challenge, in order
 to wipe out the state of certbot to ensure that new certificates are obtained
 (as opposed to former ones being reused, whereas their expiration timestamp will
 not be specifically read).
@@ -817,7 +818,7 @@ certificate (hence HTTPS access) would exist.
 
 Returns whether a state deletion was done.
 
-Not integrated to start/{2,3} as multiple LEEC instances can be used, and one
+Not integrated to `start/{2,3}` as multiple LEEC instances can be used, and one
 should not interfere with the others, through their common state (e.g. regarding
 the one of certbot). Also, this may be useful only at the first LEEC
 initialisation, not for the next automatic renewals.
@@ -877,13 +878,13 @@ Starts a linked instance of the LEEC service FSM, possibly with a trace bridge,
 meant to rely on the specified type of challenge.
 
 Note that for most challenges to succeed, LEEC must be started from the domain
-of interest, as a webserver there must be controlled (for the http-01 challenge)
-or its DNS zone must be updated, generally from one of the authorised IP
-addresses (for the dns-01 challenge).
+of interest, as a webserver there must be controlled (for the `http-01`
+challenge) or its DNS zone must be updated, generally from one of the authorised
+IP addresses (for the `dns-01` challenge).
 
-Note also that some challenges (especially the dns-01 one) will take significant
-time to succeed (typically as a few minutes will have to be waited for DNS
-changes to propagate).
+Note also that some challenges (especially the `dns-01` one) will take
+significant time to succeed (typically as a few minutes will have to be waited
+for DNS changes to propagate).
 """.
 -spec start( challenge_type(), [ start_option() ], option( bridge_spec() ) ) ->
 										start_outcome().
@@ -918,7 +919,6 @@ start( ChallengeType='http-01', StartOptions, MaybeBridgeSpec ) ->
 
 				[ { ok, _Started } = application:ensure_all_started( A )
 					|| A <- [ shotgun, elli ] ]
-
 			end },
 
 		{ native_httpc,
@@ -928,7 +928,6 @@ start( ChallengeType='http-01', StartOptions, MaybeBridgeSpec ) ->
 					"following start options:~n  ~p.", [ StartOptions ] ),
 
 				web_utils:start( _Opt=ssl )
-
 			end } ] ),
 
 	JsonParserState = json_utils:start_parser(),
@@ -1374,7 +1373,8 @@ stop( _LCS={ _ChalType, FsmPid } ) ->
 Terminates the specified instance of LEEC service: stops it properly, and
 terminates the corresponding FSM process.
 
-Not to be mixed up with the terminate/3 function known as a gen_statem callback.
+Not to be mixed up with the `terminate/3` function known as a gen_statem
+callback.
 """.
 -spec terminate( leec_caller_state() ) -> void().
 terminate( _LEECCallerState={ _ChalType='http-01', FsmPid } ) ->
@@ -1421,7 +1421,7 @@ Parameters:
 
 Will make use of any trace bridge transmitted.
 
-Transitions to the 'idle' initial state.
+Transitions to the `idle` initial state.
 """.
 -spec init( { challenge_type(), [ start_option() ], json_utils:parser_state(),
 			  option( bridge_spec() ) } ) ->
@@ -1539,7 +1539,7 @@ init( { ChallengeType, StartOptions, JsonParserState, MaybeBridgeSpec } ) ->
 
 -doc """
 Tells about the retained mode regarding callback. Here, one callback function
-per state, akin to gen_fsm.
+per state, akin to `gen_fsm`.
 """.
 -spec callback_mode() -> fsm_utils:callback_mode_ret().
 callback_mode() ->
@@ -1582,7 +1582,7 @@ get_agent_key_path( _CallerState={ _ChalType, FsmPid } ) ->
 -doc """
 Returns the ongoing challenges with pre-computed thumbprints.
 
-Returns #{Challenge => Thumbrint} if ok, 'error' if fails.
+Returns `#{Challenge => Thumbrint}` if ok, `error` if fails.
 
 (exported API helper)
 """.
@@ -1649,12 +1649,12 @@ send_ongoing_challenges( InvalidLCS, TargetPid ) ->
 
 
 -doc """
-Manages the 'idle' state, the initial state, typically used when awaiting
+Manages the `idle` state, the initial state, typically used when awaiting
 for certificate requests to be triggered.
 """.
 % idle(get_ongoing_challenges | send_ongoing_challenges): nothing done
 -spec idle( event_type(), event_content(), leec_http_state() ) ->
-				state_callback_result().
+                                                state_callback_result().
 % idle with request {create, BinDomain, CertReqOptionMap}: starts the
 % certificate creation procedure.
 %
@@ -1842,7 +1842,7 @@ idle( EventType, EventContentMsg, _LHState ) ->
 
 
 -doc """
-Manages the 'pending' state, when challenges are on-the-go, that is being
+Manages the `pending` state, when challenges are on-the-go, that is being
 processed with the ACME server.
 """.
 pending( _EventType=enter, _PreviousState, _Data ) ->
@@ -1883,7 +1883,7 @@ pending( _EventType={ call, From }, _EventContentMsg=get_ongoing_challenges,
 pending( _EventType=cast,
 		 _EventContentMsg={ send_ongoing_challenges, TargetPid },
 		 _Data=LHState=#leec_http_state{ account_key=AccountKey,
-								  challenges=TypeChallengeMap } ) ->
+                                         challenges=TypeChallengeMap } ) ->
 
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
 		"[~w] Ongoing challenges to be sent to ~w.", [ self(), TargetPid ] ) ),
@@ -2053,14 +2053,14 @@ pending( EventType, EventContentMsg, _LHState ) ->
 
 
 -doc """
-Manages the 'valid' state.
+Manages the `valid` state.
 
 When challenges have been successfully completed, finalizes the ACME order and
 generates the TLS certificate.
 
 Returns Status, the order status.
 
-Transitions to 'finalize' state.
+Transitions to the `finalize` state.
 """.
 valid( _EventType=enter, _PreviousState, _Data ) ->
 	cond_utils:if_defined( leec_debug_fsm, trace_bridge:debug_fmt(
@@ -2142,17 +2142,17 @@ valid( EventType, EventContentMsg, _LHState ) ->
 
 
 -doc """
-Manages the 'finalize' state.
+Manages the `finalize` state.
 
 When order is being finalized, and certificate generation is ongoing.
 
-Waits for certificate generation being complete (order status becoming 'valid').
+Waits for certificate generation being complete (order status becoming `valid`).
 
 Returns the order status.
 
 Transitions to:
-  state 'processing': still ongoing
-  state 'valid'     : certificate is ready
+  state `processing`: still ongoing
+  state `valid`     : certificate is ready
 """.
 finalize( _EventType=enter, _PreviousState, _Data ) ->
 
@@ -2296,17 +2296,17 @@ finalize( UnexpectedEventType, EventContentMsg, _LHState ) ->
 
 
 -doc """
-Manages the 'invalid' state.
+Manages the `invalid` state.
 
 When order is being finalized, and certificate generation is ongoing.
 
-Waits for certificate generation being complete (order status == 'valid').
+Waits for certificate generation being complete (order status == `valid`).
 
 Returns the order status.
 
 Transitions to:
-  state 'processing': still ongoing
-  state 'valid'     : certificate is ready
+  state `processing`: still ongoing
+  state `valid`     : certificate is ready
 """.
 invalid( _EventType=enter, _PreviousState, _Data=LHState ) ->
 
@@ -2326,11 +2326,7 @@ invalid( _EventType=enter, _PreviousState, _Data=LHState ) ->
 % Callback section.
 
 
--doc """
-Handles the specified call in the same way for all states.
-
-(helper)
-""".
+-doc "Handles the specified call in the same way for all states.".
 -spec handle_call_for_all_states( server_ref(), request(), state_name(),
 		leec_http_state() ) -> state_callback_result().
 handle_call_for_all_states( ServerRef, _Request=get_status, StateName,
@@ -2386,7 +2382,7 @@ handle_call_for_all_states( ServerRef, _Request=stop, StateName,
 	%   _Data=LHState }.
 
 	trace_bridge:warning_fmt( "FSM ~w stopped, switching to idle'.",
-							  [ self(), InterfMode ] ),
+							  [ self() ] ),
 	{ next_state, _NextState=idle, _NewData=DestroyLHState };
 
 
@@ -2425,7 +2421,7 @@ code_change( _, StateName, LHState, _ ) ->
 
 
 -doc """
-Parses the start/1 options.
+Parses the `start/1` options.
 
 Available options are:
 
@@ -2446,7 +2442,7 @@ standalone interfacing mode
 
 - http_timeout: timeout for ACME API requests (in milliseconds)
 
-Returns LHState (type record 'leec_http_state') filled with corresponding,
+Returns LHState (type record `leec_http_state`) filled with corresponding,
 checked option values.
 """.
 -spec get_start_options( [ start_option() ], leec_http_state() ) ->
@@ -2622,12 +2618,12 @@ setup_interfacing_mode( #leec_http_state{ interfacing_mode=InterfMode } ) ->
 -doc """
 Loops a few times on authorization check until challenges are all validated
 (with increasing waiting times after each attempt); if successful, the FSM
-should be in 'valid' state when returning.
+should be in `valid` state when returning.
 
 Returns:
-- {error, timeout} if failed after X loops
-- {error, Err} if another error
-- 'ok' if succeed
+- `{error, timeout}` if failed after X loops
+- `{error, Err}` if another error
+- `ok` if succeed
 """.
 -spec wait_challenges_valid( fsm_pid() ) -> base_status().
 wait_challenges_valid( FsmPid ) ->
@@ -2696,11 +2692,7 @@ wait_creation_completed( FsmPid, C ) ->
 
 
 
--doc """
-Waits until specified status is read.
-
-(helper)
-""".
+-doc "Waits until specified status is read.".
 -spec wait_creation_completed( fsm_pid(), count(), count() ) ->
 								wait_creation_result().
 wait_creation_completed( _FsmPid, _Count=0, _Max ) ->
@@ -2781,11 +2773,11 @@ perform_authorization( ChallengeType, AuthUris,
 
 -doc """
 Requests authorizations based on specified challenge type and URIs: for each
-challenge type (e.g. http-01, dns-01, etc.), a challenge is proposed.
+challenge type (e.g. `http-01`, `dns-01`, etc.), a challenge is proposed.
 
 At least in some cases, a single authorization URI is actually listed.
 
-Returns {ok, Challenges, Nonce} where:
+Returns `{ok, Challenges, Nonce}` where:
 
 - Challenges is map of Uri -> Challenge, where Challenge is of ChallengeType
    type
@@ -3005,9 +2997,9 @@ init_for_challenge_type( ChallengeType, _InterfMode=standalone,
 Cleans up challenge context after it has been fullfilled (with success or not).
 
 In:
-- 'webroot' mode: delete token file
-- 'standalone' mode: stop internal webserver
-- 'slave' mode: nothing to do
+- `webroot` mode: delete token file
+- `standalone` mode: stop internal webserver
+- `slave` mode: nothing to do
 """.
 -spec challenge_destroy( web_interfacing_mode(), leec_http_state() ) ->
 									leec_http_state().
