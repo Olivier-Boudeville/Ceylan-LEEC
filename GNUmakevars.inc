@@ -123,7 +123,7 @@ endif
 # The uniquely-defined version of this layer, for all uses (including rebar, hex
 # and the code itself, see leec_utils:get_leec_version{_string,}/0):
 #
-LEEC_VERSION := 1.2.6
+LEEC_VERSION := 1.2.7
 
 
 # PROJECT_VERSION should be defined on a per-project basis.
