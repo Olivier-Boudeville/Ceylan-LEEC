@@ -29,9 +29,9 @@
 </tr>
 <tr class="field"><th class="field-name">Creation date:</th><td class="field-body">Wednesday, November 11, 2020</td>
 </tr>
-<tr class="field"><th class="field-name">Lastly updated:</th><td class="field-body">Saturday, April 19, 2025</td>
+<tr class="field"><th class="field-name">Lastly updated:</th><td class="field-body">Saturday, August 23, 2025</td>
 </tr>
-<tr class="field"><th class="field-name">Version:</th><td class="field-body">1.2.6</td>
+<tr class="field"><th class="field-name">Version:</th><td class="field-body">1.2.7</td>
 </tr>
 <tr class="field"><th class="field-name">Status:</th><td class="field-body">Stable</td>
 </tr>
@@ -271,17 +271,17 @@ $<span class="w"> </span>rebar3<span class="w"> </span>upgrade<span class="w"> <
 <p>Additionally to the intrinsic advantages of wildcard certificates, with this approach we moved:</p>
 <ul class="simple">
 <li>(probably) from a leaf certificate to a more flexible full-chain one</li>
-<li>from a 4096-bit RSA algorithm to a more recent, supposedly stronger, smaller 256-bit id-ecPublicKey (ASN1 OID: prime256v1 / NIST CURVE: P-256) one</li>
+<li>from a 4096-bit RSA algorithm to a more recent, supposedly stronger, smaller 256-bit id-ecPublicKey (<em>ASN1 OID: prime256v1 / NIST CURVE: P-256</em>) one</li>
 </ul>
 <p>One should nevertheless note that:</p>
 <ul class="simple">
-<li>rate limits still apply, and moreover certbot instances are not able to run concurrently (reporting &quot;<em>Another instance of Certbot is already running</em>&quot;), most probably because they cannot edit collaboratively the certbot state on the filesystem; as a consequence, we use our task ring to avoid any overlapping, but then, on startup, the duration before all domains are ready may become large (as dns-01 challenges are long to resolve because of DNS propagation)</li>
-<li>certbot manages by itself the certificates that it produces, reading their expiration date to decide at each launch whether they shall be then updated; as a result, when a LEEC-using program (like US-Web) starts, should it do not check their remaining lifespan, it shall better wipe out its local certbot persistent state (see <tt class="docutils literal">leec:reset_state/2</tt>), so that it gets fresh certificates (otherwise such programs may plan a renewal too late for any &quot;already used&quot; certificate)</li>
+<li>rate limits still apply, and moreover certbot instances are not able to run concurrently (reporting &quot;<em>Another instance of Certbot is already running</em>&quot;), most probably because they are not able to edit collaboratively the certbot state on the filesystem; as a consequence, we use our task ring to avoid any overlapping, but then, on startup, the duration before all domains are ready may become large (as dns-01 challenges are long to resolve, because of DNS propagation; roughly 2 minutes and 15 seconds per domain, according to our tests)</li>
+<li>certbot manages by itself the certificates that it produces, reading their expiration date to decide at each launch whether they shall be then updated; as a result, when a LEEC-using program (like US-Web) starts, should it not check their remaining lifespan (which is currently not done), it shall better wipe out its local certbot persistent state (see <tt class="docutils literal">leec:reset_state/2</tt>), so that it gets fresh certificates (otherwise these programs may plan a renewal too late for any certificate that was already generated)</li>
 </ul>
 <div class="section" id="software-installation">
 <h4>Software Installation</h4>
 <p>The certbot mechanism will have to use the API that is specific to one's DNS provider, in our case it will be <a class="reference external" href="https://certbot-dns-ovh.readthedocs.io/en/stable/">certbot-dns-ovh</a>.</p>
-<p>Installation can be done with <tt class="docutils literal">pacman <span class="pre">-Sy</span> certbot <span class="pre">certbot-dns-ovh</span></tt>.</p>
+<p>Installation can be done with <tt class="docutils literal">pacman <span class="pre">-S</span> certbot <span class="pre">certbot-dns-ovh</span></tt>.</p>
 </div>
 <div class="section" id="dns-configuration">
 <h4>DNS Configuration</h4>
@@ -417,7 +417,7 @@ $<span class="w"> </span>rebar3<span class="w"> </span>upgrade<span class="w"> <
 <h4>Certbot Configuration</h4>
 <p>Now that, for a given domain, we have a suitable token and credentials, these latter ones will have to be made available to certbot.</p>
 <p>We do not want this third-party code to run as root, we prefer running it as a LEEC-specific user: typically, for any usage like <a class="reference external" href="http://us-web.esperide.org/">US-Web</a>, the specific user running the webserver.</p>
-<p id="credentials-file">We therefore create in a directory of choice (for example <tt class="docutils literal"><span class="pre">/etc/xdg/universal-server/</span></tt>) a <tt class="docutils literal"><span class="pre">leec-ovh-credentials-for-foobar.org.txt</span></tt> file whose content is:</p>
+<p id="credentials-file">We therefore create in a directory of choice (for example <tt class="docutils literal"><span class="pre">/etc/xdg/universal-server/</span></tt>) a <tt class="docutils literal"><span class="pre">leec-ovh-credentials-for-foobar.org.txt</span></tt> file whose content (of course still based on bogus values) is:</p>
 <pre class="code bash literal-block">
 <span class="nv">dns_ovh_endpoint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>ovh-eu<span class="w">
 </span><span class="nv">dns_ovh_application_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>3a2b42bc0caeb7d4<span class="w">
@@ -463,7 +463,7 @@ $<span class="w"> </span>sudo<span class="w"> </span>-u<span class="w"> </span>w
 <h1><a class="toc-backref" href="#toc-entry-14">Design Notes</a></h1>
 <div class="section" id="multiple-domains-having-each-multiple-hostnames">
 <h2><a class="toc-backref" href="#toc-entry-15">Multiple Domains Having Each Multiple Hostnames</a></h2>
-<p>At least the ACME servers from Let's Encrypt enforce various rate limits (both in <a class="reference external" href="https://letsencrypt.org/docs/rate-limits/">production environment</a> and in <a class="reference external" href="https://letsencrypt.org/docs/staging-environment/">staging</a> one) that are fairly low, which leads to preferring requesting certificates only on a per-domain basis (e.g. globally for <tt class="docutils literal">foobar.org</tt>) rather than on a per-hostname host basis (e.g. one for <tt class="docutils literal">baz.foobar.org</tt>, another one for <tt class="docutils literal">hurrican.foobar.org</tt>, etc., these hosts being virtual ones or not), as such requests would quickly become too numerous to respect these rate thresholds.</p>
+<p>At least the ACME servers from Let's Encrypt enforce various rate limits (both in <a class="reference external" href="https://letsencrypt.org/docs/rate-limits/">production environment</a> and in <a class="reference external" href="https://letsencrypt.org/docs/staging-environment/">staging</a> one) that are fairly low, which leads to preferring requesting certificates only on a per-domain basis (e.g. globally for <tt class="docutils literal">foobar.org</tt>) rather than on a per-hostname host basis (e.g. one for <tt class="docutils literal">baz.foobar.org</tt>, another one for <tt class="docutils literal">hurricane.foobar.org</tt>, etc., these hosts being virtual ones or not), as such requests would quickly become too numerous to respect these rate thresholds.</p>
 <p>A per-domain certificate should then include directly its various hostnames as <em>Subject Alternative Names</em> (SAN entries).</p>
 <p>With the <tt class="docutils literal"><span class="pre">http-01</span></tt> challenge type, no wildcard for such SAN hosts (e.g. <tt class="docutils literal">*.foobar.org</tt>) can be specified, so all the wanted ones have to be explicitly listed <a class="footnote-reference" href="#footnote-7" id="footnote-reference-7">[7]</a>.</p>
 <table class="docutils footnote" frame="void" id="footnote-7" rules="none">
@@ -472,7 +472,7 @@ $<span class="w"> </span>sudo<span class="w"> </span>-u<span class="w"> </span>w
 <tr><td class="label"><a class="fn-backref" href="#footnote-reference-7">[7]</a></td><td>As a result, the certificate may disclose virtual hosts that would be otherwise invisible from the Internet (as not even declared in the DNS entries for that domain that would act as wildcard name resolvers).</td></tr>
 </tbody>
 </table>
-<p>So for example, with LEEC, the certificate for <tt class="docutils literal">foobar.org</tt> (that would be managed by a dedicated LEEC agent) should list following SAN entries: <tt class="docutils literal">baz.foobar.org</tt>, <tt class="docutils literal">hurrican.foobar.org</tt>, etc.</p>
+<p>So for example, with LEEC, the certificate for <tt class="docutils literal">foobar.org</tt> (that would be managed by a dedicated LEEC agent) should list following SAN entries: <tt class="docutils literal">baz.foobar.org</tt>, <tt class="docutils literal">hurricane.foobar.org</tt>, etc.</p>
 <p>For more flexibility a <a class="reference internal" href="#wildcard-certificate">wildcard certificate</a> may be preferred.</p>
 </div>
 <div class="section" id="concurrent-certificate-operations">
