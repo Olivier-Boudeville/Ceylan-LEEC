@@ -68,7 +68,7 @@
   % {mod, {leec_app,[]}}
 
   {links, [ {"Official website", "http://leec.esperide.org" },
-			{"Github", "https://github.com/Olivier-Boudeville/Ceylan-LEEC"} ]}
+            {"Github", "https://github.com/Olivier-Boudeville/Ceylan-LEEC"} ]}
 
   %{build_tools, ["rebar"]},
 

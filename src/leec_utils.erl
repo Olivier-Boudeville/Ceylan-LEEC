@@ -60,23 +60,23 @@ This module concentrates **>utilities transverse to LEEC**.
 -doc "Returns the version of the LEEC library being used.".
 -spec get_leec_version() -> three_digit_version().
 get_leec_version() ->
-	basic_utils:parse_version( get_leec_version_string() ).
+    basic_utils:parse_version( get_leec_version_string() ).
 
 
 
 -doc "Returns the version of the LEEC library being used, as a string.".
 -spec get_leec_version_string() -> ustring().
 get_leec_version_string() ->
-	% As defined (uniquely) in GNUmakevars.inc:
-	?leec_version.
+    % As defined (uniquely) in GNUmakevars.inc:
+    ?leec_version.
 
 
 
 -doc "Encodes the specified content in b64.".
 -spec b64encode( any_string() ) -> binary_b64().
 b64encode( X ) ->
-	Base64 = base64:encode( X ),
-	<< <<(encode_byte( B )):8>> || <<B:8>> <= Base64, B =/= $= >>.
+    Base64 = base64:encode( X ),
+    << <<(encode_byte( B )):8>> || <<B:8>> <= Base64, B =/= $= >>.
 
 
 
@@ -84,46 +84,46 @@ b64encode( X ) ->
 -spec jsonb64encode( map(), parser_state() ) -> binary_b64().
 jsonb64encode( X, ParserState ) when is_map( X ) ->
 
-	%trace_bridge:debug_fmt( "Encoding in JSON then b64:~n  ~p", [ X ] ),
-	XJson = json_utils:to_json( X, ParserState ),
-	%trace_bridge:debug_fmt( "JSON result:~n~p", [ XJson ] ),
+    %trace_bridge:debug_fmt( "Encoding in JSON then b64:~n  ~p", [ X ] ),
+    XJson = json_utils:to_json( X, ParserState ),
+    %trace_bridge:debug_fmt( "JSON result:~n~p", [ XJson ] ),
 
-	b64encode( XJson );
+    b64encode( XJson );
 
 jsonb64encode( X, _ParserState ) ->
-	throw( { invalid_content_to_jsonb64encode, X } ).
+    throw( { invalid_content_to_jsonb64encode, X } ).
 
 
 
 % (helper)
 -spec encode_byte( byte() ) -> byte().
 encode_byte( $+ ) ->
-	$-;
+    $-;
 
 encode_byte( $/ ) ->
-	$_;
+    $_;
 
 encode_byte( B ) ->
-	B.
+    B.
 
 
 
 -doc "Returns the hex digest of the specified string argument.".
 -spec hexdigest( any_string() ) -> binary().
 hexdigest( X ) ->
-	<< <<( hex( H ) ),( hex(L) )>> || <<H:4,L:4>> <= X >>.
+    << <<( hex( H ) ),( hex(L) )>> || <<H:4,L:4>> <= X >>.
 
 
 % (helper)
 hex( C ) when C < 10 ->
-	$0 + C;
+    $0 + C;
 
 hex( C ) ->
-	$a + C - 10.
+    $a + C - 10.
 
 
 
 -doc "Returns the SHA256 hexadecimal digest of the specified content.".
 -spec hashdigest( sha256, binary() ) -> binary().
 hashdigest( sha256, Content ) ->
-	hexdigest( crypto:hash( sha256, Content ) ).
+    hexdigest( crypto:hash( sha256, Content ) ).

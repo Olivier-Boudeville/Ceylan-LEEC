@@ -67,9 +67,9 @@ Known keys:
 -doc "Initializes a RSA JWS with specified TLS private key.".
 -spec init( tls_private_key() ) -> jws().
 init( #tls_private_key{ b64_pair={ N, E } } ) ->
-	#jws{ alg='RS256',
-		  jwk=#tls_public_key{ kty='RSA', n=N, e=E },
-		  nonce=undefined }.
+    #jws{ alg='RS256',
+          jwk=#tls_public_key{ kty='RSA', n=N, e=E },
+          nonce=undefined }.
 
 
 
@@ -81,35 +81,35 @@ See <https://www.rfc-editor.org/rfc/rfc8555.html#section-6.2>.
 Content is the payload (if any).
 """.
 -spec encode( tls_private_key(), jws(), content(), leec_http_state() ) ->
-					leec:binary_b64().
+                    leec:binary_b64().
 encode( PrivateKey, Jws, Content,
-		#leec_http_state{ json_parser_state=ParserState } ) ->
+        #leec_http_state{ json_parser_state=ParserState } ) ->
 
-	cond_utils:if_defined( leec_debug_codec, trace_bridge:debug_fmt(
-		"Encoding to JSON following JWS:~n  ~p~n with content: ~p",
-		[ Jws, Content ] ) ),
+    cond_utils:if_defined( leec_debug_codec, trace_bridge:debug_fmt(
+        "Encoding to JSON following JWS:~n  ~p~n with content: ~p",
+        [ Jws, Content ] ) ),
 
-	Protected = leec_utils:jsonb64encode( jws_to_map( Jws ), ParserState ),
+    Protected = leec_utils:jsonb64encode( jws_to_map( Jws ), ParserState ),
 
-	Payload = case Content of
+    Payload = case Content of
 
-		% For POST-as-GET queries, payload is just an empty string:
-		undefined ->
-			<<>>;
+        % For POST-as-GET queries, payload is just an empty string:
+        undefined ->
+            <<>>;
 
-		_ ->
-			leec_utils:jsonb64encode( Content, ParserState )
+        _ ->
+            leec_utils:jsonb64encode( Content, ParserState )
 
-	end,
+    end,
 
-	Signed = crypto:sign( rsa, sha256, <<Protected/binary, $., Payload/binary>>,
-						  PrivateKey#tls_private_key.raw ),
+    Signed = crypto:sign( rsa, sha256, <<Protected/binary, $., Payload/binary>>,
+                          PrivateKey#tls_private_key.raw ),
 
-	EncSigned = leec_utils:b64encode( Signed ),
+    EncSigned = leec_utils:b64encode( Signed ),
 
-	json_utils:to_json( #{ <<"protected">> => Protected,
-						   <<"payload">> => Payload,
-						   <<"signature">> => EncSigned }, ParserState ).
+    json_utils:to_json( #{ <<"protected">> => Protected,
+                           <<"payload">> => Payload,
+                           <<"signature">> => EncSigned }, ParserState ).
 
 
 
@@ -119,18 +119,18 @@ Builds and returns the ACME key authorization.
 See <https://www.rfc-editor.org/rfc/rfc8555.html#section-8.1>.
 """.
 -spec get_key_authorization( tls_public_key(), leec:token(),
-							 leec_http_state() ) -> leec:key_auth().
+                             leec_http_state() ) -> leec:key_auth().
 get_key_authorization( #tls_public_key{ kty=Kty, n=N, e=E }, Token,
-					   #leec_http_state{ json_parser_state=ParserState } ) ->
+                       #leec_http_state{ json_parser_state=ParserState } ) ->
 
-	Thumbprint = json_utils:to_json( #{ <<"kty">> => Kty, <<"n">> => N,
-										<<"e">> => E }, ParserState ),
+    Thumbprint = json_utils:to_json( #{ <<"kty">> => Kty, <<"n">> => N,
+                                        <<"e">> => E }, ParserState ),
 
-	ThumbprintHash = crypto:hash( sha256, Thumbprint ),
+    ThumbprintHash = crypto:hash( sha256, Thumbprint ),
 
-	B64Hash = leec_utils:b64encode( ThumbprintHash ),
+    B64Hash = leec_utils:b64encode( ThumbprintHash ),
 
-	<<Token/binary, $., B64Hash/binary>>.
+    <<Token/binary, $., B64Hash/binary>>.
 
 
 
@@ -140,46 +140,46 @@ typically for encoding.
 """.
 -spec jws_to_map( jws() ) -> map().
 jws_to_map( #jws{ alg=Alg, url=MaybeUrl, kid=MaybeKid, jwk=MaybeJwk,
-				  nonce=MaybeNonce } ) ->
+                  nonce=MaybeNonce } ) ->
 
-	AlgMap = #{ alg => Alg },
+    AlgMap = #{ alg => Alg },
 
-	UrlMap = case MaybeUrl of
+    UrlMap = case MaybeUrl of
 
-		undefined ->
-			AlgMap;
+        undefined ->
+            AlgMap;
 
-		Url ->
-			AlgMap#{ url => Url }
+        Url ->
+            AlgMap#{ url => Url }
 
-	end,
+    end,
 
-	KidMap = case MaybeKid of
+    KidMap = case MaybeKid of
 
-		undefined ->
-			UrlMap;
+        undefined ->
+            UrlMap;
 
-		Kid ->
-			UrlMap#{ kid => Kid }
+        Kid ->
+            UrlMap#{ kid => Kid }
 
-	end,
+    end,
 
-	JwkMap = case MaybeJwk of
+    JwkMap = case MaybeJwk of
 
-		undefined ->
-			KidMap;
+        undefined ->
+            KidMap;
 
-		Jwk ->
-			KidMap#{ jwk => leec_tls:key_to_map( Jwk ) }
+        Jwk ->
+            KidMap#{ jwk => leec_tls:key_to_map( Jwk ) }
 
-	end,
+    end,
 
-	case MaybeNonce of
+    case MaybeNonce of
 
-		undefined ->
-			JwkMap;
+        undefined ->
+            JwkMap;
 
-		Nonce ->
-			JwkMap#{ nonce => Nonce }
+        Nonce ->
+            JwkMap#{ nonce => Nonce }
 
-	end.
+    end.

@@ -47,40 +47,40 @@ Note: not integrated in Ceylan-LEEC, at least currently.
 
 -doc "Handles specified request; returns a reply with an http code.".
 handle( Req, Args ) ->
-	%trace_bridge:debug_fmt( "Elli: ~p~n~p", [ Req, Args ] ),
-	handle( elli_request:method( Req ), elli_request:path( Req ), Req, Args ).
+    %trace_bridge:debug_fmt( "Elli: ~p~n~p", [ Req, Args ] ),
+    handle( elli_request:method( Req ), elli_request:path( Req ), Req, Args ).
 
 
 % (helper)
 handle( 'GET', [ <<".well-known">>, <<"acme-challenge">>, Token ], Req,
-		[ Thumbprints ] ) ->
+        [ Thumbprints ] ) ->
 
-	% NOTE: when testing on Travis with local boulder instance, Host header may
-	% contain port number; I dunno if it can happen against production boulder,
-	% but these lines filter it out:
+    % NOTE: when testing on Travis with local boulder instance, Host header may
+    % contain port number; I dunno if it can happen against production boulder,
+    % but these lines filter it out:
 
-	Header = elli_request:get_header( <<"Host">>, Req, <<>> ),
+    Header = elli_request:get_header( <<"Host">>, Req, <<>> ),
 
-	[ Host | _Port ] = binary:split( Header, <<":">> ),
+    [ Host | _Port ] = binary:split( Header, <<":">> ),
 
-	%trace_bridge:debug_fmt( "ELLI: host=~p.", [ Host ] ),
+    %trace_bridge:debug_fmt( "ELLI: host=~p.", [ Host ] ),
 
-	case maps:get( Host, Thumbprints, _Def=undefined ) of
+    case maps:get( Host, Thumbprints, _Def=undefined ) of
 
-		#{ Token := Thumbprint } ->
+        #{ Token := Thumbprint } ->
 
-			%trace_bridge:debug_fmt( "Token match: ~p -> ~p.",
-			%                       [ Token, Thumbprint ] ),
+            %trace_bridge:debug_fmt( "Token match: ~p -> ~p.",
+            %                       [ Token, Thumbprint ] ),
 
-			{ 200, [ { <<"Content-Type">>, <<"text/plain">> } ], Thumbprint };
+            { 200, [ { <<"Content-Type">>, <<"text/plain">> } ], Thumbprint };
 
-		Other ->
-			trace_bridge:debug_fmt( "No token match: ~p -> ~p.",
-									[ Token, Other ] ),
+        Other ->
+            trace_bridge:debug_fmt( "No token match: ~p -> ~p.",
+                                    [ Token, Other ] ),
 
-			{ 404, [], <<"Not Found">> }
+            { 404, [], <<"Not Found">> }
 
-	end.
+    end.
 
 
 
@@ -90,4 +90,4 @@ Handles specified request events.
 Unused.
 """.
 handle_event( _, _, _ ) ->
-	ok.
+    ok.
