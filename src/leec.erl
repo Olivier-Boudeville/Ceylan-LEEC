@@ -23,10 +23,10 @@
 
 -moduledoc """
 **Main module of LEEC**, the Ceylan Let's Encrypt Erlang fork; see
-[http://leec.esperide.org] for more information.
+<http://leec.esperide.org> for more information.
 
-Original 'Let's Encrypt Erlang' application:
-[https://github.com/gbour/letsencrypt-erlang].
+Original `Let's Encrypt Erlang` application:
+<https://github.com/gbour/letsencrypt-erlang>.
 """.
 
 
@@ -1563,17 +1563,21 @@ parallel) rather than multiplying the keys.
             'error' | option( bin_file_path() ).
 get_agent_key_path( _CallerState={ _ChalType, FsmPid } ) ->
 
-    case catch gen_statem:call( _ServerRef=FsmPid,
-                                _Request=get_agent_key_path ) of
+    try
+
+        % Returns BinKeyPath:
+        gen_statem:call( _ServerRef=FsmPid, _Request=get_agent_key_path )
+
+    % Even if class 'throw' never expected, only 'exit' (if time-out or statem
+    % process died - hence noproc) or 'error' (internal error, still possible):
+    %
+    catch Class:Reason ->
 
         % Process not started, wrong state, etc.:
-        { 'EXIT', ExitReason } ->
-            trace_bridge:error_fmt( "Agent key path not obtained: ~p.",
-                                    [ ExitReason ] ),
-            error;
+        trace_bridge:error_fmt( "Agent key path not obtained "
+            "(exception class: ~ts): ~p.", [ Class, Reason ] ),
 
-        BinKeyPath ->
-            BinKeyPath
+        error
 
     end.
 
@@ -1587,16 +1591,10 @@ Returns `#{Challenge => Thumbrint}` if ok, `error` if fails.
 (exported API helper)
 """.
 -spec get_ongoing_challenges( fsm_pid() ) ->
-                    'error' | 'no_challenge' | thumbprint_map().
+                    'no_challenge' | thumbprint_map() | 'error'.
 get_ongoing_challenges( FsmPid ) ->
-    case catch gen_statem:call( _ServerRef=FsmPid,
-                                _Request=get_ongoing_challenges ) of
-
-        % Process not started, wrong state, etc.:
-        { 'EXIT', ExitReason } ->
-            trace_bridge:error_fmt( "Challenge not obtained: ~p.",
-                                    [ ExitReason ] ),
-            error;
+    try gen_statem:call( _ServerRef=FsmPid,
+                         _Request=get_ongoing_challenges ) of
 
         % If in 'idle' state:
         no_challenge ->
@@ -1604,6 +1602,17 @@ get_ongoing_challenges( FsmPid ) ->
 
         ThumbprintMap ->
             ThumbprintMap
+
+    % Even if class 'throw' never expected, only 'exit' (if time-out or statem
+    % process died - hence noproc) or 'error' (internal error, still possible):
+    %
+    catch Class:Reason ->
+
+        % Process not started, wrong state, etc.:
+        trace_bridge:error_fmt( "Challenge not obtained "
+            "(exception class: ~ts): ~p.", [ Class, Reason ] ),
+
+        error
 
     end.
 
